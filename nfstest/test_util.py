@@ -61,6 +61,8 @@ from nfs_util import NFSUtil
 import packet.nfs.nfs3_const as nfs3_const
 import packet.nfs.nfs4_const as nfs4_const
 from optparse import OptionParser,OptionGroup,IndentedHelpFormatter,SUPPRESS_HELP
+import xml.dom.minidom
+import datetime
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
@@ -234,6 +236,10 @@ class TestUtil(NFSUtil):
         self.nfs4err_list = [nfs4_const.NFS4ERR_NOENT]
         self.nlm4err_list = []
         self.mnt3err_list = []
+        self.xunit_report = False
+        self.xunit_report_file = None
+        self.xunit_report_doc = None
+        self.test_results = []
 
         # Trace marker info
         self.trace_marker_name = "F__NFSTEST_MARKER__F__"
@@ -490,6 +496,13 @@ class TestUtil(NFSUtil):
         hmsg = "IP address of localhost"
         self.dbg_opgroup.add_option("--client-ipaddr", default=None, help=hmsg)
         self.opts.add_option_group(self.dbg_opgroup)
+
+        self.report_opgroup = OptionGroup(self.opts, "Reporting options")
+        hmsg = "Generate xUnit compatible test report"
+        self.report_opgroup.add_option("--xunit-report", action="store_true", default=False, help=hmsg)
+        hmsg = "Path to xout report file"
+        self.report_opgroup.add_option("--xunit-report-file", default=None, help=hmsg)
+        self.opts.add_option_group(self.report_opgroup)
 
         usage = self.usage
         if len(self.testnames) > 0:
@@ -1076,6 +1089,11 @@ class TestUtil(NFSUtil):
             self.trcpname = self.get_name()
             self.nfsstatname = self.get_name()
 
+            if self.xunit_report:
+                self.xunit_report_doc = xml.dom.minidom.Document()
+                if self.xunit_report_file is None:
+                    self.xunit_report_file = "%s.xml" % os.path.join(self.tmpdir, self.get_name())
+
             self._opts_done = True
 
     def test_options(self, name=None):
@@ -1215,6 +1233,11 @@ class TestUtil(NFSUtil):
                         os.unlink(rfile)
             except:
                 pass
+
+        if self.xunit_report:
+            with open(self.xunit_report_file, "w") as f:
+                f.write(self.xunit_report_doc.toprettyxml(indent="  "))
+
         self.umount()
         self.dprint('DBG7', "CLEANUP done")
 
@@ -1357,6 +1380,29 @@ class TestUtil(NFSUtil):
                 self.testname = name
                 # Execute test
                 getattr(self, testmethod)(**kwargs)
+
+        if self.xunit_report:
+            failures = 0
+
+            xunit_testsuite = self.xunit_report_doc.createElement("testsuite")
+            xunit_testsuite.setAttribute("timestamp", str(datetime.datetime.now()))
+            xunit_testsuite.setAttribute("name", self.progname)
+
+            for (t, s, r, m) in self.test_results:
+                testcase = self.xunit_report_doc.createElement("testcase")
+                xunit_testsuite.appendChild(testcase)
+                testcase.setAttribute("name", s)
+                testcase.setAttribute("classname", t)
+
+                if r == FAIL:
+                    failures += 1
+                    failure = self.xunit_report_doc.createElement("failure")
+                    failure.setAttribute("message", m)
+                    testcase.appendChild(failure)
+
+            xunit_testsuite.setAttribute("tests", str(len(self.test_results)))
+            xunit_testsuite.setAttribute("errors", str(failures))
+            self.xunit_report_doc.appendChild(xunit_testsuite)
 
     def _print_msg(self, msg, tid=None, single=0):
         """Display message to the screen and to the log file."""
@@ -1624,6 +1670,8 @@ class TestUtil(NFSUtil):
                         # Display bug message with the assertion
                         msg = "[%s]: %s" % (binfo, msg)
                     break
+
+        self.test_results.append((self.testname, msg, tid, failmsg))
         self._test_msg(tid, msg, subtest=subtest, failmsg=failmsg)
         if tid == FAIL and terminate:
             self.exit()
