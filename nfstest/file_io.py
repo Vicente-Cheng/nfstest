@@ -1037,9 +1037,6 @@ class FileIO(BaseObj):
 
         # Main seed so run can be reproduced
         self.dprint("INFO", "SEED = %d" % self.seed)
-        # Flush log file descriptor to make sure above info is not written
-        # to all log files when using multiple logs for each subprocess
-        self.flush_log()
         stime = time.time()
 
         if not os.path.exists(self.datadir):
@@ -1060,6 +1057,10 @@ class FileIO(BaseObj):
                 regex = re.search("NFS mount options:.*", line)
                 if regex:
                     self.dprint("INFO", regex.group(0))
+
+        # Flush log file descriptor to make sure above info is not written
+        # to all log files when using multiple logs for each subprocess
+        self.flush_log()
 
         if self.nprocs > 1:
             # setup interprocess queue
