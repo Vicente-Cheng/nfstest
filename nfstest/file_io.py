@@ -429,6 +429,11 @@ class FileIO(BaseObj):
         self.libc.lseek.restype = ctypes.c_long
         self.libc.memcpy.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
         self.libc.memcpy.restype = ctypes.c_void_p
+        self.libc.opendir.restype  = ctypes.c_void_p
+        self.libc.readdir.argtypes = [ctypes.c_void_p]
+        self.libc.closedir.argtypes = [ctypes.c_void_p]
+        self.libc.free.argtypes = [ctypes.c_void_p]
+        self.libc.truncate.argtypes = [ctypes.c_void_p, ctypes.c_long]
 
     def __del__(self):
         """Destructor"""
