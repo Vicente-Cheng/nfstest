@@ -675,7 +675,7 @@ class LockTest(TestUtil):
                         expr = True
                     except Exception as e:
                         # Unable to get results from blocked lock
-                        if e.errno == errno.EINTR:
+                        if getattr(e, "errno", None) == errno.EINTR:
                             self.test(False, "Timeout waiting for %sblocked lock to be granted" % ordnum, subtest=submsg)
                         else:
                             self.test(False, "Error while getting results from %sblocked lock" % ordnum, subtest=submsg, failmsg=": %s" % e)
