@@ -782,22 +782,12 @@ class DelegTest(TestUtil):
                     self.test(expr, "%s should not be sent when reading delegated file from a different process" % mode_str)
 
             # Find CLOSE request and reply
-            self.pktt.rewind(save_index)
-            match_str = "NFS.fh == '%s'" % self.pktt.escape(fh)
-            (closecall, closereply) = self.find_nfs_op(OP_CLOSE, src_ipaddr=self.client_ipaddr, match=match_str, call_only=True)
-            self.test(closecall, "CLOSE should be sent to the server")
+            self.verify_close(fh, op_stid, pindex=save_index)
 
-            if closecall:
-                self.test(op_stid == closecall.NFSop.stateid.other, "CLOSE should be sent with correct OPEN stateid")
-
-                # Verify there is only one CLOSE
-                self.pktt.rewind(closecall.record.index+1)
-                (closecall2, closereply) = self.find_nfs_op(OP_CLOSE, src_ipaddr=self.client_ipaddr, match=match_str, call_only=True)
-                if closecall2:
-                    self.test(False, "CLOSE was sent twice to the server")
-
+            if self.pktcall:
                 # Find DELEGRETURN request and reply
-                self.pktt.rewind(closecall.record.index)
+                self.pktt.rewind(self.pktcall.record.index)
+                match_str = "NFS.fh == '%s'" % self.pktt.escape(fh)
                 (delegreturncall, delegreturnreply) = self.find_nfs_op(OP_DELEGRETURN, src_ipaddr=self.client_ipaddr, match=match_str)
                 self.test(delegreturncall, "DELEGRETURN should be sent after the close")
                 if delegreturncall:
@@ -1266,7 +1256,11 @@ class DelegTest(TestUtil):
                 mds_stat = [NFS4ERR_STALE]
 
             # Verify I/O packets
+            save_index = self.pktt.get_index()
             self.verify_io_packets(op_type, open_fh, stid_type, stateid, status=mds_stat, ds_status=ds_stat, delegret=True)
+
+            # Find CLOSE request and reply
+            self.verify_close(open_fh, open_stid, pindex=save_index)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
