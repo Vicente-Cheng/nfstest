@@ -1565,6 +1565,39 @@ class NFSUtil(Host):
                 self.test(False, "LAYOUTRETURN reply was not found", failmsg=fmsg)
         self.pktt.rewind(save_index)
 
+    def verify_close(self, filehandle, stateid, pindex=None):
+        """Verify CLOSE is sent to the server. Also make sure there is
+           only one CLOSE call sent. Also the following object attributes
+           are defined: pktcall references the first CLOSE call while
+           pktreply references the first CLOSE reply.
+
+           filehandle:
+               Find CLOSE for this file handle
+           stateid:
+               Open stateid expected
+           pindex:
+               Packet index where to start the search [default: None]
+        """
+        if pindex is not None:
+            self.pktt.rewind(pindex)
+
+        # Find CLOSE request and reply
+        match_str = "NFS.fh == '%s'" % self.pktt.escape(filehandle)
+        (closecall, closereply) = self.find_nfs_op(OP_CLOSE, src_ipaddr=self.client_ipaddr, match=match_str, first_call=True)
+        self.test(closecall, "CLOSE should be sent to the server")
+
+        if closecall:
+            self.test(stateid == closecall.NFSop.stateid.other, "CLOSE should be sent with correct OPEN stateid")
+
+            # Verify there is only one CLOSE
+            self.pktt.rewind(closecall.record.index+1)
+            self.find_nfs_op(OP_CLOSE, src_ipaddr=self.client_ipaddr, match=match_str, first_call=True)
+            if self.pktcall:
+                self.test(False, "CLOSE was sent twice to the server")
+
+        self.pktcall  = closecall
+        self.pktreply = closereply
+
     def get_stateid(self, filename, **kwargs):
         """Search the packet trace for the file name given to get the OPEN
            so all related state ids can be searched. A couple of object
