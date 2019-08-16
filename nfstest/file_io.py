@@ -440,6 +440,7 @@ class FileIO(BaseObj):
         else:
             # Display message and send it to the log file
             self.dprint(level, msg)
+            self.flush_log()
 
     def _get_tree(self):
         """Read top level directory for existing files to populate database
