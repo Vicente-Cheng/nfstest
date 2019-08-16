@@ -321,6 +321,8 @@ class NFSUtil(Host):
                A value of None means there is no limit
            call_only:
                Find the call only [default: False]
+           first_call:
+               Return on first call even if reply is not found [default: False]
 
            Return a tuple: (pktcall, pktreply).
         """
@@ -332,6 +334,7 @@ class NFSUtil(Host):
         src_ipaddr   = kwargs.get("src_ipaddr",   None)
         maxindex     = kwargs.get("maxindex",     None)
         call_only    = kwargs.get("call_only",    False)
+        first_call   = kwargs.get("first_call",   False)
 
         mstatus = "" if status is None else "NFS.status == %d and " % status
         src = "IP.src == '%s' and " % src_ipaddr if src_ipaddr != None else ''
@@ -351,7 +354,7 @@ class NFSUtil(Host):
                 # Include OP_ILLEGAL in case server does not know about the
                 # operation in question
                 pktreply = self.pktt.match("RPC.xid == %d and %s NFS.resop in (%d,%d)" % (xid, mstatus, op, OP_ILLEGAL), maxindex=maxindex)
-                if pktreply:
+                if pktreply or first_call:
                     break
             else:
                 break
