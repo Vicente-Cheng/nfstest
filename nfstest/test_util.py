@@ -1301,6 +1301,7 @@ class TestUtil(NFSUtil):
                 self.remote_files.append([servername, kwds["logfile"]])
 
         self.dprint('DBG2', "Start remote procedure server %s" % svrname)
+        self.flush_log()
         self.rexecobj = Rexec(servername, **kwds)
         self.rexecobj_list.append(self.rexecobj)
         return self.rexecobj
