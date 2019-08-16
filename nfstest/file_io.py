@@ -125,6 +125,10 @@ OPENMAP = {
     os.O_SYNC:   "O_SYNC",
 }
 
+# Map signal number to its name
+SIGNAL_NAMES_DICT = dict((getattr(signal, n), n) \
+    for n in dir(signal) if n.startswith('SIG') and '_' not in n )
+
 class TermSignal(Exception):
     """Exception to be raised on SIGTERM signal"""
     pass
@@ -400,6 +404,7 @@ class FileIO(BaseObj):
         # Multiprocessing
         self.tid   = 0
         self.queue = None
+        self.process_tid_map = {}
 
         # Memory buffers
         self.fbuffers = []
@@ -1074,6 +1079,7 @@ class FileIO(BaseObj):
                 process = Process(target=self.run_process, kwargs={'tid':self.tid})
                 processes.append(process)
                 process.start()
+                self.process_tid_map[process.pid] = self.tid
                 self.tid += 1
             done = False
             while not done:
@@ -1138,8 +1144,15 @@ class FileIO(BaseObj):
                 for process in list(processes):
                     if not process.is_alive():
                         process.join()
-                        if not self.exiterr and abs(process.exitcode):
+                        exitnum = abs(process.exitcode)
+                        if exitnum != 0:
+                            # Unexpected process termination
                             errors += 1
+                            errstr  = "ERROR unexpected failure (process #%d)\n" % \
+                                self.process_tid_map.get(process.pid)
+                            errstr += "UnknownError: process terminated with signal: %s" % \
+                                SIGNAL_NAMES_DICT.get(exitnum, exitnum)
+                            self.dprint("INFO", errstr)
                         processes.remove(process)
                         if len(processes) == 0:
                             done = True
