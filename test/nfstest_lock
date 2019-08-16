@@ -334,6 +334,9 @@ class LockTest(TestUtil):
         if self.length < 2:
             self.opts.error("invalid value given in --length [%d], must be > 1" % self.length)
 
+        if float(self.lockw_timeout) < (1.2*self.unlock_delay):
+            self.opts.error("invalid value given in --lockw-timeout, must be greater than 1.2(--unlock-delay)")
+
         # Process options
         self.open_list  = self.get_list(self.opentype,  OPENMAP_R)
         self.lock_list  = self.get_list(self.locktype,  LOCKMAP_R)
