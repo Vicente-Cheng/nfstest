@@ -179,8 +179,11 @@ def getlock(fd, lock_type, offset=0, length=0, stype=F_SETLK, timeout=30):
     else:
         # Set alarm so the blocking lock could be interrupted
         signal.alarm(timeout)
-        out = fcntl(fd, stype, lockdata)
-        signal.alarm(0)
+        try:
+            out = fcntl(fd, stype, lockdata)
+        finally:
+            # Reset alarm
+            signal.alarm(0)
     return struct.unpack('hhllhh', out)
 
 def testlock(fd, lock_type, offset=0, length=0):
