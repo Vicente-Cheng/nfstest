@@ -383,6 +383,9 @@ class LockTest(TestUtil):
 
         nfsopts_list = self.process_client_option("nfsopts", remote=False, count=nprocesses)
 
+        # Flush log file before starting child processes
+        self.flush_log()
+
         # Start remote procedure server(s) locally
         for nfsopt_item in nfsopts_list:
             self.create_proc_info(nfsopt_item)
