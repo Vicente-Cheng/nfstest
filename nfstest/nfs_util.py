@@ -341,7 +341,7 @@ class NFSUtil(Host):
         dst = "IP.dst == '%s' and " % ipaddr if ipaddr is not None else ""
         if len(match):
             match += " and "
-        if port != None:
+        if port is not None and proto in ("tcp", "udp"):
             dst += "%s.dst_port == %d and " % (proto.upper(), port)
         pktcall  = None
         pktreply = None
@@ -439,7 +439,9 @@ class NFSUtil(Host):
             return (claimfh, None, None)
 
         src = "IP.src == '%s' and " % src_ipaddr if src_ipaddr is not None else ''
-        dst = "IP.dst == '%s' and %s.dst_port == %d" % (ipaddr, proto.upper(), port)
+        dst = "IP.dst == '%s'" % ipaddr
+        if proto in ("tcp", "udp"):
+            dst += " and %s.dst_port == %d" % (proto.upper(), port)
 
         file_str = ""
         deleg_str = ""
@@ -540,7 +542,8 @@ class NFSUtil(Host):
 
         if layoutget is None:
             # Find LAYOUTGET request
-            dst = self.pktt.ip_tcp_dst_expr(self.server_ipaddr, self.port)
+            port = self.port if self.proto in ("tcp", "udp") else None
+            dst = self.pktt.ip_tcp_dst_expr(self.server_ipaddr, port)
             pkt = self.pktt.match(dst + " and NFS.fh == '%s' and NFS.argop == %d" % (self.pktt.escape(filehandle), OP_LAYOUTGET))
             if pkt is not None:
                 xid = pkt.rpc.xid
@@ -1204,7 +1207,8 @@ class NFSUtil(Host):
             if port != None:
                 if proto is None:
                     proto = self.proto
-                dst += "%s.dst_port == %d and " % (proto.upper(), port)
+                if proto in ("tcp", "udp"):
+                    dst += "%s.dst_port == %d and " % (proto.upper(), port)
         fh = "NFS.fh == '%s'" % self.pktt.escape(filehandle)
         save_index = self.pktt.get_index()
         xids = []
@@ -1744,7 +1748,9 @@ class NFSUtil(Host):
         port   = kwargs.pop('port', self.port)
         proto  = kwargs.pop('proto', self.proto)
         if ipaddr is not None:
-            dst = "IP.dst == '%s' and %s.dst_port == %d and " % (ipaddr, proto.upper(), port)
+            dst = "IP.dst == '%s' and " % ipaddr
+            if proto in ("tcp", "udp"):
+                dst += "%s.dst_port == %d and " % (proto.upper(), port)
 
         # Break path into its directory components
         path_list = split_path(path)
