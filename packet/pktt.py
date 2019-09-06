@@ -1138,7 +1138,7 @@ class Pktt(BaseObj):
         return data
 
     @staticmethod
-    def ip_tcp_src_expr(ipaddr, port):
+    def ip_tcp_src_expr(ipaddr, port=None):
         """Return a match expression to find a packet coming from ipaddr:port.
 
            Examples:
@@ -1152,10 +1152,13 @@ class Pktt(BaseObj):
                # Expression ready for x.match()
                pkt = x.match(expr)
         """
-        return "IP.src == '%s' and TCP.src_port == %d" % (ipaddr, port)
+        ret = "IP.src == '%s'" % ipaddr
+        if port is not None:
+            ret += " and TCP.src_port == %d" % port
+        return ret
 
     @staticmethod
-    def ip_tcp_dst_expr(ipaddr, port):
+    def ip_tcp_dst_expr(ipaddr, port=None):
         """Return a match expression to find a packet going to ipaddr:port.
 
            Examples:
@@ -1169,7 +1172,10 @@ class Pktt(BaseObj):
                # Expression ready for x.match()
                pkt = x.match(expr)
         """
-        return "IP.dst == '%s' and TCP.dst_port == %d" % (ipaddr, port)
+        ret = "IP.dst == '%s'" % ipaddr
+        if port is not None:
+            ret += " and TCP.dst_port == %d" % port
+        return ret
 
 if __name__ == '__main__':
     # Self test of module
