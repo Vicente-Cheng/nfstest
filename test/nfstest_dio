@@ -940,7 +940,10 @@ class DioTest(TestUtil):
                             self.test(out, "%s should be sent to the correct DS%s" % (io_str, "" if ds_index is None else "(%d)"%ds_index))
                         else:
                             rserver = MDS if self.ispnfs else SERVER
-                            self.test(ipaddr == self.server_ipaddr and port == self.port, "%s should be sent to the %s" % (io_str, mds_map[rserver]))
+                            expr = ipaddr == self.server_ipaddr
+                            if self.proto in ("tcp", "udp"):
+                                expr = expr and port == self.port
+                            self.test(expr, "%s should be sent to the %s" % (io_str, mds_map[rserver]))
                 idx += 1
             for err in err_h:
                 self.test(False, "%s fails with %s, number of failures found: %d" % (io_str, err, err_h[err]))
