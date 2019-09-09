@@ -1060,8 +1060,8 @@ class DelegTest(TestUtil):
             fh1 = None
             if other_read_deleg:
                 # Find OPEN (READ) call from the second client
-                (fh1, op_stid1, deleg_stid1) = self.find_open(filename=self.filename, src_ipaddr=sipaddr, proto=sproto, nfs_version=nfs_version)
-                save_index = self.pktt.get_index()
+                (fh1, op_stid1, deleg_stid1) = self.find_open(filename=self.filename, src_ipaddr=sipaddr, port=sport, proto=sproto, nfs_version=nfs_version)
+                save_index = self.pktt.get_index() + 1
 
             # Find DELEGRETURN request and reply
             (delegreturncall, delegreturnreply) = self.find_nfs_op(OP_DELEGRETURN, src_ipaddr=self.client_ipaddr)
@@ -1070,7 +1070,9 @@ class DelegTest(TestUtil):
             self.pktt.rewind(save_index)
 
             # Find OPEN call from the second client
-            src_other_client_str = "IP.dst == '%s' and %s.dst_port == %d" % (self.server_ipaddr, sproto.upper(), sport)
+            src_other_client_str = "IP.dst == '%s'" % self.server_ipaddr
+            if sproto in ("tcp", "udp"):
+                src_other_client_str += " and %s.dst_port == %d" % (sproto.upper(), sport)
             src_other_client_str += " and IP.src == '%s' and " % sipaddr
             conflict_match_str = src_other_client_str + "NFS.argop == %d" % conflict_op
             if conflict_op == OP_OPEN:
