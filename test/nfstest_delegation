@@ -1301,7 +1301,7 @@ class DelegTest(TestUtil):
         self.basic_deleg_test(OPEN_RDWR, io_type=OPEN_WRITE)
 
     def basic09_test(self):
-        """Basic read delegation test using RDWR open while reading with file stat"""
+        """Basic write delegation test using RDWR open while reading with file stat"""
         self.basic_deleg_test(OPEN_RDWR, io_type=OPEN_READ, stat=True)
 
     def basic10_test(self):
