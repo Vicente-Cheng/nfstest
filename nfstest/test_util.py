@@ -1673,7 +1673,7 @@ class TestUtil(NFSUtil):
         os.mkdir(self.absdir, mode)
         return self.dirname
 
-    def write_data(self, fd, offset=0, size=None, pattern=None, verbose=0):
+    def write_data(self, fd, offset=0, size=None, pattern=None, verbose=0, dlevel="DBG5"):
         """Write data to the file given by the file descriptor
 
            fd:
@@ -1695,7 +1695,7 @@ class TestUtil(NFSUtil):
             dsize = min(self.wsize, size)
             os.lseek(fd, offset, 0)
             if verbose:
-                self.dprint('DBG5', "    Write file %d@%d" % (dsize, offset))
+                self.dprint(dlevel, "    Write file %d@%d" % (dsize, offset))
             count = os.write(fd, self.data_pattern(offset, dsize, pattern))
             size -= count
             offset += count
