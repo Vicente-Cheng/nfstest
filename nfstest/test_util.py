@@ -1673,7 +1673,7 @@ class TestUtil(NFSUtil):
         os.mkdir(self.absdir, mode)
         return self.dirname
 
-    def write_data(self, fd, offset=0, size=None, pattern=None):
+    def write_data(self, fd, offset=0, size=None, pattern=None, verbose=0):
         """Write data to the file given by the file descriptor
 
            fd:
@@ -1684,6 +1684,8 @@ class TestUtil(NFSUtil):
                Total number of bytes to write [default: --filesize option]
            pattern:
                Data pattern to write to the file [default: data_pattern default]
+           verbose:
+               Verbosity level [default: 0]
         """
         if size is None:
             size = self.filesize
@@ -1692,6 +1694,8 @@ class TestUtil(NFSUtil):
             # Write as much as wsize bytes per write call
             dsize = min(self.wsize, size)
             os.lseek(fd, offset, 0)
+            if verbose:
+                self.dprint('DBG5', "    Write file %d@%d" % (dsize, offset))
             count = os.write(fd, self.data_pattern(offset, dsize, pattern))
             size -= count
             offset += count
@@ -1716,6 +1720,8 @@ class TestUtil(NFSUtil):
                List of offsets where each hole is located [default: None]
            hole_size:
                Size of each hole [default: --wsize option]
+           verbose:
+               Verbosity level [default: 0]
 
            Returns the file name created, the file name is also stored
            in the object attribute filename -- attribute absfile is also
@@ -1727,6 +1733,7 @@ class TestUtil(NFSUtil):
         ftype     = kwds.pop("ftype",     FTYPE_FILE)
         hole_list = kwds.pop("hole_list", None)
         hole_size = kwds.pop("hole_size", self.wsize)
+        verbose   = kwds.pop("verbose", 0)
 
         self.get_filename(dir=dir)
         if size is None:
@@ -1746,24 +1753,24 @@ class TestUtil(NFSUtil):
 
         try:
             if ftype == FTYPE_FILE:
-                self.write_data(fd, offset, size, pattern)
+                self.write_data(fd, offset, size, pattern, verbose)
             elif ftype in [FTYPE_SP_OFFSET, FTYPE_SP_ZERO]:
                 for doffset, dsize, dtype in sfile.sparse_data:
                     # Do not write anything to a hole for FTYPE_SP_OFFSET
                     if dtype:
                         self.dprint('DBG4', "    Writing data segment starting at offset %d with length %d" % (doffset, dsize))
-                        self.write_data(fd, doffset, dsize, pattern)
+                        self.write_data(fd, doffset, dsize, pattern, verbose)
                     elif ftype == FTYPE_SP_ZERO:
                         # Write zeros to create the hole
                         self.dprint('DBG4', "    Writing hole segment starting at offset %d with length %d" % (doffset, dsize))
-                        self.write_data(fd, doffset, dsize, "\x00")
+                        self.write_data(fd, doffset, dsize, "\x00", verbose)
                 if sfile.endhole and ftype == FTYPE_SP_OFFSET:
                     # Extend the file to create the last hole
                     os.ftruncate(fd, size)
             elif ftype == FTYPE_SP_DEALLOC:
                 # Create regular file for FTYPE_SP_DEALLOC
                 self.dprint('DBG4', "    Writing data segment starting at offset %d with length %d" % (0, size))
-                self.write_data(fd, offset, size, pattern)
+                self.write_data(fd, offset, size, pattern, verbose)
 
                 for doffset in hole_list:
                     self.dprint('DBG4', "    Create hole starting at offset %d with length %d" % (doffset, hole_size))
