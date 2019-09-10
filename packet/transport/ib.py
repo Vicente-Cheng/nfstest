@@ -30,7 +30,7 @@ import packet.application.rpcordma_const as rdma
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2017 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.1"
+__version__   = "1.2"
 
 # Operation Code Transport Services (3 most significant bits)
 ib_transport_services = {
@@ -984,6 +984,7 @@ class IB(BaseObj):
                  "icrc", "vcrc")
     _fattrs   = ("bth",)
     _strname  = "IB" # Layer name (IB, RoCE or RRoCE) to display
+    _senddata = {}
 
     def __init__(self, pktt):
         """Constructor
@@ -1175,4 +1176,30 @@ class IB(BaseObj):
                 pktt.unpack = Unpack(data)
                 RPC(pktt, proto=17)
                 return True
+        elif self.opcode == RC + SEND_First:
+            # Create a dictionary for each destination QP where the
+            # key is the PSN and the value is the segment data
+            self._senddata[self.bth.destqp] = {self.bth.psn: unpack.read(len(unpack))}
+        elif self.opcode == RC + SEND_Middle:
+            # Add segment to the correct destination QP
+            sdata = self._senddata.get(self.bth.destqp)
+            if sdata:
+                sdata[self.bth.psn] = unpack.read(len(unpack))
+        elif self.opcode in (RC + SEND_Last, RC + SEND_Last_Invalidate):
+            # Add last segment to the correct destination QP
+            # and remove saved segments
+            sdata = self._senddata.pop(self.bth.destqp)
+            if sdata:
+                sdata[self.bth.psn] = unpack.read(len(unpack))
+                data = ""
+                # Reassemble data according to the PSN numbers
+                for psn in sorted(sdata.keys()):
+                    data += sdata[psn]
+                pktt.unpack = Unpack(data)
+                rpcordma = RPCoRDMA(pktt.unpack)
+                if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
+                    pkt.add_layer("rpcordma", rpcordma)
+                    # Decode RPC layer
+                    RPC(pktt, proto=17)
+                    return True
         return False
