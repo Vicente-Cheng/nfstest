@@ -1,0 +1,212 @@
+#!/usr/bin/env python
+#===============================================================================
+# Copyright 2019 NetApp, Inc. All Rights Reserved,
+# contribution by Jorge Mora <mora@netapp.com>
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#===============================================================================
+import os
+import traceback
+import nfstest_config as c
+from nfstest.test_util import TestUtil
+
+# Module constants
+__author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
+__copyright__ = "Copyright (C) 2019 NetApp, Inc."
+__license__   = "GPL v2"
+__version__   = "1.0"
+
+USAGE = """%prog --server <server> [options]
+
+NFS file compare
+================
+Create a file using one set of NFS mount options and then verify the data
+is correct by reading the file using another set of NFS mount options.
+
+Examples:
+    Use positional arguments with nfsversion=3 for second mount:
+        %prog -s 192.168.0.2 -e /exports --nfsopts :::3
+
+    Use named arguments instead:
+        %prog -s 192.168.0.2 -e /exports --nfsopts nfsversion=3
+
+Notes:
+    The user id in the local host must have access to run commands as root
+    using the 'sudo' command without the need for a password."""
+
+# Test script ID
+SCRIPT_ID = "FCMP"
+
+TESTNAMES = ["test01", "test02"]
+
+class FcmpTest(TestUtil):
+    """FcmpTest object
+
+       FcmpTest() -> New test object
+
+       Usage:
+           x = FcmpTest(testnames=['test01'])
+
+           # Run all the tests
+           x.run_tests()
+           x.exit()
+    """
+    def __init__(self, **kwargs):
+        """Constructor
+
+           Initialize object's private data.
+        """
+        TestUtil.__init__(self, **kwargs)
+
+        hmsg = "NFS options used for comparing test file. " \
+               "NFS mount definition is a list of arguments separated by a ':' " \
+               "given in the following order if positional arguments are used " \
+               "(see examples): " \
+               "::export:nfsversion:port:proto:sec"
+        self.test_opgroup.add_option("--nfsopts", default=None, help=hmsg)
+        hmsg = "NFS mount options used for comparing test file other " \
+               "than the ones specified in --nfsopts [default: '%default']"
+        self.test_opgroup.add_option("--cmpopts", default="hard", help=hmsg)
+
+        self.opts.version = "%prog " + __version__
+        self.opts.set_defaults(nfiles=0)
+        self.opts.set_defaults(filesize="1m")
+        self.opts.set_defaults(rsize="64k")
+        self.opts.set_defaults(wsize="64k")
+        self.opts.set_defaults(mtopts="hard")
+
+        self.scan_options()
+
+        # Disable createtraces option
+        self.createtraces = False
+
+        nfsopts_item = self.process_client_option("nfsopts", remote=False)[0]
+        # Create a copy of the nfsopts item
+        client_args = dict(nfsopts_item)
+        # Create a Host object for the given client
+        client_args.pop("client", "")
+        client_args["mtpoint"] = self.mtpoint
+        client_args["mtopts"] = self.cmpopts
+        self.create_host("", **client_args)
+
+    def verify_file(self, msg):
+        """Verify file by comparing the data to a known pattern"""
+
+        error = 0
+        self.dprint('DBG2', "Open file [%s] for reading" % self.absfile)
+        fd = os.open(self.absfile, os.O_RDONLY)
+
+        try:
+            offset = 0
+            size = self.filesize
+            while size > 0:
+                dsize = min(self.rsize, size)
+                self.dprint('DBG5', "    Read file %d@%d" % (dsize, offset))
+                data = os.read(fd, dsize)
+                count = len(data)
+                if count > 0:
+                    edata = self.data_pattern(offset, count)
+                    # Compare data
+                    for i in xrange(len(data)):
+                        if data[i] != edata[i]:
+                            error = 1
+                            offset += i
+                            break
+                    if error:
+                        break
+                else:
+                    size -= count
+                    if size > 0:
+                        error = 2
+                    break
+                size -= count
+                offset += count
+        finally:
+            os.close(fd)
+
+        fmsg = ""
+        if error == 1:
+            fmsg = ", difference at offset %d" % offset
+        elif error == 2:
+            fmsg = ", file size (%d) is shorter than expected (%d)" % (self.filesize - size, self.filesize)
+        self.test(error == 0, msg, failmsg=fmsg)
+
+    def test01_test(self):
+        """Verify data read from file is correct"""
+        try:
+            self.test_group("Verify data read from file is correct")
+            self.test_info("Create file using second mount options")
+
+            self.clientobj.mount()
+            self.create_file(verbose=1, dlevels=["DBG2"])
+        except Exception:
+            self.test(False, traceback.format_exc())
+            return
+        finally:
+            self.clientobj.umount()
+
+        try:
+            self.test_info("Compare file's data using main mount options")
+            self.trace_start()
+            self.mount()
+            self.verify_file("Data read from file is correct")
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            self.umount()
+            self.trace_stop()
+
+    def test02_test(self):
+        """Verify data written to file is correct"""
+        error = None
+        try:
+            self.test_group("Verify data written to file is correct")
+            self.test_info("Create file using main mount options")
+
+            self.trace_start()
+            self.mount()
+
+            try:
+                self.create_file(verbose=1, dlevels=["DBG2"])
+            except Exception as error:
+                pass
+        except Exception:
+            self.test(False, traceback.format_exc())
+            return
+        finally:
+            self.umount()
+            self.trace_stop()
+
+        if error is None:
+            self.test(True, "File successfully created")
+        else:
+            self.test(False, str(error))
+            return
+
+        try:
+            self.test_info("Compare file's data using second mount options")
+            self.clientobj.mount()
+            self.verify_file("Data written to file is correct")
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            self.clientobj.umount()
+
+################################################################################
+# Entry point
+x = FcmpTest(usage=USAGE, testnames=TESTNAMES, sid=SCRIPT_ID)
+
+try:
+    # Run all the tests
+    x.run_tests()
+except Exception:
+    x.test(False, traceback.format_exc())
+finally:
+    x.exit()
