@@ -1722,6 +1722,8 @@ class TestUtil(NFSUtil):
                Size of each hole [default: --wsize option]
            verbose:
                Verbosity level [default: 0]
+           dlevels:
+               Debug level list to use [default: ["DBG3", "DBG4", "DBG5"]]
 
            Returns the file name created, the file name is also stored
            in the object attribute filename -- attribute absfile is also
@@ -1729,11 +1731,17 @@ class TestUtil(NFSUtil):
 
            File created is removed at cleanup.
         """
+        _dlevels  = ["DBG3", "DBG4", "DBG5"]
         pattern   = kwds.pop("pattern",   None)
         ftype     = kwds.pop("ftype",     FTYPE_FILE)
         hole_list = kwds.pop("hole_list", None)
         hole_size = kwds.pop("hole_size", self.wsize)
         verbose   = kwds.pop("verbose", 0)
+        dlevels   = kwds.pop("dlevels", _dlevels)
+
+        # Make sure all levels are specified and if not use default values
+        for idx in range(len(dlevels), 3):
+            dlevels.append(_dlevels[idx])
 
         self.get_filename(dir=dir)
         if size is None:
@@ -1741,9 +1749,9 @@ class TestUtil(NFSUtil):
 
         if ftype == FTYPE_FILE:
             sfile = None
-            self.dprint('DBG3', "Creating file [%s] %d@%d" % (self.absfile, size, offset))
+            self.dprint(dlevels[0], "Creating file [%s] %d@%d" % (self.absfile, size, offset))
         elif ftype in (FTYPE_SP_OFFSET, FTYPE_SP_ZERO, FTYPE_SP_DEALLOC):
-            self.dprint('DBG3', "Creating sparse file [%s] of size %d" % (self.absfile, size))
+            self.dprint(dlevels[0], "Creating sparse file [%s] of size %d" % (self.absfile, size))
             sfile = SparseFile(self.absfile, size, hole_list, hole_size)
         else:
             raise Exception("Unknown file type %d" % ftype)
@@ -1753,27 +1761,27 @@ class TestUtil(NFSUtil):
 
         try:
             if ftype == FTYPE_FILE:
-                self.write_data(fd, offset, size, pattern, verbose)
+                self.write_data(fd, offset, size, pattern, verbose, dlevels[2])
             elif ftype in [FTYPE_SP_OFFSET, FTYPE_SP_ZERO]:
                 for doffset, dsize, dtype in sfile.sparse_data:
                     # Do not write anything to a hole for FTYPE_SP_OFFSET
                     if dtype:
-                        self.dprint('DBG4', "    Writing data segment starting at offset %d with length %d" % (doffset, dsize))
-                        self.write_data(fd, doffset, dsize, pattern, verbose)
+                        self.dprint(dlevels[1], "    Writing data segment starting at offset %d with length %d" % (doffset, dsize))
+                        self.write_data(fd, doffset, dsize, pattern, verbose, dlevels[2])
                     elif ftype == FTYPE_SP_ZERO:
                         # Write zeros to create the hole
-                        self.dprint('DBG4', "    Writing hole segment starting at offset %d with length %d" % (doffset, dsize))
-                        self.write_data(fd, doffset, dsize, "\x00", verbose)
+                        self.dprint(dlevels[1], "    Writing hole segment starting at offset %d with length %d" % (doffset, dsize))
+                        self.write_data(fd, doffset, dsize, "\x00", verbose, dlevels[2])
                 if sfile.endhole and ftype == FTYPE_SP_OFFSET:
                     # Extend the file to create the last hole
                     os.ftruncate(fd, size)
             elif ftype == FTYPE_SP_DEALLOC:
                 # Create regular file for FTYPE_SP_DEALLOC
-                self.dprint('DBG4', "    Writing data segment starting at offset %d with length %d" % (0, size))
-                self.write_data(fd, offset, size, pattern, verbose)
+                self.dprint(dlevels[1], "    Writing data segment starting at offset %d with length %d" % (0, size))
+                self.write_data(fd, offset, size, pattern, verbose, dlevels[2])
 
                 for doffset in hole_list:
-                    self.dprint('DBG4', "    Create hole starting at offset %d with length %d" % (doffset, hole_size))
+                    self.dprint(dlevels[1], "    Create hole starting at offset %d with length %d" % (doffset, hole_size))
                     out = self.libc.fallocate(fd, SR_DEALLOCATE, doffset, hole_size)
                     if out == -1:
                         err = ctypes.get_errno()
