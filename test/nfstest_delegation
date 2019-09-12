@@ -1122,7 +1122,7 @@ class DelegTest(TestUtil):
             if other_read_deleg:
                 self.pktt.rewind(save_index)
                 # Verify no CB_RECALL is sent to client under test
-                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index)
+                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index, first_call=True)
                 self.test(cbcall is None, "CB_RECALL should not be sent to the client after a READ OPEN is received from a second client")
                 if deleg_stid1 != None:
                     self.test(cbcall is None, "CB_RECALL should not be sent to the client after a second client is granted a READ delegation")
@@ -1132,7 +1132,7 @@ class DelegTest(TestUtil):
             if lock:
                 self.pktt.rewind(save_index)
                 # Verify no CB_RECALL is sent to client under test
-                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index)
+                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index, first_call=True)
                 self.test(cbcall is None, "%s delegation should not be recalled after locking the file" % mode_str)
 
                 (lockcall, lockreply) = self.find_nfs_op(OP_LOCK, src_ipaddr=self.client_ipaddr, maxindex=conflict_index)
@@ -1168,7 +1168,7 @@ class DelegTest(TestUtil):
                     self.test(expr, "%s should be sent with file holding the delegation as the source" % conflict_str)
 
             # Find CB_RECALL sent to client under test
-            (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr)
+            (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, first_call=True)
             if read_write:
                 # The client has returned the delegation so no CB_RECALL
                 self.test(cbcall is None, "CB_RECALL should not be sent to the client after a conflicting %s is received from a second client" % conflict_str)
