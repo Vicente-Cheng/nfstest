@@ -1183,6 +1183,9 @@ class DelegTest(TestUtil):
                 return
             cbrecall_index = self.pktt.get_index()
             self.test(cbcall.NFSop.stateid.other == deleg_stid, "CB_RECALL should recall %s delegation granted to client" % mode_str)
+            self.test(cbreply, "CB_RECALL reply should be sent to the server")
+            if cbreply:
+                self.test(cbreply.NFSop.status == NFS4_OK, "CB_RECALL should return NFS4_OK")
 
             # Find OPEN sent from the client right before returning the delegation
             (fh, op_stid2, deleg_stid2) = self.find_open(filename=self.filename, deleg_stateid=deleg_stid, src_ipaddr=self.client_ipaddr, fh=open_fh)
