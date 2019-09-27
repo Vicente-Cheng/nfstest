@@ -753,42 +753,6 @@ class Pktt(BaseObj):
         """Clear list of outstanding xids"""
         self._match_xid_list = []
 
-    def _match_nfs(self, uargs):
-        """Match NFS values on current packet."""
-        array = None
-        isarg = True
-        lhs, opr, rhs = self._split_match(uargs)
-
-        if self.pkt.rpc.version == 3 or _nfsopmap.get(lhs):
-            try:
-                # Top level NFSv4 packet info or NFSv3 packet
-                expr = self._process_match("self.pkt.nfs.", lhs, opr, rhs)
-                if eval(expr):
-                    if self.pkt.rpc.version == 3:
-                        # Set NFSop and NFSidx
-                        self._nfsop  = self.pkt.nfs
-                        self._nfsidx = None
-                    return True
-                return False
-            except Exception:
-                return False
-
-        idx = 0
-        obj_prefix = "item."
-        for item in self.pkt.nfs.array:
-            try:
-                # Get expression to eval
-                expr = self._process_match(obj_prefix, lhs, opr, rhs)
-                if eval(expr):
-                    self._nfsop  = item
-                    self._nfsidx = idx
-                    return True
-            except Exception:
-                # Continue searching
-                pass
-            idx += 1
-        return False
-
     def match_nfs(self, uargs):
         """Match NFS values on current packet.
 
@@ -857,9 +821,39 @@ class Pktt(BaseObj):
            the match engine to match the second or Nth occurrence of an
            operation.
         """
-        texpr = self._match_nfs(uargs)
-        self.dprint('PKT3', "    %d: match_nfs(%s) -> %r" % (self.pkt.record.index, uargs, texpr))
-        return texpr
+        array = None
+        isarg = True
+        lhs, opr, rhs = self._split_match(uargs)
+
+        if self.pkt.rpc.version == 3 or _nfsopmap.get(lhs):
+            try:
+                # Top level NFSv4 packet info or NFSv3 packet
+                expr = self._process_match("self.pkt.nfs.", lhs, opr, rhs)
+                if eval(expr):
+                    if self.pkt.rpc.version == 3:
+                        # Set NFSop and NFSidx
+                        self._nfsop  = self.pkt.nfs
+                        self._nfsidx = None
+                    return True
+                return False
+            except Exception:
+                return False
+
+        idx = 0
+        obj_prefix = "item."
+        for item in self.pkt.nfs.array:
+            try:
+                # Get expression to eval
+                expr = self._process_match(obj_prefix, lhs, opr, rhs)
+                if eval(expr):
+                    self._nfsop  = item
+                    self._nfsidx = idx
+                    return True
+            except Exception:
+                # Continue searching
+                pass
+            idx += 1
+        return False
 
     def _convert_match(self, ast):
         """Convert a parser list match expression into their corresponding
