@@ -636,7 +636,8 @@ class TestUtil(NFSUtil):
            option:
                Option name [default: "client"]
            remote:
-               Expect a client hostname or IP address in the definition
+               Expect a client hostname or IP address in the definition.
+               If this is set to None do not verify client name or IP.
                [default: True]
            count:
                Number of client definitions to expect. If remote is True,
@@ -668,14 +669,19 @@ class TestUtil(NFSUtil):
         client_list = self.process_option(option_val, CLIENT_OPTS, MOUNT_TYPE_MAP)[:count]
         count -= len(client_list)
 
-        # Verify if client name is required
-        for client_item in client_list:
-            if remote and client_item.get("client", "") == "":
-                # Client definition should have a client
-                self.config("Info list should have a client name or IP address: %s = %s" % (option, option_val))
-            elif not remote and client_item.get("client", "") != "":
-                # Process definition should not have a client
-                self.config("Info list should not have a client name or IP address: %s = %s" % (option, option_val))
+        if remote is not None:
+            # Verify if client name is required
+            for client_item in client_list:
+                if remote and client_item.get("client", "") == "":
+                    # Client definition should have a client
+                    self.config("Info list should have a client name or IP address: %s = %s" % (option, option_val))
+                elif not remote and client_item.get("client", "") != "":
+                    # Process definition should not have a client
+                    self.config("Info list should not have a client name or IP address: %s = %s" % (option, option_val))
+        elif len(client_list) and client_list[0].get("client", "") in ("", "localhost", "127.0.0.1", self.client_ipaddr):
+            remote = False
+        else:
+            remote = True
 
         if remote:
             if len(client_list) > 0 and client_list[0].get("mtpoint") is None:
