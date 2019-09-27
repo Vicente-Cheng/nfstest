@@ -764,9 +764,10 @@ class Pktt(BaseObj):
                 # Top level NFSv4 packet info or NFSv3 packet
                 expr = self._process_match("self.pkt.nfs.", lhs, opr, rhs)
                 if eval(expr):
-                    # Set NFSop and NFSidx
-                    self.pkt.NFSop = self.pkt.nfs
-                    self.pkt.NFSidx = 0
+                    if self.pkt.rpc.version == 3:
+                        # Set NFSop and NFSidx
+                        self.pkt.NFSop = self.pkt.nfs
+                        self.pkt.NFSidx = None
                     return True
                 return False
             except Exception:
