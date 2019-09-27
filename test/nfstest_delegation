@@ -1107,7 +1107,7 @@ class DelegTest(TestUtil):
             elif conflict_op in [NFSPROC3_READ, NFSPROC3_WRITE]:
                 if fh1 is None:
                     # Find the NFSv3 LOOKUP to get the file handle
-                    (fh1, op_stid1, deleg_stid1) = self.find_open(filename=self.filename, src_ipaddr=sipaddr, proto=sproto, nfs_version=nfs_version)
+                    (fh1, op_stid1, deleg_stid1) = self.find_open(filename=self.filename, src_ipaddr=sipaddr, port=sport, proto=sproto, nfs_version=nfs_version)
                 expr = fh1 is not None
                 self.test(expr, "LOOKUP should be sent from second client")
                 if expr:
