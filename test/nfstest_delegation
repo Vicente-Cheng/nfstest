@@ -312,7 +312,18 @@ class DelegTest(TestUtil):
             nclients = max(nclients, TEST_CLIENT_DICT.get(tname, 0))
 
         # Process the --client option
-        client_list = self.process_client_option(count=nclients)
+        client_list = self.process_client_option(count=nclients, remote=None)
+
+        # Remove all client specs which are not valid -- when mount is 0 that
+        # means it is the same client as the main client with the same mount
+        # options.
+        index = 0
+        while index < len(client_list):
+            if client_list[index].get("mount", 0) == 0:
+                client_list.pop(index)
+                continue
+            index += 1
+
         self.verify_client_option(TEST_CLIENT_DICT)
 
         # Start remote procedure server(s) remotely
@@ -527,7 +538,8 @@ class DelegTest(TestUtil):
         src = "IP.src == '%s' and " % self.client_ipaddr
         dst = self.pktt.ip_tcp_dst_expr(ipaddr, port)
         fh  = " and NFS.fh == '%s' and " % self.pktt.escape(filehandle)
-        matchstr = src + dst + fh + "NFS.argop == %d" % op_type
+        nfsver = self.match_nfs_version(self.nfs_version, False)
+        matchstr = src + dst + nfsver + fh + "NFS.argop == %d" % op_type
 
         save_index = self.pktt.get_index()
         self.pktt.clear_xid_list()
@@ -1078,7 +1090,8 @@ class DelegTest(TestUtil):
             if sproto in ("tcp", "udp"):
                 src_other_client_str += " and %s.dst_port == %d" % (sproto.upper(), sport)
             src_other_client_str += " and IP.src == '%s' and " % sipaddr
-            conflict_match_str = src_other_client_str + "NFS.argop == %d" % conflict_op
+            nfsver = self.match_nfs_version(nfs_version)
+            conflict_match_str = src_other_client_str + nfsver + "NFS.argop == %d" % conflict_op
             if conflict_op == OP_OPEN:
                 conflict_match_str += " and (NFS.claim.name == '%s' or" % self.filename
                 conflict_match_str += " (NFS.fh == '%s' and NFS.claim.claim == %d))" % (self.pktt.escape(open_fh), CLAIM_FH)
@@ -1126,7 +1139,7 @@ class DelegTest(TestUtil):
             if other_read_deleg:
                 self.pktt.rewind(save_index)
                 # Verify no CB_RECALL is sent to client under test
-                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index, first_call=True)
+                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index, first_call=True, nfs_version=None)
                 self.test(cbcall is None, "CB_RECALL should not be sent to the client after a READ OPEN is received from a second client")
                 if deleg_stid1 != None:
                     self.test(cbcall is None, "CB_RECALL should not be sent to the client after a second client is granted a READ delegation")
@@ -1136,7 +1149,7 @@ class DelegTest(TestUtil):
             if lock:
                 self.pktt.rewind(save_index)
                 # Verify no CB_RECALL is sent to client under test
-                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index, first_call=True)
+                (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, maxindex=conflict_index, first_call=True, nfs_version=None)
                 self.test(cbcall is None, "%s delegation should not be recalled after locking the file" % mode_str)
 
                 (lockcall, lockreply) = self.find_nfs_op(OP_LOCK, src_ipaddr=self.client_ipaddr, maxindex=conflict_index)
@@ -1172,7 +1185,7 @@ class DelegTest(TestUtil):
                     self.test(expr, "%s should be sent with file holding the delegation as the source" % conflict_str)
 
             # Find CB_RECALL sent to client under test
-            (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, first_call=True)
+            (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, first_call=True, nfs_version=None)
             if read_write:
                 # The client has returned the delegation so no CB_RECALL
                 self.test(cbcall is None, "CB_RECALL should not be sent to the client after a conflicting %s is received from a second client" % conflict_str)
