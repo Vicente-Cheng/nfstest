@@ -63,7 +63,7 @@ from packet.link.ethernet import ETHERNET
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "2.5"
+__version__   = "2.6"
 
 BaseObj.debug_map(0x100000000, 'pkt1', "PKT1: ")
 BaseObj.debug_map(0x200000000, 'pkt2', "PKT2: ")
@@ -74,7 +74,7 @@ BaseObj.debug_map(0xF00000000, 'pktt', "PKTT: ")
 # Map of tokens
 _token_map = dict(token.tok_name.items() + symbol.sym_name.items())
 # Map of items not in the array of the compound
-_nfsopmap = {'status': 1, 'tag': 1}
+_nfsopmap = {'status': 1, 'tag': 1, 'minorversion': 1}
 # Match function map
 _match_func_map = dict(zip(PKT_layers,["self._match_%s"%x for x in PKT_layers]))
 
