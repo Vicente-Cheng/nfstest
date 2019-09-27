@@ -188,10 +188,14 @@ class Host(BaseObj):
         self._invalidmtpoint = []
         self._mtpoint_created = []
         self.need_network_reset = False
-        self._localhost = False if len(self.host) > 0 else True
         self.fqdn = socket.getfqdn(self.host)
         ipv6 = self.proto[-1] == '6'
         self.ipaddr = self.get_ip_address(host=self.host, ipv6=ipv6)
+
+        if self.host in (None, "", "127.0.0.1", "localhost"):
+            self._localhost = True
+        else:
+            self._localhost = False
 
         if len(self.datadir):
             self.mtdir = os.path.join(self.mtpoint, self.datadir)
@@ -822,6 +826,8 @@ class Host(BaseObj):
         """Get IP address associated with the given host name.
            This could be run as an instance or class method.
         """
+        if host in ("127.0.0.1", "localhost"):
+            host = ""
         if len(host) != 0:
             ipstr = "v6" if ipv6 else "v4"
             family = socket.AF_INET6 if ipv6 else socket.AF_INET
