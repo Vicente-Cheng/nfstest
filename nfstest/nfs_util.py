@@ -291,6 +291,25 @@ class NFSUtil(Host):
                     self.test_info(str(pkt))
         self.pktt.set_pktlist(pktlist)
 
+    def match_nfs_version(self, nfs_version, post=True):
+        """Return the match string to search for the correct NFS version.
+
+           nfs_version:
+               NFS version to use in search.
+           post:
+               Add "and" conjunction at the end of matching string if this
+               is true. Add it at the beginning if it is false. If this is
+               set to None just return the matching string.
+        """
+        if nfs_version is None:
+            return ""
+        nfsver = " and " if post is False else ""
+        nfsver += "RPC.version == %d" % int(nfs_version)
+        if nfs_version >= 4.0:
+            nfsver += " and NFS.minorversion == %d" % int(round(10*(nfs_version - 4)))
+        nfsver += " and " if post else ""
+        return nfsver
+
     def find_nfs_op(self, op, **kwargs):
         """Find the call and its corresponding reply for the specified NFSv4
            operation going to the server specified by the ipaddr and port.
@@ -323,6 +342,8 @@ class NFSUtil(Host):
                Find the call only [default: False]
            first_call:
                Return on first call even if reply is not found [default: False]
+           nfs_version:
+               NFS version to use in search [default: mounted NFS version]
 
            Return a tuple: (pktcall, pktreply).
         """
@@ -335,6 +356,7 @@ class NFSUtil(Host):
         maxindex     = kwargs.get("maxindex",     None)
         call_only    = kwargs.get("call_only",    False)
         first_call   = kwargs.get("first_call",   False)
+        nfs_version  = kwargs.pop('nfs_version',  self.nfs_version)
 
         mstatus = "" if status is None else "NFS.status == %d and " % status
         src = "IP.src == '%s' and " % src_ipaddr if src_ipaddr != None else ''
@@ -343,11 +365,15 @@ class NFSUtil(Host):
             match += " and "
         if port is not None and proto in ("tcp", "udp"):
             dst += "%s.dst_port == %d and " % (proto.upper(), port)
+
+        nfsver = self.match_nfs_version(nfs_version)
+        match_str = src + dst + nfsver + match + "NFS.argop == %d" % op
+
         pktcall  = None
         pktreply = None
         while True:
             # Find request
-            pktcall = self.pktt.match(src + dst + match + "NFS.argop == %d" % op, maxindex=maxindex)
+            pktcall = self.pktt.match(match_str, maxindex=maxindex)
             if pktcall and not call_only:
                 # Find reply
                 xid = pktcall.rpc.xid
@@ -428,6 +454,7 @@ class NFSUtil(Host):
                     "proto"      : proto,
                     "src_ipaddr" : src_ipaddr,
                     "maxindex"   : maxindex,
+                    "nfs_version": nfs_version,
                     "match"      : "NFS.name == '%s'" % filename,
                 }
                 self.find_nfs_op(NFSPROC3_LOOKUP, **margs)
@@ -475,8 +502,12 @@ class NFSUtil(Host):
         elif len(file_str) == 0:
             raise Exception("Must specify either filename or claimfh")
 
+        nfsver = self.match_nfs_version(nfs_version, False)
+        match_open = " and NFS.argop == %d and (%s)" % (OP_OPEN, file_str)
+        match_str = src + dst + nfsver + match_open
+
         while True:
-            pktcall = self.pktt.match(src + dst + " and NFS.argop == %d and %s" % (OP_OPEN, file_str), maxindex=maxindex)
+            pktcall = self.pktt.match(match_str, maxindex=maxindex)
             if not pktcall:
                 return (None, None, None)
             xid = pktcall.rpc.xid
