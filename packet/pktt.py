@@ -766,8 +766,8 @@ class Pktt(BaseObj):
                 if eval(expr):
                     if self.pkt.rpc.version == 3:
                         # Set NFSop and NFSidx
-                        self.pkt.NFSop = self.pkt.nfs
-                        self.pkt.NFSidx = None
+                        self._nfsop  = self.pkt.nfs
+                        self._nfsidx = None
                     return True
                 return False
             except Exception:
@@ -780,8 +780,8 @@ class Pktt(BaseObj):
                 # Get expression to eval
                 expr = self._process_match(obj_prefix, lhs, opr, rhs)
                 if eval(expr):
-                    self.pkt.NFSop = item
-                    self.pkt.NFSidx = idx
+                    self._nfsop  = item
+                    self._nfsidx = idx
                     return True
             except Exception:
                 # Continue searching
@@ -1011,6 +1011,8 @@ class Pktt(BaseObj):
             pkt_list   = self.pktlist
             save_index = self.pindex
         self.dprint('PKT1', ">>> %d: match(%s)" % (save_index, expr))
+        self._nfsop  = None
+        self._nfsidx = None
 
         if maxindex is None:
             # Use global max index as default
@@ -1041,6 +1043,8 @@ class Pktt(BaseObj):
                         # Save xid of matched call
                         self._match_xid_list.append(pkt.rpc.xid)
                     self.dprint('PKT2', "    %s" % pkt)
+                    pkt.NFSop  = self._nfsop
+                    pkt.NFSidx = self._nfsidx
                     return pkt
             except Exception:
                 pass
