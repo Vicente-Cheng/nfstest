@@ -487,7 +487,7 @@ struct specdata4 {
  * Stateid
  */
 /* EQATTR: other */
-/* STRFMT1: {0},{1:crc16} */
+/* STRFMT1: {0},{1:crc32} */
 struct stateid4 {
     uint32_t  seqid;
     opaque    other[NFS4_OTHER_SIZE]; /* STRHEX:1 */
