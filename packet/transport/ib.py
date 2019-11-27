@@ -1186,24 +1186,22 @@ class IB(BaseObj):
             self._senddata[self.bth.destqp] = {self.bth.psn: unpack.read(len(unpack))}
         elif self.opcode == RC + SEND_Middle:
             # Add segment to the correct destination QP
-            sdata = self._senddata.get(self.bth.destqp)
-            if sdata:
-                sdata[self.bth.psn] = unpack.read(len(unpack))
+            sdata = self._senddata.setdefault(self.bth.destqp, {})
+            sdata[self.bth.psn] = unpack.read(len(unpack))
         elif self.opcode in (RC + SEND_Last, RC + SEND_Last_Invalidate):
             # Add last segment to the correct destination QP
             # and remove saved segments
-            sdata = self._senddata.pop(self.bth.destqp)
-            if sdata:
-                sdata[self.bth.psn] = unpack.read(len(unpack))
-                data = ""
-                # Reassemble data according to the PSN numbers
-                for psn in sorted(sdata.keys()):
-                    data += sdata[psn]
-                pktt.unpack = Unpack(data)
-                rpcordma = RPCoRDMA(pktt.unpack)
-                if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
-                    pkt.add_layer("rpcordma", rpcordma)
-                    # Decode RPC layer
-                    RPC(pktt, proto=17)
-                    return True
+            sdata = self._senddata.pop(self.bth.destqp, {})
+            sdata[self.bth.psn] = unpack.read(len(unpack))
+            data = ""
+            # Reassemble data according to the PSN numbers
+            for psn in sorted(sdata.keys()):
+                data += sdata[psn]
+            pktt.unpack = Unpack(data)
+            rpcordma = RPCoRDMA(pktt.unpack)
+            if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
+                pkt.add_layer("rpcordma", rpcordma)
+                # Decode RPC layer
+                RPC(pktt, proto=17)
+                return True
         return False
