@@ -922,6 +922,10 @@ class RDMAinfo(RDMAbase):
                         # from packet.utils.RDMAbase
                         self.rdma_write_chunks[-1].append(rsegment)
 
+                if len(self.rdma_write_chunks[-1]) == 0:
+                    # Clear list of RDMA write chunks if no segments were added
+                    self.rdma_write_chunks.pop()
+
         # Reassembly is done on the reply message with proc=RDMA_NOMSG.
         # The RDMA list is processed on the call message to set up the
         # reply chunk and its respective segments expected by the reply
