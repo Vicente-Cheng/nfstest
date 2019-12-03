@@ -179,6 +179,88 @@ class AllocTest(TestUtil):
         super(AllocTest, self).setup(**kwargs)
         self.umount()
 
+    def verify_fallocate(self, fd, offset, size, **kwargs):
+        """Verify fallocate works as expected
+
+           fd:
+               Allocate/deallocate disk space for the file referred
+               to by this file handle
+           offset:
+               Starting offset where the allocation or deallocation
+               takes place
+           size:
+               Length of region in file to allocate or deallocate
+           msg:
+               Message appended to assertion [default: ""]
+           smsg:
+               Message appended to file size assertion [default: ""]
+           dmsg:
+               Debug message to display [default: None]
+           absfile:
+               File name to display in default debug message
+               [default: self.absfile]
+           ftype:
+               File type [default: "file"]
+           error:
+               Expected error [default: None]
+           dealloc:
+               Verify deallocate when set to True [default: False]
+        """
+        msg     = kwargs.pop("msg", "")
+        smsg    = kwargs.pop("smsg", "")
+        dmsg    = kwargs.pop("dmsg", None)
+        absfile = kwargs.pop("absfile", self.absfile)
+        ftype   = kwargs.pop("ftype", "file")
+        error   = kwargs.pop("error", None)
+        dealloc = kwargs.pop("dealloc", False)
+        err = 0
+        fmsg = ""
+
+        if dealloc:
+            mode  = SR_DEALLOCATE
+            opstr = "Deallocate"
+        else:
+            mode  = SR_ALLOCATE
+            opstr = "Allocate"
+
+        s_msg = opstr.lower() + smsg
+        if dmsg is None:
+            dmsg = "%s %s %s starting at offset %d with length %d" % (opstr, ftype, absfile, offset, size)
+
+        # Get the size of file
+        fstat = os.fstat(fd)
+        esize = fstat.st_size
+
+        self.dprint('DBG3', dmsg)
+        out = self.libc.fallocate(fd, mode, offset, size)
+        if out == -1:
+            err = ctypes.get_errno()
+            errstr = errno.errorcode.get(err,err)
+            fmsg = ", got error [%s] %s" % (errstr, os.strerror(err))
+        elif error:
+            fmsg = ", but it succeeded"
+
+        if error is None:
+            # Expecting fallocate to succeed
+            self.test(out == 0, "%s should succeed %s" % (opstr, msg), failmsg=fmsg)
+            if dealloc:
+                tmsg = "File size should not change after %s" % s_msg
+            else:
+                esize = max(esize, offset+size)
+                tmsg = "File size should be correct after %s" % s_msg
+        else:
+            # Expecting fallocate to fail
+            tmsg = "File size should not change after a failed %s" % s_msg
+            errorstr = errno.errorcode.get(error,error)
+            self.test(out == -1 and err == error, "%s should fail with %s %s" % (opstr, errorstr, msg), failmsg=fmsg)
+
+        if ftype == "file":
+            fstat = os.fstat(fd)
+            tfmsg = ", expecting file size %d and got %d" % (esize, fstat.st_size)
+            self.test(esize == fstat.st_size, tmsg, failmsg=tfmsg)
+
+        return out
+
     def alloc01(self, open_mode, offset=0, size=None, msg="", lock=False, dealloc=False):
         """Main test to verify ALLOCATE/DEALLOCATE succeeds on files opened as
            write only or read and write.
@@ -223,7 +305,6 @@ class AllocTest(TestUtil):
                 else:
                     # Get a new file name
                     self.get_filename()
-                filesize = offset + size
                 drange = [0, 0]
                 zrange = [offset, size]
             else:
@@ -231,7 +312,6 @@ class AllocTest(TestUtil):
                 o_str = open_str
                 # Create a new file to have an existing file for the test
                 self.create_file()
-                filesize = max(self.filesize, offset + size)
                 # No change on current data should be expected on allocate
                 drange = [0, self.filesize]
                 if offset+size > self.filesize:
@@ -244,11 +324,8 @@ class AllocTest(TestUtil):
                     zrange = [0, 0]
 
             if dealloc:
-                filesize = self.filesize
                 nfsop = OP_DEALLOCATE
-                mode = SR_DEALLOCATE
                 opstr = "Deallocate"
-                prefix = "de"
 
                 if offset >= self.filesize:
                     # Deallocate range is fully outside the current file size
@@ -274,9 +351,7 @@ class AllocTest(TestUtil):
                     zrange = [offset, size]
             else:
                 nfsop = OP_ALLOCATE
-                mode = SR_ALLOCATE
                 opstr = "Allocate"
-                prefix = ""
 
             self.umount()
             self.trace_start()
@@ -287,27 +362,13 @@ class AllocTest(TestUtil):
 
             if lock:
                 self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (self.absfile, offset, size))
-                out = getlock(fd, F_WRLCK, offset, size)
+                getlock(fd, F_WRLCK, offset, size)
 
             # Allocate or deallocate test range
-            self.dprint('DBG3', "%s file %s starting at offset %d with length %d" % (opstr, self.absfile, offset, size))
-            out = self.libc.fallocate(fd, mode, offset, size)
-            if out == -1:
-                # The fallocate call was not expected to fail
-                err = ctypes.get_errno()
-                self.test(False, "%s [%s] %s" % (opstr, errno.errorcode.get(err,err), os.strerror(err)))
-                return
-
-            self.test(out == 0, "%s should succeed when the file is opened as %s" % (opstr.upper(), o_str))
-            fstat = os.fstat(fd)
+            tmsg = "when the file is opened as %s" % o_str
+            self.verify_fallocate(fd, offset, size, msg=tmsg, smsg=msg, dealloc=dealloc)
             os.close(fd)
             fd = None
-            if dealloc:
-                tmsg = "File size should not change after deallocation"
-            else:
-                tmsg = "File size should be correct after allocation"
-            fmsg = ", expecting file size %d and got %d" % (filesize, fstat.st_size)
-            self.test(fstat.st_size == filesize, tmsg + msg, failmsg=fmsg)
 
             # Verify the contents of the file are correct, data and zero regions
             self.dprint('DBG3', "Open file %s for reading" % self.absfile)
@@ -453,32 +514,14 @@ class AllocTest(TestUtil):
                 self.trace_start()
             self.mount()
 
-            if dealloc:
-                mode = SR_DEALLOCATE
-                opstr = "Deallocate"
-                prefix = "de"
-            else:
-                mode = SR_ALLOCATE
-                opstr = "Allocate"
-                prefix = ""
-
             # Use an existing file
             absfile = self.abspath(self.files[0])
             self.dprint('DBG3', "Open file %s for reading" % absfile)
             fd = os.open(absfile, os.O_RDONLY)
 
             # Allocate or deallocate test range
-            self.dprint('DBG3', "%s file %s starting at offset %d with length %d" % (opstr, self.absfile, 0, self.filesize))
-            out = self.libc.fallocate(fd, mode, 0, self.filesize)
-            err = 0
-            if out == -1:
-                err = ctypes.get_errno()
-            self.test(out == -1, "%s should fail when the file is opened as read only" % opstr.upper())
-            if out == -1:
-                fmsg = ", expecting EBADF but got %s" % errno.errorcode.get(err,err)
-                self.test(err == errno.EBADF, "%s should fail with EBADF" % opstr.upper(), failmsg=fmsg)
-            fstat = os.fstat(fd)
-            self.test(fstat.st_size == self.filesize, "File size should not change after a failed %sallocation" % prefix)
+            tmsg = "when the file is opened as read only"
+            self.verify_fallocate(fd, 0, self.filesize, absfile=absfile, msg=tmsg, error=errno.EBADF, dealloc=dealloc)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -509,48 +552,22 @@ class AllocTest(TestUtil):
             self.mount()
 
             if dealloc:
-                mode = SR_DEALLOCATE
-                opstr = "Deallocate"
-                prefix = "de"
                 # Create a new file
                 self.create_file()
-                filesize = self.filesize
             else:
-                mode = SR_ALLOCATE
-                opstr = "Allocate"
-                prefix = ""
                 # Get a new file name
                 self.get_filename()
-                filesize = 0
 
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
 
             # Use an invalid offset
-            self.dprint('DBG3', "%s file %s with invalid offset of %d" % (opstr, self.absfile, -1))
-            out = self.libc.fallocate(fd, mode, -1, self.filesize)
-            err = 0
-            if out == -1:
-                err = ctypes.get_errno()
-                fmsg = ", expecting EINVAL but got %s" % errno.errorcode.get(err,err)
-            elif out == 0:
-                fmsg = ", expecting EINVAL but it succeeded"
-            self.test(out == -1 and err == errno.EINVAL, "%s should fail with EINVAL when the offset is not a valid value" % opstr.upper(), failmsg=fmsg)
-            fstat = os.fstat(fd)
-            self.test(fstat.st_size == filesize, "File size should not change after a failed %sallocation" % prefix)
+            tmsg = "when the offset is invalid"
+            self.verify_fallocate(fd, -1, self.filesize, msg=tmsg, error=errno.EINVAL, dealloc=dealloc)
 
             # Use an invalid length
-            self.dprint('DBG3', "%s file %s with invalid length of %d" % (opstr, self.absfile, 0))
-            out = self.libc.fallocate(fd, mode, 0, 0)
-            err = 0
-            if out == -1:
-                err = ctypes.get_errno()
-                fmsg = ", expecting EINVAL but got %s" % errno.errorcode.get(err,err)
-            elif out == 0:
-                fmsg = ", expecting EINVAL but it succeeded"
-            self.test(out == -1 and err == errno.EINVAL, "%s should fail with EINVAL when the length is not a valid value" % opstr.upper(), failmsg=fmsg)
-            fstat = os.fstat(fd)
-            self.test(fstat.st_size == filesize, "File size should not change after a failed %sallocation" % prefix)
+            tmsg = "when the length is invalid"
+            self.verify_fallocate(fd, 0, 0, msg=tmsg, error=errno.EINVAL, dealloc=dealloc)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -582,13 +599,6 @@ class AllocTest(TestUtil):
             # Get a new file name
             self.get_filename()
 
-            if dealloc:
-                mode = SR_DEALLOCATE
-                opstr = "Deallocate"
-            else:
-                mode = SR_ALLOCATE
-                opstr = "Allocate"
-
             self.dprint('DBG3', "Create named pipe %s" % self.absfile)
             os.mkfifo(self.absfile)
 
@@ -605,16 +615,8 @@ class AllocTest(TestUtil):
             self.dprint('DBG3', "Open named pipe %s for writing" % self.absfile)
             fd = os.open(self.absfile, os.O_WRONLY)
 
-            self.dprint('DBG3', "%s named pipe %s starting at offset %d with length %d" % (opstr, self.absfile, 0, self.filesize))
-            out = self.libc.fallocate(fd, mode, 0, self.filesize)
-            err = 0
-            if out == -1:
-                err = ctypes.get_errno()
-                fmsg = ", expecting ESPIPE but got %s" % errno.errorcode.get(err,err)
-            elif out == 0:
-                fmsg = ", expecting ESPIPE but it succeeded"
-            expr = out == -1 and err == errno.ESPIPE
-            self.test(expr, "%s should fail with ESPIPE when using a named pipe file handle" % opstr.upper(), failmsg=fmsg)
+            tmsg = "when using a named pipe file handle"
+            self.verify_fallocate(fd, 0, self.filesize, ftype="named pipe", msg=tmsg, error=errno.ESPIPE, dealloc=dealloc)
 
             os.close(fd)
             fd = None
@@ -652,6 +654,7 @@ class AllocTest(TestUtil):
             otherfile = None
             offset = 0
             size = self.filesize
+            free_space = 4*self.statvfs.f_bsize
 
             self.test_info("====  %s test %02d%s" % (self.testname, self.testidx, msg))
             self.testidx += 1
@@ -659,11 +662,11 @@ class AllocTest(TestUtil):
             self.umount()
             self.trace_start()
             self.mount()
-            strsize = formatstr.str_units(self.filesize)
 
             # Get a new file name
             self.get_filename()
             filename = self.filename
+            absfile = self.absfile
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
 
@@ -671,13 +674,8 @@ class AllocTest(TestUtil):
                 self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (self.absfile, offset, size))
                 out = getlock(fd, F_WRLCK, offset, size)
 
-            self.dprint('DBG3', "Allocate %s file" % strsize)
-            out = self.libc.fallocate(fd, SR_ALLOCATE, offset, size)
-            if out == -1:
-                err = ctypes.get_errno()
-                self.test(False, "Allocate [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err)))
-                return
-            self.test(out == 0, "ALLOCATE should succeed when the file is opened as write only")
+            tmsg = "when the file is opened as write only"
+            self.verify_fallocate(fd, offset, size, absfile=absfile, msg=tmsg)
 
             # Get a new file name
             self.get_filename()
@@ -685,15 +683,12 @@ class AllocTest(TestUtil):
             fd1 = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
             rmfile = self.absfile
 
-            maxsize = self.get_freebytes() - 4*self.statvfs.f_bsize
-            strsize = formatstr.str_units(maxsize)
-            self.dprint('DBG3', "Allocate %s file (rest of the available disk space)" % strsize)
-            out = self.libc.fallocate(fd1, SR_ALLOCATE, 0, maxsize)
-            if out == -1:
-                err = ctypes.get_errno()
-                self.test(False, "Allocate [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err)))
-                return
-            self.test(out == 0, "ALLOCATE should allocate the maximum number of blocks left on the device")
+            maxsize = self.get_freebytes() - free_space
+            tmsg = "when allocating the maximum number of blocks left on the device"
+            dmsg = "Allocate file %s with length of %s (available disk space minus %s) " % \
+                   (self.absfile, formatstr.str_units(maxsize), formatstr.str_units(free_space))
+            out = self.verify_fallocate(fd1, 0, maxsize, msg=tmsg, dmsg=dmsg)
+            if out == -1: return
 
             # Use the rest of the remaining space and a little bit more
             filesize = self.get_freebytes() + self.filesize
@@ -708,15 +703,8 @@ class AllocTest(TestUtil):
             self.test(expr, "Write to a different file should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
             otherfile = self.filename
 
-            self.dprint('DBG3', "Allocate %s file" % strsize)
-            out = self.libc.fallocate(fd, SR_ALLOCATE, offset+size, filesize)
-            err = 0
-            if out == -1:
-                err = ctypes.get_errno()
-                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(err,err)
-            elif out == 0:
-                fmsg = ", expecting ENOSPC but it succeeded"
-            self.test(out == -1 and err == errno.ENOSPC, "ALLOCATE should fail with ENOSPC when whole range cannot be guaranteed", failmsg=fmsg)
+            tmsg = "when whole range cannot be guaranteed"
+            self.verify_fallocate(fd, offset+size, filesize, absfile=absfile, msg=tmsg, error=errno.ENOSPC)
 
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
@@ -965,6 +953,7 @@ class AllocTest(TestUtil):
         try:
             fd = None
             rmfile = None
+            free_space = 4*self.statvfs.f_bsize
 
             self.test_info("====  %s test %02d%s" % (self.testname, self.testidx, msg))
             self.testidx += 1
@@ -980,15 +969,12 @@ class AllocTest(TestUtil):
             fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
             rmfile = self.absfile
 
-            maxsize = self.get_freebytes() - 4*self.statvfs.f_bsize
-            strsize = formatstr.str_units(maxsize)
-            self.dprint('DBG3', "Allocate %s file (rest of the available disk space)" % strsize)
-            out = self.libc.fallocate(fd, SR_ALLOCATE, 0, maxsize)
-            if out == -1:
-                err = ctypes.get_errno()
-                self.test(False, "Allocate [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err)))
-                return
-            self.test(out == 0, "ALLOCATE should allocate the maximum number of blocks left on the device")
+            maxsize = self.get_freebytes() - free_space
+            tmsg = "when allocating the maximum number of blocks left on the device"
+            dmsg = "Allocate file %s with length of %s (available disk space minus %s) " % \
+                   (self.absfile, formatstr.str_units(maxsize), formatstr.str_units(free_space))
+            out = self.verify_fallocate(fd, 0, maxsize, msg=tmsg, dmsg=dmsg)
+            if out == -1: return
 
             # Use the rest of the remaining space and a little bit more
             filesize = self.get_freebytes() + self.filesize
@@ -1013,13 +999,8 @@ class AllocTest(TestUtil):
                 self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (self.absfile, offset, size))
                 out = getlock(fd, F_WRLCK, offset, size)
 
-            self.dprint('DBG3', "Deallocate %s from file" % strsize)
-            out = self.libc.fallocate(fd, SR_DEALLOCATE, offset, size)
-            if out == -1:
-                err = ctypes.get_errno()
-                self.test(False, "Deallocate [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err)))
-                return
-            self.test(out == 0, "DEALLOCATE should succeed when no space is left on the device")
+            tmsg = "when no space is left on the device"
+            self.verify_fallocate(fd, offset, size, msg=tmsg, dealloc=True)
 
             try:
                 fmsg = ""
@@ -1162,19 +1143,12 @@ class AllocTest(TestUtil):
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
 
-            self.dprint('DBG3', "Allocate %s file" % strsize)
             tstart = time.time()
-            out = self.libc.fallocate(fd, SR_ALLOCATE, 0, filesize)
-            if out == -1:
-                err = ctypes.get_errno()
-                self.test(False, "Allocate [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err)))
-                return
+            tmsg = "when the file is opened as write only"
+            out = self.verify_fallocate(fd, 0, filesize, msg=tmsg)
             os.close(fd)
             fd = None
             t1delta = time.time() - tstart
-            self.test(out == 0, "ALLOCATE should succeed when the file is opened as write only")
-            fstat = os.stat(self.absfile)
-            self.test(fstat.st_size == filesize, "File size should be correct after allocation")
             self.dprint('INFO', "ALLOCATE took %f seconds" % t1delta)
 
             # Get a new file name
