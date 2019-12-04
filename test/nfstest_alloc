@@ -261,6 +261,59 @@ class AllocTest(TestUtil):
 
         return out
 
+    def verify_allocate(self, offset, size, **kwargs):
+        """Verify client sends ALLOCATE/DEALLOCATE with correct arguments
+
+           offset:
+               Starting offset of allocation or deallocation
+           size:
+               Length of region in file to allocate or deallocate
+           stateid:
+               Expected stateid in call [default: self.stateid]
+           status:
+               Expected status in reply [default: NFS4_OK]
+           dealloc:
+               Verify DEALLOCATE when set to True [default: False]
+        """
+        status  = kwargs.pop("status",  NFS4_OK)
+        stateid = kwargs.pop("stateid", self.stateid)
+        dealloc = kwargs.pop("dealloc", False)
+        mstatus = nfsstat4.get(status, status)
+
+        nfsop = OP_DEALLOCATE if dealloc else OP_ALLOCATE
+        opstr = "DEALLOCATE"  if dealloc else "ALLOCATE"
+
+        # Find next ALLOCATE/DEALLOCATE call and reply
+        (pktcall, pktreply) = self.find_nfs_op(nfsop, status=None)
+        self.dprint('DBG7', str(pktcall))
+        self.dprint('DBG7', str(pktreply))
+
+        self.test(pktcall, "%s should be sent to the server" % opstr)
+        if pktcall is None:
+            return
+
+        allocobj = pktcall.NFSop
+
+        fmsg = ", expecting 0x%08x but got 0x%08x" % (formatstr.crc32(stateid), formatstr.crc32(allocobj.stateid.other))
+        self.test(allocobj.stateid == stateid, "%s should be sent with correct stateid" % opstr, failmsg=fmsg)
+        fmsg = ", expecting %d but got %d" % (offset, allocobj.offset)
+        self.test(allocobj.offset == offset, "%s should be sent with correct offset" % opstr, failmsg=fmsg)
+        fmsg = ", expecting %d but got %d" % (size, allocobj.length)
+        self.test(allocobj.length == size, "%s should be sent with correct length" % opstr, failmsg=fmsg)
+
+        if status == NFS4_OK:
+            msg = "%s should return NFS4_OK" % opstr
+        else:
+            msg = "%s should fail with %s when whole range cannot be guaranteed" % (opstr, mstatus)
+
+        if pktreply:
+            rstatus = pktreply.nfs.status
+            fmsg = ", expecting %s but got %s" % (mstatus, nfsstat4.get(rstatus, rstatus))
+        else:
+            rstatus = None
+            fmsg = ""
+        self.test(pktreply and rstatus == status, msg, failmsg=fmsg)
+
     def alloc01(self, open_mode, offset=0, size=None, msg="", lock=False, dealloc=False):
         """Main test to verify ALLOCATE/DEALLOCATE succeeds on files opened as
            write only or read and write.
@@ -419,22 +472,8 @@ class AllocTest(TestUtil):
             # Get the correct state id for the ALLOCATE/DEALLOCATE operation
             self.get_stateid(self.filename)
 
-            # Find the ALLOCATE/DEALLOCATE packet call and reply
-            (pktcall, pktreply) = self.find_nfs_op(nfsop, status=None)
-            if pktcall:
-                self.dprint('DBG7', str(pktcall))
-                self.dprint('DBG7', str(pktreply))
-            self.test(pktcall, "%s should be sent to the server" % opstr.upper())
-
-            if pktcall:
-                allocobj = pktcall.NFSop
-                fmsg = ", expecting %s but got %s" % (self.stid_str(self.stateid), self.stid_str(allocobj.stateid.other))
-                self.test(allocobj.stateid == self.stateid, "%s should be sent with correct stateid" % opstr.upper(), failmsg=fmsg)
-                fmsg = ", expecting %d but got %d" % (offset, allocobj.offset)
-                self.test(allocobj.offset == offset, "%s should be sent with correct offset" % opstr.upper(), failmsg=fmsg)
-                fmsg = ", expecting %d but got %d" % (size, allocobj.length)
-                self.test(allocobj.length == size, "%s should be sent with correct length" % opstr.upper(), failmsg=fmsg)
-                self.test(pktreply.nfs.status == 0, "%s should return NFS4_OK" % opstr.upper())
+            # Verify ALLOCATE/DEALLOCATE packet call and reply
+            self.verify_allocate(offset, size, dealloc=dealloc)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -681,6 +720,7 @@ class AllocTest(TestUtil):
             self.get_filename()
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd1 = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
+            maxfile = self.filename
             rmfile = self.absfile
 
             maxsize = self.get_freebytes() - free_space
@@ -744,46 +784,24 @@ class AllocTest(TestUtil):
             self.set_nfserr_list(nfs4list=[NFS4ERR_NOENT, NFS4ERR_NOSPC])
             self.trace_open()
             self.set_pktlist()
+
+            # Find OPEN and correct stateid to use for the other file
+            self.get_stateid(maxfile)
+            other_stateid = self.stateid
+
             # Find OPEN and correct stateid to use
-            self.get_stateid(filename)
+            self.pktt.rewind(0)
+            self.get_stateid(filename, noreset=True)
             save_index = self.pktt.get_index()
 
-            # Find ALLOCATE for file
-            (pktcall, pktreply) = self.find_nfs_op(OP_ALLOCATE)
-            self.dprint('DBG7', str(pktcall))
-            self.dprint('DBG7', str(pktreply))
-            self.test(pktcall, "ALLOCATE should be sent to the server")
-            allocobj = pktcall.NFSop
-            fmsg = ", expecting %s but got %s" % (self.stid_str(self.stateid), self.stid_str(allocobj.stateid.other))
-            self.test(allocobj.stateid == self.stateid, "ALLOCATE should be sent with correct stateid", failmsg=fmsg)
-            fmsg = ", expecting %d but got %d" % (offset, allocobj.offset)
-            self.test(allocobj.offset == offset, "ALLOCATE should be sent with correct offset", failmsg=fmsg)
-            fmsg = ", expecting %d but got %d" % (size, allocobj.length)
-            self.test(allocobj.length == size, "ALLOCATE should be sent with correct length", failmsg=fmsg)
-            self.test(pktreply and pktreply.nfs.status == 0, "ALLOCATE should return NFS4_OK")
+            # Verify ALLOCATE packet call and reply
+            self.verify_allocate(offset, size)
 
-            # Find ALLOCATE which allocates the rest of the disk space
-            (pktcall, pktreply) = self.find_nfs_op(OP_ALLOCATE)
-            self.dprint('DBG7', str(pktcall))
-            self.dprint('DBG7', str(pktreply))
-            self.test(pktcall, "ALLOCATE should be sent to the server to fill all disk space")
+            # Verify ALLOCATE which allocates the rest of the disk space
+            self.verify_allocate(0, maxsize, stateid=other_stateid)
 
-            # Find second ALLOCATE for file
-            (pktcall, pktreply) = self.find_nfs_op(OP_ALLOCATE, status=None)
-            self.dprint('DBG7', str(pktcall))
-            self.dprint('DBG7', str(pktreply))
-            self.test(pktcall, "ALLOCATE should be sent to the server")
-            allocobj = pktcall.NFSop
-            fmsg = ", expecting %s but got %s" % (self.stid_str(self.stateid), self.stid_str(allocobj.stateid.other))
-            self.test(allocobj.stateid == self.stateid, "ALLOCATE should be sent with correct stateid", failmsg=fmsg)
-            fmsg = ", expecting %d but got %d" % (self.filesize, allocobj.offset)
-            self.test(allocobj.offset == self.filesize, "ALLOCATE should be sent with correct offset", failmsg=fmsg)
-            fmsg = ", expecting %d but got %d" % (filesize, allocobj.length)
-            self.test(allocobj.length == filesize, "ALLOCATE should be sent with correct length", failmsg=fmsg)
-            if pktreply:
-                status = pktreply.nfs.status
-                fmsg = ", expecting NFS4ERR_NOSPC but got %s" % nfsstat4.get(status, status)
-                self.test(status == NFS4ERR_NOSPC, "ALLOCATE should fail with NFS4ERR_NOSPC when whole range cannot be guaranteed", failmsg=fmsg)
+            # Verify second ALLOCATE for file
+            self.verify_allocate(offset+size, filesize, status=NFS4ERR_NOSPC)
 
             # Rewind packet trace to search for WRITEs
             in_alloc  = True
@@ -1056,19 +1074,11 @@ class AllocTest(TestUtil):
             # Find OPEN and correct stateid to use
             self.get_stateid(filename)
 
-            # Find DEALLOCATE for file
-            (pktcall, pktreply) = self.find_nfs_op(OP_DEALLOCATE)
-            self.dprint('DBG7', str(pktcall))
-            self.dprint('DBG7', str(pktreply))
-            self.test(pktcall, "DEALLOCATE should be sent to the server")
-            allocobj = pktcall.NFSop
-            fmsg = ", expecting %s but got %s" % (self.stid_str(self.stateid), self.stid_str(allocobj.stateid.other))
-            self.test(allocobj.stateid == self.stateid, "DEALLOCATE should be sent with correct stateid", failmsg=fmsg)
-            fmsg = ", expecting %d but got %d" % (offset, allocobj.offset)
-            self.test(allocobj.offset == offset, "DEALLOCATE should be sent with correct offset", failmsg=fmsg)
-            fmsg = ", expecting %d but got %d" % (size, allocobj.length)
-            self.test(allocobj.length == size, "DEALLOCATE should be sent with correct length", failmsg=fmsg)
-            self.test(pktreply and pktreply.nfs.status == 0, "DEALLOCATE should return NFS4_OK")
+            # Verify ALLOCATE which allocates the rest of the disk space
+            self.verify_allocate(0, maxsize)
+
+            # Verify DEALLOCATE for file
+            self.verify_allocate(offset, size, dealloc=True)
 
             in_dealloc  = True
             out_dealloc = False
