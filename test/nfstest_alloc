@@ -634,6 +634,7 @@ class AllocTest(TestUtil):
         """
         try:
             fd = None
+            pid = None
             self.umount()
             if self._createtraces:
                 # Just capture the packet trace when --createtraces is set
@@ -663,12 +664,12 @@ class AllocTest(TestUtil):
 
             os.close(fd)
             fd = None
-
-            # Reap the background reading process
-            (pid, out) = os.waitpid(pid, 0)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
+            if pid is not None:
+                # Reap the background reading process
+                (pid, out) = os.waitpid(pid, 0)
             if fd:
                 os.close(fd)
             self.umount()
