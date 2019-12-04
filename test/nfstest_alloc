@@ -147,6 +147,10 @@ class AllocTest(TestUtil):
         self.opts.version = "%prog " + __version__
         # Tests are valid for NFSv4.2 and beyond
         self.opts.set_defaults(nfsversion=4.2)
+        # Option self.free_blocks
+        hmsg = "Number of free blocks to use when trying to allocate all " + \
+               "available space [default: %default]"
+        self.test_opgroup.add_option("--free-blocks", type="int", default=64, help=hmsg)
         # Option self.perf_fsize
         hmsg = "Starting file size for the perf01 test [default: %default]"
         self.test_opgroup.add_option("--perf-fsize", default="1MB", help=hmsg)
@@ -692,8 +696,8 @@ class AllocTest(TestUtil):
             rmfile = None
             otherfile = None
             offset = 0
-            size = self.filesize
-            free_space = 4*self.statvfs.f_bsize
+            size = 4*self.filesize
+            free_space = self.free_blocks * self.statvfs.f_bsize
 
             self.test_info("====  %s test %02d%s" % (self.testname, self.testidx, msg))
             self.testidx += 1
@@ -705,30 +709,32 @@ class AllocTest(TestUtil):
             # Get a new file name
             self.get_filename()
             filename = self.filename
-            absfile = self.absfile
-            self.dprint('DBG3', "Open file %s for writing" % self.absfile)
-            fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
+            testfile = self.absfile
+            self.dprint('DBG3', "Open file %s for writing" % testfile)
+            fd = os.open(testfile, os.O_WRONLY|os.O_CREAT)
 
             if lock:
-                self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (self.absfile, offset, size))
+                self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (testfile, offset, size))
                 out = getlock(fd, F_WRLCK, offset, size)
 
             tmsg = "when the file is opened as write only"
-            self.verify_fallocate(fd, offset, size, absfile=absfile, msg=tmsg)
+            self.verify_fallocate(fd, offset, size, absfile=testfile, msg=tmsg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             # Get a new file name
             self.get_filename()
-            self.dprint('DBG3', "Open file %s for writing" % self.absfile)
-            fd1 = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
             maxfile = self.filename
-            rmfile = self.absfile
+            rmfile  = self.absfile
+            self.dprint('DBG3', "Open file %s for writing" % rmfile)
+            fd1 = os.open(rmfile, os.O_WRONLY|os.O_CREAT)
 
             maxsize = self.get_freebytes() - free_space
             tmsg = "when allocating the maximum number of blocks left on the device"
             dmsg = "Allocate file %s with length of %s (available disk space minus %s) " % \
-                   (self.absfile, formatstr.str_units(maxsize), formatstr.str_units(free_space))
+                   (rmfile, formatstr.str_units(maxsize), formatstr.str_units(free_space))
             out = self.verify_fallocate(fd1, 0, maxsize, msg=tmsg, dmsg=dmsg)
             if out == -1: return
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             # Use the rest of the remaining space and a little bit more
             filesize = self.get_freebytes() + self.filesize
@@ -742,29 +748,33 @@ class AllocTest(TestUtil):
             expr = werror and werror.errno == errno.ENOSPC
             self.test(expr, "Write to a different file should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
             otherfile = self.filename
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             tmsg = "when whole range cannot be guaranteed"
-            self.verify_fallocate(fd, offset+size, filesize, absfile=absfile, msg=tmsg, error=errno.ENOSPC)
+            self.verify_fallocate(fd, offset+size, filesize, absfile=testfile, msg=tmsg, error=errno.ENOSPC)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
                 werror = None
-                os.lseek(fd, size, 0)
-                data = self.data_pattern(size, filesize)
-                self.dprint('DBG3', "Write file %s %d@%d" % (self.absfile, len(data), size))
+                os.lseek(fd, offset+size, 0)
+                data = self.data_pattern(offset+size, filesize)
+                self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset+size))
                 count = os.write(fd, data)
                 os.fsync(fd)
             except OSError as werror:
                 fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
             expr = werror and werror.errno == errno.ENOSPC
             self.test(expr, "Write outside the allocated region should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             os.lseek(fd, offset, 0)
-            data = self.data_pattern(offset, self.filesize, pattern="\x55\xaa")
-            self.dprint('DBG3', "Write file %s %d@%d" % (self.absfile, len(data), offset))
+            data = self.data_pattern(offset, size, pattern="\x55\xaa")
+            self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset))
             count = os.write(fd, data)
             os.fsync(fd)
             self.test(count > 0, "Write within the allocated region should succeed when no space is left on the device"+msg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -970,8 +980,8 @@ class AllocTest(TestUtil):
         """
         try:
             fd = None
-            rmfile = None
-            free_space = 4*self.statvfs.f_bsize
+            testfile = None
+            free_space = self.free_blocks * self.statvfs.f_bsize
 
             self.test_info("====  %s test %02d%s" % (self.testname, self.testidx, msg))
             self.testidx += 1
@@ -979,20 +989,22 @@ class AllocTest(TestUtil):
             self.umount()
             self.trace_start()
             self.mount()
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             # Get a new file name
             self.get_filename()
             filename = self.filename
-            self.dprint('DBG3', "Open file %s for writing" % self.absfile)
-            fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
-            rmfile = self.absfile
+            testfile = self.absfile
+            self.dprint('DBG3', "Open file %s for writing" % testfile)
+            fd = os.open(testfile, os.O_WRONLY|os.O_CREAT)
 
             maxsize = self.get_freebytes() - free_space
             tmsg = "when allocating the maximum number of blocks left on the device"
             dmsg = "Allocate file %s with length of %s (available disk space minus %s) " % \
-                   (self.absfile, formatstr.str_units(maxsize), formatstr.str_units(free_space))
-            out = self.verify_fallocate(fd, 0, maxsize, msg=tmsg, dmsg=dmsg)
+                   (testfile, formatstr.str_units(maxsize), formatstr.str_units(free_space))
+            out = self.verify_fallocate(fd, 0, maxsize, absfile=testfile, msg=tmsg, dmsg=dmsg)
             if out == -1: return
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             # Use the rest of the remaining space and a little bit more
             filesize = self.get_freebytes() + self.filesize
@@ -1006,32 +1018,35 @@ class AllocTest(TestUtil):
                 fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
             expr = werror and werror.errno == errno.ENOSPC
             self.test(expr, "Write to a different file should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             offset = 0
-            size = 2*self.filesize + 4*self.statvfs.f_bsize
+            size = 4*self.filesize
             # Free space after deallocate
             free_space = size - offset
             strsize = formatstr.str_units(size)
 
             if lock:
-                self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (self.absfile, offset, size))
+                self.dprint('DBG3', "Lock file %s starting at offset %d with length %d" % (testfile, offset, size))
                 out = getlock(fd, F_WRLCK, offset, size)
 
             tmsg = "when no space is left on the device"
-            self.verify_fallocate(fd, offset, size, msg=tmsg, dealloc=True)
+            self.verify_fallocate(fd, offset, size, absfile=testfile, msg=tmsg, dealloc=True)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             try:
                 fmsg = ""
                 werror = None
                 os.lseek(fd, offset, 0)
                 data = self.data_pattern(offset, self.filesize)
-                self.dprint('DBG3', "Write file %s %d@%d" % (self.absfile, len(data), offset))
+                self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset))
                 count = os.write(fd, data)
                 os.fsync(fd)
             except OSError as werror:
                 err = werror.errno
                 fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
             self.test(werror is None, "Write within the deallocated region should succeed", failmsg=fmsg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             try:
                 fmsg = ""
@@ -1041,19 +1056,21 @@ class AllocTest(TestUtil):
                 err = werror.errno
                 fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
             self.test(werror is None, "Write to another file should succeed when no space is left on the device after a successful DEALLOCATE"+msg, failmsg=fmsg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
                 werror = None
                 os.lseek(fd, offset+self.filesize, 0)
-                data = self.data_pattern(offset+self.filesize, self.filesize)
-                self.dprint('DBG3', "Write file %s %d@%d" % (self.absfile, len(data), offset+self.filesize))
+                data = self.data_pattern(offset+self.filesize, size)
+                self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset+self.filesize))
                 count = os.write(fd, data)
                 os.fsync(fd)
             except OSError as werror:
                 fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
             expr = werror and werror.errno == errno.ENOSPC
             self.test(expr, "Write within the deallocated region should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
+            self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -1062,8 +1079,8 @@ class AllocTest(TestUtil):
                     os.close(fd)
                 except:
                     pass
-            if rmfile:
-                os.unlink(rmfile)
+            if testfile:
+                os.unlink(testfile)
             self.umount()
             self.trace_stop()
 
@@ -1073,9 +1090,10 @@ class AllocTest(TestUtil):
             self.set_pktlist()
             # Find OPEN and correct stateid to use
             self.get_stateid(filename)
+            stateid = self.open_stateid if self.deleg_stateid is None else self.deleg_stateid
 
             # Verify ALLOCATE which allocates the rest of the disk space
-            self.verify_allocate(0, maxsize)
+            self.verify_allocate(0, maxsize, stateid=stateid)
 
             # Verify DEALLOCATE for file
             self.verify_allocate(offset, size, dealloc=True)
