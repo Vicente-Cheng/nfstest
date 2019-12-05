@@ -622,6 +622,10 @@ class RDMAsegment(object):
             # Sub-segment already exists, just update epsn
             if only:
                 seg.epsn = psn
+            elif iosize == 0:
+                # This is a retransmission of Read Request since there
+                # is no data
+                return seg
             else:
                 dmalen = seg.dmalen
                 seg.epsn = psn + dmalen/iosize - 1 + (1 if dmalen%iosize else 0)
