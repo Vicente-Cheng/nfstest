@@ -1279,7 +1279,7 @@ class SSCTest(TestUtil):
 
                                 # Look for CB_OFFLOAD to get the actual result of the COPY
                                 mstr = "crc16(nfs.stateid.other) == %d" % crc16(copyobj.copyid.other)
-                                (pktcall, pktreply) = self.find_nfs_op(OP_CB_OFFLOAD, ipaddr=self.client_ipaddr, port=None, match=mstr)
+                                (pktcall, pktreply) = self.find_nfs_op(OP_CB_OFFLOAD, ipaddr=self.client_ipaddr, port=None, nfs_version=None, match=mstr)
                                 self.test(pktcall, "CB_OFFLOAD should be sent by %sserver when COPY returns synchronous=0" % svrstr)
                                 if pktcall is not None:
                                     ehandle = copyobj.dst_file.filehandle
