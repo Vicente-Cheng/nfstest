@@ -90,132 +90,144 @@ Notes:
 # Test script ID
 SCRIPT_ID = "DELEGATION"
 
-TESTNAMES_STAT = [
-    "basic03",
-    "basic04",
-    "basic09",
-    "basic10",
-]
-TESTNAMES_LOCK = [
-    "basic05",
-    "basic06",
-    "basic11",
-    "basic12",
-]
-TESTNAMES_LOCAL = sorted([
-    "basic01",
-    "basic02",
-    "basic07",
-    "basic08",
-] + TESTNAMES_STAT + TESTNAMES_LOCK)
+# Test group flags
+GROUP_BASIC     = 0x0001
+GROUP_RECALL    = 0x0002
+GROUP_STAT      = 0x0004
+GROUP_LOCK      = 0x0008
+GROUP_SETATTR   = 0x0010
+GROUP_REMOVE    = 0x0020
+GROUP_RENAME    = 0x0040
+GROUP_PENDING   = 0x0080
+GROUP_RDELEG    = 0x0100
+GROUP_WDELEG    = 0x0200
 
-TESTNAMES_SETATTR = [
-    "recall07",
-    "recall08",
-    "recall09",
-    "recall10",
-    "recall35",
-    "recall36",
-    "recall37",
-    "recall38",
+TESTNAMES_ALL = [
+    ( "basic01",  GROUP_BASIC|GROUP_RDELEG ),
+    ( "basic02",  GROUP_BASIC|GROUP_WDELEG ),
+    ( "basic03",  GROUP_BASIC|GROUP_RDELEG|GROUP_STAT ),
+    ( "basic04",  GROUP_BASIC|GROUP_WDELEG|GROUP_STAT ),
+    ( "basic05",  GROUP_BASIC|GROUP_RDELEG|GROUP_LOCK ),
+    ( "basic06",  GROUP_BASIC|GROUP_WDELEG|GROUP_LOCK ),
+    ( "basic07",  GROUP_BASIC|GROUP_WDELEG ),
+    ( "basic08",  GROUP_BASIC|GROUP_WDELEG ),
+    ( "basic09",  GROUP_BASIC|GROUP_WDELEG|GROUP_STAT ),
+    ( "basic10",  GROUP_BASIC|GROUP_WDELEG|GROUP_STAT ),
+    ( "basic11",  GROUP_BASIC|GROUP_WDELEG|GROUP_LOCK ),
+    ( "basic12",  GROUP_BASIC|GROUP_WDELEG|GROUP_LOCK ),
+    ( "recall01", GROUP_RECALL|GROUP_RDELEG ),
+    ( "recall02", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall03", GROUP_RECALL|GROUP_RDELEG ),
+    ( "recall04", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall05", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall06", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall07", GROUP_RECALL|GROUP_RDELEG|GROUP_SETATTR ),
+    ( "recall08", GROUP_RECALL|GROUP_WDELEG|GROUP_SETATTR ),
+    ( "recall09", GROUP_RECALL|GROUP_RDELEG|GROUP_SETATTR ),
+    ( "recall10", GROUP_RECALL|GROUP_WDELEG|GROUP_SETATTR ),
+    ( "recall11", GROUP_RECALL|GROUP_RDELEG|GROUP_REMOVE ),
+    ( "recall12", GROUP_RECALL|GROUP_WDELEG|GROUP_REMOVE ),
+    ( "recall13", GROUP_RECALL|GROUP_RDELEG|GROUP_REMOVE ),
+    ( "recall14", GROUP_RECALL|GROUP_WDELEG|GROUP_REMOVE ),
+    ( "recall15", GROUP_RECALL|GROUP_RDELEG|GROUP_RENAME ),
+    ( "recall16", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall17", GROUP_RECALL|GROUP_RDELEG|GROUP_RENAME ),
+    ( "recall18", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall19", GROUP_RECALL|GROUP_RDELEG|GROUP_RENAME ),
+    ( "recall20", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall21", GROUP_RECALL|GROUP_RDELEG|GROUP_RENAME ),
+    ( "recall22", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall23", GROUP_RECALL|GROUP_RDELEG|GROUP_PENDING ),
+    ( "recall24", GROUP_RECALL|GROUP_RDELEG|GROUP_PENDING ),
+    ( "recall25", GROUP_RECALL|GROUP_WDELEG|GROUP_PENDING ),
+    ( "recall26", GROUP_RECALL|GROUP_WDELEG|GROUP_PENDING ),
+    ( "recall27", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall28", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall29", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall30", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall31", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall32", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall33", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall34", GROUP_RECALL|GROUP_WDELEG ),
+    ( "recall35", GROUP_RECALL|GROUP_WDELEG|GROUP_SETATTR ),
+    ( "recall36", GROUP_RECALL|GROUP_WDELEG|GROUP_SETATTR ),
+    ( "recall37", GROUP_RECALL|GROUP_WDELEG|GROUP_SETATTR ),
+    ( "recall38", GROUP_RECALL|GROUP_WDELEG|GROUP_SETATTR ),
+    ( "recall39", GROUP_RECALL|GROUP_WDELEG|GROUP_REMOVE ),
+    ( "recall40", GROUP_RECALL|GROUP_WDELEG|GROUP_REMOVE ),
+    ( "recall41", GROUP_RECALL|GROUP_WDELEG|GROUP_REMOVE ),
+    ( "recall42", GROUP_RECALL|GROUP_WDELEG|GROUP_REMOVE ),
+    ( "recall43", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall44", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall45", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall46", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall47", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall48", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall49", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall50", GROUP_RECALL|GROUP_WDELEG|GROUP_RENAME ),
+    ( "recall51", GROUP_RECALL|GROUP_WDELEG|GROUP_PENDING ),
+    ( "recall52", GROUP_RECALL|GROUP_WDELEG|GROUP_PENDING ),
+    ( "recall53", GROUP_RECALL|GROUP_WDELEG|GROUP_PENDING ),
+    ( "recall54", GROUP_RECALL|GROUP_WDELEG|GROUP_PENDING ),
 ]
-TESTNAMES_REMOVE = [
-    "recall11",
-    "recall12",
-    "recall13",
-    "recall14",
-    "recall39",
-    "recall40",
-    "recall41",
-    "recall42",
-]
-TESTNAMES_RENAME = [
-    "recall15",
-    "recall16",
-    "recall17",
-    "recall18",
-    "recall19",
-    "recall20",
-    "recall21",
-    "recall22",
-    "recall43",
-    "recall44",
-    "recall45",
-    "recall46",
-    "recall47",
-    "recall48",
-    "recall49",
-    "recall50",
-]
-TESTNAMES_PENDING = [
-    "recall23",
-    "recall24",
-    "recall25",
-    "recall26",
-    "recall51",
-    "recall52",
-    "recall53",
-    "recall54",
-]
-TESTNAMES_REMOTE = sorted([
-    "recall01",
-    "recall02",
-    "recall03",
-    "recall04",
-    "recall05",
-    "recall06",
-    "recall27",
-    "recall28",
-    "recall29",
-    "recall30",
-    "recall31",
-    "recall32",
-    "recall33",
-    "recall34",
-] + TESTNAMES_SETATTR + TESTNAMES_REMOVE + TESTNAMES_RENAME + TESTNAMES_PENDING)
+
+def group_list(group):
+    return [x[0] for x in TESTNAMES_ALL if x[1]&group]
+
+TESTNAMES_BASIC  = group_list(GROUP_BASIC)
+TESTNAMES_RECALL = group_list(GROUP_RECALL)
 
 # Include the test groups in the list of test names
 # so they are displayed in the help
 GTESTS = ["recall", "setattr", "remove", "rename", "pending"]
-TESTNAMES = ["basic", "stat", "lock"] + TESTNAMES_LOCAL + GTESTS + TESTNAMES_REMOTE
+TESTNAMES = ["basic", "stat", "lock"] + TESTNAMES_BASIC + GTESTS + \
+             TESTNAMES_RECALL + ["read_deleg", "write_deleg"]
 
 TESTGROUPS = {
     "basic": {
-         "tests": TESTNAMES_LOCAL,
+         "tests": TESTNAMES_BASIC,
          "desc": "Run all basic delegation tests: ",
     },
     "stat": {
-         "tests": TESTNAMES_STAT,
+         "tests": group_list(GROUP_STAT),
          "desc": "Run all basic delegation tests with file stat: ",
     },
     "lock": {
-         "tests": TESTNAMES_LOCK,
+         "tests": group_list(GROUP_LOCK),
          "desc": "Run all basic delegation tests with file lock: ",
     },
     "recall": {
-         "tests": TESTNAMES_REMOTE,
+         "tests": TESTNAMES_RECALL,
          "desc": "Run all recall delegation tests: ",
     },
     "setattr": {
-         "tests": TESTNAMES_SETATTR,
+         "tests": group_list(GROUP_SETATTR),
          "desc": "Run all tests using SETATTR to recall the delegation: ",
     },
     "remove": {
-         "tests": TESTNAMES_REMOVE,
+         "tests": group_list(GROUP_REMOVE),
          "desc": "Run all tests recalling the delegation by removing the delegated file: ",
     },
     "rename": {
-         "tests": TESTNAMES_RENAME,
+         "tests": group_list(GROUP_RENAME),
          "desc": "Run all tests recalling the delegation by renaming the delegated file: ",
     },
     "pending": {
-         "tests": TESTNAMES_PENDING,
+         "tests": group_list(GROUP_PENDING),
          "desc": "Run all recall delegation tests having a pending open: ",
+    },
+    "read_deleg": {
+         "tests": group_list(GROUP_RDELEG),
+         "desc": "Run all read delegation tests: ",
+    },
+    "write_deleg": {
+         "tests": group_list(GROUP_WDELEG),
+         "desc": "Run all write delegation tests: ",
     },
 }
 
 # Dictionary having the number of clients required by each test
-TEST_CLIENT_DICT = {x:1 for x in TESTNAMES_REMOTE}
+TEST_CLIENT_DICT = {x:1 for x in TESTNAMES_RECALL}
 
 PATTERN = 'FF00'
 
