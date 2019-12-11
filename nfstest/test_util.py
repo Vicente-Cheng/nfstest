@@ -214,6 +214,7 @@ class TestUtil(NFSUtil):
         self.test_msgs = []
         self._msg_count = {}
         self._reset_files()
+        self.runtest = None
         self._runtest = True
         self.runtest_list = []
         self.runtest_neg  = False
@@ -308,9 +309,9 @@ class TestUtil(NFSUtil):
 
     def _verify_testnames(self):
         """Process --runtest option."""
-        if not hasattr(self, 'runtest'):
+        if self.runtest is None:
             return
-        if self.runtest == 'all':
+        elif self.runtest == 'all':
             self.testlist = self.testnames
         else:
             if self.runtest[0] == '^':
@@ -772,14 +773,14 @@ class TestUtil(NFSUtil):
                     # given but there is not enough clients to run it
                     if len(client_list):
                         self.config("Not enough clients specified in --%s for '%s' to run" % (option, tname))
-                    else:
+                    elif self.runtest is not None:
                         self.config("Specify option --%s for --runtest='%s'" % (option, self.runtest))
                 else:
                     # Test was not explicitly given so do not run it
                     self.remove_test(tname)
                     tests_removed += 1
 
-        if tests_removed > 0 and len(self.testlist) == 0:
+        if tests_removed > 0 and len(self.testlist) == 0 and self.runtest is not None:
             # Only tests which require a client were specified but
             # no client specification was given
             self.config("Specify option --%s for --runtest='%s'" % (option, self.runtest))
