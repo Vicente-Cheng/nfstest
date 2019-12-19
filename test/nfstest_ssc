@@ -297,15 +297,41 @@ class SSCTest(TestUtil):
 
         self.scan_options()
 
-        # XXX Set correct copy_file_range system call number since
-        # copy_file_range has no wrapper function in libc yet
-        arch = os.uname()[4]
-        if arch == "x86_64":
-            self.NR_copy_file_range = 326
-        elif arch == "x86_32":
-            self.NR_copy_file_range = 377
-        else:
-            self.config("Machine architecture not supported: %s" % arch)
+        try:
+            # Define prototype for copy_file_range
+            self.libc.copy_file_range.restype  = ctypes.c_ssize_t
+            self.libc.copy_file_range.argtypes = [
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_longlong),
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_longlong),
+                ctypes.c_size_t,
+                ctypes.c_uint,
+            ]
+            self._use_copy_file_range = True
+        except:
+            # Set correct copy_file_range system call number since
+            # copy_file_range has no wrapper function in libc
+            arch = os.uname()[4]
+            if arch == "x86_64":
+                self.NR_copy_file_range = 326
+            elif arch == "x86_32":
+                self.NR_copy_file_range = 377
+            else:
+                self.config("Machine architecture not supported: %s" % arch)
+
+            # Define prototype for syscall to use it as copy_file_range
+            self.libc.syscall.restype  = ctypes.c_ssize_t
+            self.libc.syscall.argtypes = [
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_longlong),
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_longlong),
+                ctypes.c_size_t,
+                ctypes.c_uint,
+            ]
+            self._use_copy_file_range = False
 
         # For tests copying data starting from a non-zero source offset,
         # copy the bytes right up to the end of the source file
@@ -340,21 +366,12 @@ class SSCTest(TestUtil):
         self._createtraces = self.createtraces
         self.createtraces = False
 
-        #XXX Use syscall until copy_file_range is in libc
-        self.libc.syscall.restype  = ctypes.c_longlong
-        self.libc.syscall.argtypes = [
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.POINTER(ctypes.c_longlong),
-            ctypes.c_int,
-            ctypes.POINTER(ctypes.c_longlong),
-            ctypes.c_uint,
-            ctypes.c_uint,
-        ]
-
     def copy_file_range(self, srcfd, srcoff, dstfd, dstoff, count, flags):
-        """Wrapper for copy_file_range system call since it is not yet in libc"""
-        return self.libc.syscall(self.NR_copy_file_range, srcfd, srcoff, dstfd, dstoff, count, flags)
+        """Wrapper for copy_file_range system call"""
+        if self._use_copy_file_range:
+            return self.libc.copy_file_range(srcfd, srcoff, dstfd, dstoff, count, flags)
+        else:
+            return self.libc.syscall(self.NR_copy_file_range, srcfd, srcoff, dstfd, dstoff, count, flags)
 
     def setup(self):
         """Setup test environment"""
