@@ -586,6 +586,7 @@ class SSCTest(TestUtil):
         # Get the correct number of copies the client will send
         ncopies = max(ncopies, max(nsfiles, ndfiles))
 
+        verify_data = failure
         if failure:
             # Expecting a failure
             ncopies = 1
@@ -836,7 +837,7 @@ class SSCTest(TestUtil):
                     if count == -1:
                         fmsg = ", expecting %s but got %s" % (errstr, errno.errorcode.get(errorno, errorno))
                     else:
-                        failure = 0 # The copy succeeded so test the results
+                        verify_data = 0 # The copy succeeded so test the results
                         fmsg = ", expecting %s but it succeeded" % errstr
                     if enforce:
                         expr = count == -1 and errorno == failure
@@ -895,7 +896,7 @@ class SSCTest(TestUtil):
             ####################################################################
             # Verify written data by copy_file_range
             ####################################################################
-            if failure or errorno or count is None:
+            if verify_data or errorno or count is None:
                 # No need to check anything else.
                 # This will execute corresponding finally block and then return
                 return
@@ -1016,7 +1017,11 @@ class SSCTest(TestUtil):
             # Verify correct packets are sent to server(s)
             ####################################################################
             copy_index = None
-            self.set_nfserr_list(nfs4list=[NFS4ERR_NOENT, NFS4ERR_NOTSUPP])
+            nfs_error_list = [NFS4ERR_NOENT, NFS4ERR_NOTSUPP]
+            if samefile or failure == errno.EINVAL or \
+               (src_off is not None and ((src_off + nbytes) > self.filesize)):
+                nfs_error_list.append(NFS4ERR_INVAL)
+            self.set_nfserr_list(nfs4list=nfs_error_list)
             self.trace_open()
             # Search some packets on source server
             args = {"ipaddr": self.server_ipaddr, "port": self.port, "noreset":True}
