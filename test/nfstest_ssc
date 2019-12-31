@@ -992,7 +992,12 @@ class SSCTest(TestUtil):
                             os.lseek(dstobj.fd, doff, os.SEEK_SET)
                             ddata = os.read(dstobj.fd, rsize)
                             cnt = len(ddata)
-                            sdata = self.data_pattern(doff, cnt, DATA_PATTERN)
+                            if write:
+                                sdata = self.data_pattern(doff, cnt, DATA_PATTERN)
+                            elif samefile:
+                                sdata = self.data_pattern(doff, cnt)
+                            else:
+                                sdata = self.data_pattern(doff, cnt, "\x00")
                             if sdata != ddata:
                                 expr = False
                                 break
@@ -1252,12 +1257,17 @@ class SSCTest(TestUtil):
                     except:
                         pass
 
+                    if samefile:
+                        copyobj.dst_file.filehandle = copyobj.src_file.filehandle
+
                     fmsg = ", expecting 0x%08x but got 0x%08x" % (crc32(copyobj.src_file.filehandle), crc32(src_fhandle))
                     self.test(src_fhandle == copyobj.src_file.filehandle, "%s should be sent with correct source file handle" % opstr, failmsg=fmsg)
                     fmsg = ", expecting 0x%08x but got 0x%08x" % (crc32(copyobj.dst_file.filehandle), crc32(dst_fhandle))
                     self.test(dst_fhandle == copyobj.dst_file.filehandle, "%s should be sent with correct destination file handle" % opstr, failmsg=fmsg)
 
-                    if copyobj.dst_lstid is None:
+                    if samefile:
+                        dst_stid = src_stateid
+                    elif copyobj.dst_lstid is None:
                         dst_stid = copyobj.dst_file.stateid
                     else:
                         dst_stid = copyobj.dst_lstid
@@ -1276,7 +1286,17 @@ class SSCTest(TestUtil):
                     if pktreply:
                         status = pktreply.NFSop.status
                         fmsg = ", expecting NFS4_OK but got %s" % status
-                        self.test(status == NFS4_OK, "%s should succeed" % opstr, failmsg=fmsg)
+                        if samefile and not enforce:
+                            errm = "NFS4ERR_INVAL"
+                            expr = (status == NFS4ERR_INVAL)
+                            if clone:
+                                errm += " or NFS4ERR_NOTSUPP"
+                                expr = (status in (NFS4ERR_INVAL, NFS4ERR_NOTSUPP))
+                            amsg = "%s should failed with %s" % (opstr, errm)
+                            fmsg = ", expecting NFS4ERR_INVAL but got %s" % nfsstat4.get(status, status)
+                            self.test(expr, amsg, failmsg=fmsg)
+                        else:
+                            self.test(status == NFS4_OK, "%s should succeed" % opstr, failmsg=fmsg)
                         if status != NFS4_OK and enforce:
                             if clone:
                                 # XXX If CLONE fails with NFS4ERR_NOTSUPP, expecting a COPY
@@ -1376,7 +1396,7 @@ class SSCTest(TestUtil):
             else:
                 opstr = "COPY"
 
-            if copy_index is None and nbytes > 0:
+            if (copy_index is None or samefile) and nbytes > 0:
                 # COPY/CLONE not sent by the client so verify system call
                 # falls back to copy the file(s) via the client
                 # Verify client sends the reads to the source server
@@ -1391,7 +1411,10 @@ class SSCTest(TestUtil):
                         if fhandle == copyobj.src_file.filehandle:
                             expr = True
                             break
-                    self.test(expr, "READs should be sent to %sserver when %s is not supported" % (svr_str, opstr))
+                    if samefile:
+                        self.test(expr, "READs should be sent to %sserver when %s fails" % (svr_str, opstr))
+                    else:
+                        self.test(expr, "READs should be sent to %sserver when %s is not supported" % (svr_str, opstr))
 
                 # Verify client sends the writes to the destination server
                 index_map = self.get_io(OP_WRITE)
@@ -1401,7 +1424,10 @@ class SSCTest(TestUtil):
                         if fhandle == copyobj.dst_file.filehandle:
                             expr = True
                             break
-                    self.test(expr, "WRITEs should be sent to %sserver when %s is not supported" % (svrstr, opstr))
+                    if samefile:
+                        self.test(expr, "WRITEs should be sent to %sserver when %s fails" % (svrstr, opstr))
+                    else:
+                        self.test(expr, "WRITEs should be sent to %sserver when %s is not supported" % (svrstr, opstr))
             elif copy_index is not None:
                 # COPY/CLONE is sent by the client
                 if write:
@@ -1507,12 +1533,12 @@ class SSCTest(TestUtil):
         self.basic_ssc(src_off=self.s_offset, nbytes=self.filesize, copymsg=msg)
 
     def intra13_test(self):
-        """Verify intra server side COPY fails when both source and destination
+        """Verify intra server side COPY may fail when both source and destination
            files point to the same file
         """
-        self.test_group("Verify intra server side COPY fails when both source and destination files point to the same file")
+        self.test_group("Verify intra server side COPY may fail when both source and destination files point to the same file")
         msg = "both source and destination files point to the same file"
-        self.basic_ssc(samefile=1, failure=errno.EINVAL, copymsg=msg)
+        self.basic_ssc(samefile=1, write=0, failure=errno.EINVAL, enforce=0, copymsg=msg)
 
     def intra14_test(self):
         """Verify intra server side COPY succeeds when using multiple source and
