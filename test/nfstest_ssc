@@ -490,6 +490,8 @@ class SSCTest(TestUtil):
 
     def pkt_locks(self, fhandle, **kwargs):
         """Search the packets for the lock stateid given by the file handle"""
+        if fhandle is None:
+            return
         kwargs["match"] = "crc32(nfs.fh) == %d" % crc32(fhandle)
         self.find_nfs_op(OP_LOCK, **kwargs)
         if self.pktreply:
