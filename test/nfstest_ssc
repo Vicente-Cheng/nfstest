@@ -572,6 +572,7 @@ class SSCTest(TestUtil):
         src_seek = kwargs.get("src_seek", 0) # Source offset to seek to before copy_file_range
         dst_seek = kwargs.get("dst_seek", 0) # Destination offset to seek to before copy_file_range
         failure  = kwargs.get("failure", 0)  # Error number of expected failure
+        enforce  = kwargs.get("enforce", 1)  # Enforce expected failure when True(1)
         dstfail  = kwargs.get("dstfail", 0)  # Failure is caused by the destination file
         copymsg  = kwargs.get("copymsg", "") # Specific assertion message on COPY success test
         write    = kwargs.get("write", self.pre_write) # Write before copy_file_range
@@ -837,7 +838,16 @@ class SSCTest(TestUtil):
                     else:
                         failure = 0 # The copy succeeded so test the results
                         fmsg = ", expecting %s but it succeeded" % errstr
-                    self.test(count == -1 and errorno == failure, "COPY(copy_file_range) should fail with %s when %s" % (errstr, msg), failmsg=fmsg)
+                    if enforce:
+                        expr = count == -1 and errorno == failure
+                        amsg = "COPY(copy_file_range) should fail with %s when %s" % (errstr, msg)
+                    elif count == -1:
+                        expr = errorno == failure
+                        amsg = "COPY(copy_file_range) may fail with %s when %s" % (errstr, msg)
+                    else:
+                        expr = True
+                        amsg = "COPY(copy_file_range) may succeed when %s" % msg
+                    self.test(expr, amsg, failmsg=fmsg)
                 else:
                     # Expecting a success
                     fmsg = ", failed with %s" % errno.errorcode.get(errorno, errorno)
@@ -1267,7 +1277,7 @@ class SSCTest(TestUtil):
                         status = pktreply.NFSop.status
                         fmsg = ", expecting NFS4_OK but got %s" % status
                         self.test(status == NFS4_OK, "%s should succeed" % opstr, failmsg=fmsg)
-                        if status != NFS4_OK:
+                        if status != NFS4_OK and enforce:
                             if clone:
                                 # XXX If CLONE fails with NFS4ERR_NOTSUPP, expecting a COPY
                                 # XXX If CLONE fails with other than NFS4ERR_NOTSUPP???
@@ -1481,12 +1491,12 @@ class SSCTest(TestUtil):
         self.basic_ssc(dstopen=os.O_RDONLY, failure=errno.EBADF, dstfail=1)
 
     def intra11_test(self):
-        """Verify intra server side COPY fails when source offset is beyond the
+        """Verify intra server side COPY may fail when source offset is beyond the
            end of the file
         """
-        self.test_group("Verify intra server side COPY fails when source offset is beyond the end of the file")
+        self.test_group("Verify intra server side COPY may fail when source offset is beyond the end of the file")
         msg = "source offset is beyond the end of the file"
-        self.basic_ssc(src_off=self.filesize, failure=errno.EINVAL, copymsg=msg)
+        self.basic_ssc(src_off=self.filesize, failure=errno.EINVAL, enforce=0, copymsg=msg)
 
     def intra12_test(self):
         """Verify intra server side COPY fails when source offset plus count
