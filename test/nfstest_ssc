@@ -976,7 +976,7 @@ class SSCTest(TestUtil):
                 except Exception:
                     self.test(False, traceback.format_exc())
 
-            if write:
+            if write or dst_off > 0:
                 # Verify destination file was not modified outside the
                 # file ranges from the copies
                 for dstobj in self.dst_file_list():
@@ -1543,7 +1543,10 @@ class SSCTest(TestUtil):
         """
         self.test_group("Verify intra server side COPY may fail when both source and destination files point to the same file")
         msg = "both source and destination files point to the same file"
+        self.test_info("====  %s test 01 (dst_off = 0)" % self.testname)
         self.basic_ssc(samefile=1, write=0, failure=errno.EINVAL, enforce=0, copymsg=msg)
+        self.test_info("====  %s test 02 (dst_off > 0)" % self.testname)
+        self.basic_ssc(samefile=1, write=0, failure=errno.EINVAL, enforce=0, copymsg=msg, dst_off=self.filesize/2)
 
     def intra14_test(self):
         """Verify intra server side COPY succeeds when using multiple source and
