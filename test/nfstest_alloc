@@ -737,6 +737,11 @@ class AllocTest(TestUtil):
             if out == -1: return
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
+            # Check if space was actually allocated
+            if self.get_freebytes() > free_space:
+                self.test(False, "Space was not actually allocated -- skipping rest of the test")
+                return
+
             # Use the rest of the remaining space and a little bit more
             filesize = self.get_freebytes() + self.filesize
 
@@ -1006,6 +1011,11 @@ class AllocTest(TestUtil):
             out = self.verify_fallocate(fd, 0, maxsize, absfile=testfile, msg=tmsg, dmsg=dmsg)
             if out == -1: return
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
+
+            # Check if space was actually allocated
+            if self.get_freebytes() > free_space:
+                self.test(False, "Space was not actually allocated -- skipping rest of the test")
+                return
 
             # Use the rest of the remaining space and a little bit more
             filesize = self.get_freebytes() + self.filesize
