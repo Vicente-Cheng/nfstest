@@ -267,6 +267,26 @@ class PosixTest(TestUtil):
         # Clear umask
         os.umask(0)
 
+    def setup(self, **kwargs):
+        """Setup test environment"""
+        self.umount()
+        self.mount()
+        super(PosixTest, self).setup(**kwargs)
+
+        self.setup_readlink = {}
+        if "readlink" in self.testlist:
+            for stype in ("file", "directory"):
+                if stype == "file":
+                    self.create_file()
+                    srcpath = self.absfile
+                else:
+                    self.create_dir()
+                    srcpath = self.absdir
+                self.get_filename()
+                self.dprint('DBG3', "Creating symbolic link to %s [%s -> %s]" % (stype, self.absfile, srcpath))
+                os.symlink(srcpath, self.absfile)
+                self.setup_readlink[stype] = (srcpath, self.absfile)
+
     def access(self, path, mode, test, msg=""):
         """Test file access.
 
@@ -1312,21 +1332,19 @@ class PosixTest(TestUtil):
         """Verify Test POSIX API readlink() by reading a symbolic link."""
         self.test_group("Verify POSIX API readlink() on %s" % self.nfsstr())
 
-        self.create_file()
-        srcfile = self.absfile
-        self.get_filename()
-        self.dprint('DBG3', "Creating symbolic link to file [%s -> %s]" % (self.absfile, srcfile))
-        os.symlink(srcfile, self.absfile)
-        data = posix.readlink(self.absfile)
-        self.test(data == srcfile, "readlink - data of symbolic link should be the name of the source file")
-
-        self.create_dir()
-        srcdir = self.absdir
-        self.get_filename()
-        self.dprint('DBG3', "Creating symbolic link to directory [%s -> %s]" % (self.absfile, srcdir))
-        os.symlink(srcdir, self.absfile)
-        data = posix.readlink(self.absfile)
-        self.test(data == srcdir, "readlink - data of symbolic link should be the name of the source directory")
+        for stype in ("file", "directory"):
+            srcpath, symlink = self.setup_readlink.get(stype)
+            self.dprint('DBG3', "Reading symbolic link to %s [%s]" % (stype, symlink))
+            error = 0
+            fmsg = ""
+            try:
+                data = posix.readlink(symlink)
+            except OSError as ioerr:
+                error = ioerr.errno
+                fmsg = ", got error [%s] %s" % (errno.errorcode.get(error,error), os.strerror(error))
+            self.test(error == 0, "readlink - reading symbolic link to a %s should succeed" % stype, failmsg=fmsg)
+            if error == 0:
+                self.test(data == srcpath, "readlink - data of symbolic link should be the name of the source %s" % stype)
 
     def rename_test(self):
         """Verify POSIX API rename() by renaming a file, directory, and a
