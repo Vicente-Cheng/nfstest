@@ -274,14 +274,19 @@ class PosixTest(TestUtil):
         super(PosixTest, self).setup(**kwargs)
 
         self.setup_readlink = {}
+        self.setup_readlink_types = ("file", "directory", "non-existent file")
         if "readlink" in self.testlist:
-            for stype in ("file", "directory"):
+            # Setup specific to "readlink" test
+            for stype in self.setup_readlink_types:
                 if stype == "file":
                     self.create_file()
                     srcpath = self.absfile
-                else:
+                elif stype == "directory":
                     self.create_dir()
                     srcpath = self.absdir
+                else:
+                    self.get_filename()
+                    srcpath = self.absfile
                 self.get_filename()
                 self.dprint('DBG3', "Creating symbolic link to %s [%s -> %s]" % (stype, self.absfile, srcpath))
                 os.symlink(srcpath, self.absfile)
@@ -1332,7 +1337,7 @@ class PosixTest(TestUtil):
         """Verify Test POSIX API readlink() by reading a symbolic link."""
         self.test_group("Verify POSIX API readlink() on %s" % self.nfsstr())
 
-        for stype in ("file", "directory"):
+        for stype in self.setup_readlink_types:
             srcpath, symlink = self.setup_readlink.get(stype)
             self.dprint('DBG3', "Reading symbolic link to %s [%s]" % (stype, symlink))
             error = 0
@@ -1344,7 +1349,8 @@ class PosixTest(TestUtil):
                 fmsg = ", got error [%s] %s" % (errno.errorcode.get(error,error), os.strerror(error))
             self.test(error == 0, "readlink - reading symbolic link to a %s should succeed" % stype, failmsg=fmsg)
             if error == 0:
-                self.test(data == srcpath, "readlink - data of symbolic link should be the name of the source %s" % stype)
+                src_str = "source " if stype in ("file", "directory") else ""
+                self.test(data == srcpath, "readlink - data of symbolic link should be the name of the %s%s" % (src_str, stype))
 
     def rename_test(self):
         """Verify POSIX API rename() by renaming a file, directory, and a
