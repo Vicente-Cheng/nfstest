@@ -551,10 +551,9 @@ class PosixTest(TestUtil):
                 data = self.data_pattern(test_pos, self.posix_iosize)
             else:
                 data = self.data_pattern(test_pos, self.posix_iosize, pattern="-")
-                fdr = open(self.absfile, "r")
-                fdr.seek(test_pos)
-                out = fdr.read(self.posix_iosize)
-                fdr.close()
+                with open(self.absfile, "r") as fdr:
+                    fdr.seek(test_pos)
+                    out = fdr.read(self.posix_iosize)
             self.test(out == data, "fcntl - %s data is correct when repositioning file pointer using DUP'ed file descriptor" % str_ed)
 
             fdflags = self.libc.fcntl(fd, fcntl.F_GETFD, 0)
@@ -584,10 +583,9 @@ class PosixTest(TestUtil):
                 out = self._do_io(fd2, "%s file using DUP'ed file descriptor" % objtype.capitalize(), pattern="+")
 
                 data = self.data_pattern(test_pos, self.posix_iosize, pattern="+")
-                fdr = open(self.absfile, "r")
-                fdr.seek(-self.posix_iosize, os.SEEK_END)
-                out = fdr.read(self.posix_iosize)
-                fdr.close()
+                with open(self.absfile, "r") as fdr:
+                    fdr.seek(-self.posix_iosize, os.SEEK_END)
+                    out = fdr.read(self.posix_iosize)
                 self.test(out == data, "fcntl - data is %s correctly at the end of the file when O_APPEND is set regardless where the file pointer is set" % str_ed)
 
             posix.close(fd)
@@ -1061,9 +1059,8 @@ class PosixTest(TestUtil):
             posix.close(fd)
 
             self.dprint('DBG3', "Read data from file to verify data written using mmap region")
-            fd = open(self.absfile, "r")
-            data = fd.read()
-            fd.close()
+            with open(self.absfile, "r") as fdr:
+                data = fdr.read()
             self.test(data == self.data_pattern(0,N), "%s - written data should be correct" % objtype)
 
             absfile = self.abspath(self.files[0])
