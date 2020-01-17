@@ -446,13 +446,18 @@ class PosixTest(TestUtil):
         self.test_group("Verify POSIX API closedir() on %s" % self.nfsstr())
 
         try:
+            fd = None
             self.create_dir()
 
             fd = self.libc.opendir(self.absdir)
             out = self.libc.closedir(fd)
+            fd = None
             self.test(out == 0, "closedir - closedir() should succeed")
         except Exception:
             self.test(False, traceback.format_exc())
+        finally:
+            if fd:
+                self.libc.closedir(fd)
 
     def creat_test(self):
         """Verify POSIX API creat(path, mode) is equivalent to
@@ -1353,14 +1358,19 @@ class PosixTest(TestUtil):
         self.test_group("Verify POSIX API opendir() on %s" % self.nfsstr())
 
         try:
+            fd = None
             self.create_dir()
             fd = self.libc.opendir(self.absdir)
-            self.libc.closedir(fd)
             self.test(fd != None, "opendir - opendir() on an existent directory should succeed")
+            self.libc.closedir(fd)
+            fd = None
             fd = self.libc.opendir(self.absdir+'bogus')
             self.test(fd == None, "opendir - opendir() on a non-existent directory should fail")
         except Exception:
             self.test(False, traceback.format_exc())
+        finally:
+            if fd:
+                self.libc.closedir(fd)
 
     def read_test(self):
         """Verify POSIX API read() by reading data from a file. Verify that
@@ -1395,6 +1405,7 @@ class PosixTest(TestUtil):
         self.test_group("Verify POSIX API readdir() on %s" % self.nfsstr())
 
         try:
+            fd = None
             self.create_dir()
             self.create_file(dir=self.dirname)
             filename = os.path.basename(self.filename)
@@ -1407,12 +1418,16 @@ class PosixTest(TestUtil):
                     break
                 dirlist.append(dirent[0].d_name)
             self.libc.closedir(fd)
+            fd = None
 
             self.test(len(dirlist) > 0, "readdir - readdir() on an open directory should succeed")
             self.test(filename in dirlist, "readdir - file in directory should be returned by readdir()")
             self.test(True, "readdir - readdir() should return 0 at the end of the list")
         except Exception:
             self.test(False, traceback.format_exc())
+        finally:
+            if fd:
+                self.libc.closedir(fd)
 
     def readlink_test(self):
         """Verify Test POSIX API readlink() by reading a symbolic link."""
@@ -1645,6 +1660,7 @@ class PosixTest(TestUtil):
         self.test_group("Verify POSIX API %s() on %s" % (objtype, self.nfsstr()))
 
         try:
+            fd = None
             self.create_dir()
             N = 5
             for i in xrange(N):
@@ -1682,8 +1698,12 @@ class PosixTest(TestUtil):
                     self.test(name == dirlist[index], "%s - directory entry is correct at offset = %d" % (objtype, offsets[index]))
 
             self.libc.closedir(fd)
+            fd = None
         except Exception:
             self.test(False, traceback.format_exc())
+        finally:
+            if fd:
+                self.libc.closedir(fd)
 
     def telldir_test(self):
         """Verify POSIX API telldir() on a directory."""
