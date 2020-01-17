@@ -1839,11 +1839,19 @@ class TestUtil(NFSUtil):
                 self.wfds.append(fd)
                 self.lock_type = fcntl.F_WRLCK
 
-    def close_files(self):
-        """Close all files opened by open_files()."""
-        for fd in self.wfds + self.rfds:
-            self.dprint('DBG3', "Closing file")
-            os.close(fd)
+    def close_files(self, *fdlist):
+        """Close all files opened by open_files() and all file descriptors
+           given as arguments.
+        """
+        for fd_list in (self.wfds, self.rfds, fdlist):
+            for fd in fd_list:
+                try:
+                    if fd is not None:
+                        os.fstat(fd) # If fd is not opened -- it fails
+                        self.dprint('DBG3', "Closing file")
+                        os.close(fd)
+                except:
+                    pass
         self._reset_files()
 
     def write_files(self):
