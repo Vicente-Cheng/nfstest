@@ -989,6 +989,8 @@ class PosixTest(TestUtil):
 
         try:
             fd = None
+            addr = 0
+            map_len = N
             absfile = self.abspath(self.files[0])
             self.dprint('DBG3', "Open file %s for reading" % absfile)
             fd = posix.open(absfile, posix.O_RDONLY)
@@ -1000,18 +1002,22 @@ class PosixTest(TestUtil):
             self.test(ptr.value[:N] == self.data_pattern(0,N), "%s - read data should be correct" % objtype)
             self.dprint('DBG3', "munmap file")
             out = self.libc.munmap(addr, N)
+            addr = 0
             self.test(out == 0, "%s - munmap should succeed" % objtype)
 
             self.dprint('DBG3', "mmap file for reading using aligned offset")
-            addr = self.libc.mmap(0, N-self.PAGESIZE, mmap.PROT_READ, mmap.MAP_SHARED, fd, self.PAGESIZE)
+            map_len = N-self.PAGESIZE
+            addr = self.libc.mmap(0, map_len, mmap.PROT_READ, mmap.MAP_SHARED, fd, self.PAGESIZE)
             self.test(addr > 0, "%s - mmap using aligned offset should succeed" % objtype)
             ptr = ctypes.cast(addr, ctypes.c_char_p)
-            self.test(ptr.value[:N-self.PAGESIZE] == self.data_pattern(self.PAGESIZE,N-self.PAGESIZE), "%s - read data should be correct" % objtype)
+            self.test(ptr.value[:map_len] == self.data_pattern(self.PAGESIZE,map_len), "%s - read data should be correct" % objtype)
             self.dprint('DBG3', "munmap file")
-            out = self.libc.munmap(addr, N-self.PAGESIZE)
+            out = self.libc.munmap(addr, map_len)
+            addr = 0
             self.test(out == 0, "%s - munmap should succeed" % objtype)
 
             self.dprint('DBG3', "mmap file for reading")
+            map_len = N
             addr = self.libc.mmap(0, N, mmap.PROT_READ, mmap.MAP_SHARED, fd, 0)
             self.test(addr > 0, "%s - mmap should succeed" % objtype)
             ptr = ctypes.cast(addr, ctypes.c_char_p)
@@ -1021,6 +1027,7 @@ class PosixTest(TestUtil):
             self.test(ptr.value[:N] == self.data_pattern(0,N), "%s - read data after file descriptor has been closed should be correct" % objtype)
             self.dprint('DBG3', "munmap file")
             out = self.libc.munmap(addr, N)
+            addr = 0
             self.test(out == 0, "%s - munmap after the file has been closed should succeed" % objtype)
 
             self.get_filename()
@@ -1049,6 +1056,7 @@ class PosixTest(TestUtil):
                 out = self.libc.munmap(addr, 0)
                 self.test(out == -1, "%s - munmap with length of 0 should return an error" % objtype)
             out = self.libc.munmap(addr, N)
+            addr = 0
             self.test(out == 0, "%s - munmap with correct length should succeed" % objtype)
             posix.close(fd)
 
@@ -1070,6 +1078,9 @@ class PosixTest(TestUtil):
             self.test(False, traceback.format_exc())
         finally:
             self.close_files(fd)
+            if addr > 0:
+                # Make sure to also unmap the file region
+                self.libc.munmap(addr, map_len)
 
     def mmap_test(self):
         """Verify POSIX API mmap() by mapping a file and verifying I/O
