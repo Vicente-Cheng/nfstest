@@ -107,6 +107,7 @@ NFSTEST_SCRIPTS = [
     'test/nfstest_cache',
     'test/nfstest_delegation',
     'test/nfstest_dio',
+    'test/nfstest_fcmp',
     'test/nfstest_file',
     'test/nfstest_interop',
     'test/nfstest_io',
