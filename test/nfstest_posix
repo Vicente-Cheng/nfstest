@@ -464,18 +464,20 @@ class PosixTest(TestUtil):
             self.get_filename()
             self.dprint('DBG3', "Create file %s using POSIX API creat()" % self.absfile)
             fd = self.libc.creat(self.absfile, mode)
+            self.test(fd > 0, "creat - creat() should succeed")
             count = posix.write(fd, self.data_pattern(0, self.filesize))
             posix.close(fd)
-            self.test(os.path.exists(self.absfile), "creat - creation of file should succeed")
+            self.test(os.path.exists(self.absfile), "creat - file should be created")
             fstat = os.stat(self.absfile)
             self.test(fstat.st_mode & 0777 == mode, "creat - mode permissions of created file should be correct")
             self.test(fstat.st_size == count, "creat - file size should be correct")
 
             self.dprint('DBG3', "Open existing file %s using POSIX API creat()" % self.absfile)
             fd = self.libc.creat(self.absfile, 0744)
+            self.test(fd > 0, "creat - existent file open should succeed")
             posix.close(fd)
             fstat = os.stat(self.absfile)
-            self.test(os.path.exists(self.absfile), "creat - existent file open should succeed")
+            self.test(os.path.exists(self.absfile), "creat - file should still exist")
             self.test(fstat.st_mode & 0777 == mode, "creat - mode permissions of opened file should not be changed")
             self.test(fstat.st_size == 0, "creat - existent file should be truncated")
         except Exception:
@@ -535,6 +537,7 @@ class PosixTest(TestUtil):
             self.dprint('DBG3', "DUP file descriptor using POSIX API fcntl(fd, F_DUPFD, n)")
             self.libc.fcntl.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
             fd2 = self.libc.fcntl(fd, fcntl.F_DUPFD, nfd)
+            self.test(fd2 > 0, "fcntl - F_DUPFD should succeed")
             self.test(fd2 >= nfd, "fcntl - DUP'ed file descriptor should be greater than or equal to the value given")
 
             self.dprint('DBG3', "Reposition file pointer using DUP'ed file descriptor")
