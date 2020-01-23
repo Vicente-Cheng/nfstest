@@ -46,6 +46,7 @@ import os
 import re
 import sys
 import time
+import errno
 import fcntl
 import ctypes
 import struct
@@ -1888,3 +1889,52 @@ class TestUtil(NFSUtil):
             except Exception, e:
                 self.warning("Unable to get lock on file: %r" % e)
         return ret
+
+    def str_args(self, args):
+        """Return the formal string representation of the given list
+           where string objects are truncated.
+        """
+        alist = []
+        for item in args:
+            if isinstance(item, str) and len(item) > 16:
+                alist.append(repr(item[:16]+"..."))
+            else:
+                alist.append(repr(item))
+        return ", ".join(alist)
+
+    def run_func(self, func, *args, **kwargs):
+        """Run function with the given arguments and return the results.
+           All positional arguments are passed to the function while the
+           named arguments change the behavior of the method.
+           Object attribute "oserror" is set to the OSError object if the
+           function fails.
+
+           msg:
+               Test assertion message [default: None]
+           err:
+               Expected error number [default: 0]
+        """
+        msg = kwargs.get("msg", None)
+        err = kwargs.get("err", 0)
+        error = 0
+        result = None
+        self.oserror = None
+        expestr = str(errno.errorcode.get(err,err))
+        fmsg = ", expecting %s but it succeeded" % expestr if err else ""
+        self.dprint('DBG4', "%s(%s)" % (func.__name__, self.str_args(args)))
+        try:
+            result = func(*args)
+        except OSError as oserr:
+            self.oserror = oserr
+            error = oserr.errno
+            errstr = str(errno.errorcode.get(error,error))
+            strerr = os.strerror(error)
+            self.dprint('DBG4', "%s() got error [%s] %s" % (func.__name__, errstr, strerr))
+            if err:
+                fmsg = ", expecting %s but got %s" % (expestr, errstr)
+            else:
+                fmsg = ", got error [%s] %s" % (errstr, strerr)
+        if msg is not None:
+            # Display test assertion
+            self.test(error == err, msg, failmsg=fmsg)
+        return result
