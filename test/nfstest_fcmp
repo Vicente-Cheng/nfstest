@@ -112,6 +112,7 @@ class FcmpTest(TestUtil):
                 data = os.read(fd, dsize)
                 count = len(data)
                 if count > 0:
+                    base_offset = offset
                     edata = self.data_pattern(offset, count)
                     # Compare data
                     for i in xrange(len(data)):
@@ -120,6 +121,21 @@ class FcmpTest(TestUtil):
                             offset += i
                             break
                     if error:
+                        nlen = 32
+                        doff = offset - base_offset
+                        if doff + nlen > count:
+                            # Not enough data in current buffer to display,
+                            # so read file at the given failed offset
+                            os.lseek(fd, offset, os.SEEK_SET)
+                            data = os.read(fd, nlen)
+                            edata = self.data_pattern(offset, len(data))
+                        else:
+                            # Enough data in current buffer
+                            data = data[doff:doff+nlen]
+                            edata = edata[doff:doff+nlen]
+                        self.dprint('DBG2', "Found difference at offset %d" % offset)
+                        self.dprint('DBG2', "    File data:     %r" % data)
+                        self.dprint('DBG2', "    Expected data: %r" % edata)
                         break
                 else:
                     size -= count
