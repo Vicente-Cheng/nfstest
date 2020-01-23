@@ -1432,6 +1432,19 @@ class PosixTest(TestUtil):
                 if self.oserror is None:
                     src_str = "source " if stype in ("file", "directory") else ""
                     self.test(data == srcpath, "readlink - data of symbolic link should be the name of the %s%s" % (src_str, stype))
+
+            # The named file does not exist.
+            symlink += "_bogus"
+            self.dprint('DBG3', "Reading non-existent symbolic link [%s]" % symlink)
+            amsg = "readlink - reading non-existent symbolic link should fail"
+            self.run_func(posix.readlink, symlink, msg=amsg, err=errno.ENOENT)
+
+            # The named file is not a symbolic link.
+            for stype in ("file", "directory"):
+                srcpath, symlink = self.setup_readlink.get(stype)
+                self.dprint('DBG3', "Reading a %s as a symbolic link [%s]" % (stype, srcpath))
+                amsg = "readlink - reading a %s as a symbolic link should fail" % stype
+                self.run_func(posix.readlink, srcpath, msg=amsg, err=errno.EINVAL)
         except Exception:
             self.test(False, traceback.format_exc())
 
