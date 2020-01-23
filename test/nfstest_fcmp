@@ -13,6 +13,7 @@
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #===============================================================================
 import os
+import errno
 import traceback
 import nfstest_config as c
 from nfstest.test_util import TestUtil
@@ -167,7 +168,17 @@ class FcmpTest(TestUtil):
 
             self.trace_start()
             self.clientobj.mount()
-            self.create_file(verbose=1, dlevels=["DBG2"])
+            try:
+                fmsg = ""
+                expr = True
+                self.create_file(verbose=1, dlevels=["DBG2"])
+            except OSError as error:
+                expr = False
+                err = error.errno
+                fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
+            self.test(expr, "File should be created", failmsg=fmsg)
+            if not expr:
+                return
         except Exception:
             self.test(False, traceback.format_exc())
             return
@@ -186,7 +197,6 @@ class FcmpTest(TestUtil):
 
     def test02_test(self):
         """Verify data written to file is correct"""
-        error = None
         try:
             self.test_group("Verify data written to file is correct")
             self.test_info("Create file using main mount options")
@@ -195,20 +205,21 @@ class FcmpTest(TestUtil):
             self.mount()
 
             try:
+                fmsg = ""
+                expr = True
                 self.create_file(verbose=1, dlevels=["DBG2"])
-            except Exception as error:
-                pass
+            except OSError as error:
+                expr = False
+                err = error.errno
+                fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
+            self.test(expr, "File should be created", failmsg=fmsg)
+            if not expr:
+                return
         except Exception:
             self.test(False, traceback.format_exc())
             return
         finally:
             self.umount()
-
-        if error is None:
-            self.test(True, "File successfully created")
-        else:
-            self.test(False, str(error))
-            return
 
         try:
             self.test_info("Compare file's data using second mount options")
