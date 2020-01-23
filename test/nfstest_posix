@@ -1118,7 +1118,7 @@ class PosixTest(TestUtil):
         self.set_nfserr_list(
             nfs3list=[nfs3_const.NFS3ERR_NOENT, nfs3_const.NFS3ERR_INVAL],
             nfs4list=[nfs4_const.NFS4ERR_NOENT, nfs4_const.NFS4ERR_INVAL,
-                      nfs4_const.NFS4ERR_OPENMODE],
+                      nfs4_const.NFS4ERR_OPENMODE, nfs4_const.NFS4ERR_BADXDR],
         )
 
         flist = []
