@@ -339,18 +339,16 @@ class PosixTest(TestUtil):
             cwd_orig = os.getcwd()
             self.create_dir()
             self.dprint('DBG3', "Change to directory %s using POSIX API chdir()" % self.absdir)
-            posix.chdir(self.absdir)
+            amsg = "chdir - chdir() should succeed"
+            self.run_func(posix.chdir, self.absdir, msg=amsg)
             cwd = os.getcwd()
             self.test(cwd == self.absdir, "chdir - current working directory should be changed")
-            posix.chdir(cwd_orig)
+            self.run_func(posix.chdir, cwd_orig, msg=amsg)
             cwd = os.getcwd()
             self.test(cwd == cwd_orig, "chdir - current working directory should be changed back to the original directory")
-
-            try:
-                posix.chdir(cwd_orig+'bogus')
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 2, "chdir - changing to a non-existent directory should return an error")
+            amsg = "chdir - changing to a non-existent directory should return an error"
+            self.run_func(posix.chdir, self.absdir+"_bogus", msg=amsg, err=errno.ENOENT)
+            self.test(cwd == os.getcwd(), "chdir - current working directory should not be changed")
         except Exception:
             self.test(False, traceback.format_exc())
 
@@ -417,24 +415,17 @@ class PosixTest(TestUtil):
             self.get_filename()
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd = posix.open(self.absfile, posix.O_WRONLY|posix.O_CREAT)
-            posix.close(fd)
-            self.test(True, "close - close() on write file should succeed")
-            try:
-                count = posix.write(fd, self.data_pattern(0, self.filesize))
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 9, "close - write after close should return an error")
+            amsg = "close - close() on write file should succeed"
+            self.run_func(posix.close, fd, msg=amsg)
+            amsg = "close - write after close should return an error"
+            self.run_func(posix.write, fd, self.data_pattern(0, 32), msg=amsg, err=errno.EBADF)
 
             self.dprint('DBG3', "Open file %s for reading" % self.absfile)
             fd = posix.open(self.absfile, posix.O_RDONLY)
-            posix.close(fd)
-            self.test(True, "close - close() on read file should succeed")
-
-            try:
-                posix.read(fd, 10)
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 9, "close - read after close should return an error")
+            amsg = "close - close() on read file should succeed"
+            self.run_func(posix.close, fd, msg=amsg)
+            amsg = "close - read after close should return an error"
+            self.run_func(posix.read, fd, 32, msg=amsg, err=errno.EBADF)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -676,11 +667,13 @@ class PosixTest(TestUtil):
         if path != None:
             op_str = 'statvfs'
             self.dprint('DBG3', "statvfs %s [%s]" % (objtype, path))
-            stv = posix.statvfs(path)
+            amsg = "statvfs - statvfs() should succeed"
+            stv = self.run_func(posix.statvfs, path, msg=amsg)
         elif fd != None:
             op_str = 'fstatvfs'
             self.dprint('DBG3', "fstatvfs %s (%d)" % (objtype, fd))
-            stv = posix.fstatvfs(fd)
+            amsg = "fstatvfs - fstatvfs() should succeed"
+            stv = self.run_func(posix.fstatvfs, fd, msg=amsg)
 
         self.test(stv.f_bsize != None,   "%s - f_bsize should be returned for %s" % (op_str, objtype))
         self.test(stv.f_frsize != None,  "%s - f_frsize should be returned for %s" % (op_str, objtype))
@@ -734,12 +727,13 @@ class PosixTest(TestUtil):
             srcfile = self.abspath(self.files[0])
             fstat_b = os.stat(srcfile)
             dstat_b = os.stat(self.mtdir)
-            sleep(1)
+            sleep(1.1)
 
             self.get_filename()
             self.dprint('DBG3', "Create link %s -> %s using POSIX API link()" % (self.absfile, srcfile))
-            posix.link(srcfile, self.absfile)
-            lstat = os.stat(srcfile)
+            amsg = "link - link() should succeed"
+            self.run_func(posix.link, srcfile, self.absfile, msg=amsg)
+            lstat = os.stat(self.absfile)
             fstat = os.stat(srcfile)
             dstat = os.stat(self.mtdir)
             self.test(lstat != None, "link - link should be created")
@@ -766,47 +760,47 @@ class PosixTest(TestUtil):
             count = posix.write(fd, data)
             self.test(count == len(data), "lseek - write should succeed at offset=0")
             self.dprint('DBG3', "Set file pointer lseek(4, SEEK_SET)")
-            offset = posix.lseek(fd, 4, os.SEEK_SET)
+            offset = self.run_func(posix.lseek, fd, 4, os.SEEK_SET)
             self.test(offset == 4, "lseek - offset: 4, whence: SEEK_SET succeeds")
             self.dprint('DBG3', "Write file [%s]" % 'BBBB')
             count = posix.write(fd, 'BBBB')
             self.dprint('DBG3', "Set file pointer lseek(8, SEEK_CUR)")
-            offset = posix.lseek(fd, 8, os.SEEK_CUR)
+            offset = self.run_func(posix.lseek, fd, 8, os.SEEK_CUR)
             self.test(offset == 16, "lseek - offset: 8, whence: SEEK_CUR succeeds")
             self.dprint('DBG3', "Write file [%s]" % 'CCCCCC')
             count = posix.write(fd, 'CCCCCC')
             self.dprint('DBG3', "Set file pointer lseek(1000, SEEK_END)")
-            offset = posix.lseek(fd, 1000, os.SEEK_END)
+            offset = self.run_func(posix.lseek, fd, 1000, os.SEEK_END)
             self.test(offset == 1022, "lseek - offset: 1000, whence: SEEK_END succeeds")
             self.dprint('DBG3', "Write file [%s]" % 'DDDDDDDD')
             count = posix.write(fd, 'DDDDDDDD')
             if self.nfs_version > 2:
                 N = 2*1024*1024*1024
                 self.dprint('DBG3', "Set file pointer lseek(2GB, SEEK_SET)")
-                offset = posix.lseek(fd, N, os.SEEK_SET)
+                offset = self.run_func(posix.lseek, fd, N, os.SEEK_SET)
                 self.test(offset == N, "lseek - offset: 2GB, whence: SEEK_SET succeeds")
                 self.dprint('DBG3', "Set file pointer lseek(2GB-1, SEEK_CUR)")
-                offset = posix.lseek(fd, N-1, os.SEEK_CUR)
+                offset = self.run_func(posix.lseek, fd, N-1, os.SEEK_CUR)
                 self.test(offset == 2*N-1, "lseek - offset: 4GB-1, whence: SEEK_CUR succeeds")
                 self.dprint('DBG3', "Set file pointer lseek(2GB, SEEK_END)")
-                offset = posix.lseek(fd, N, os.SEEK_END)
+                offset = self.run_func(posix.lseek, fd, N, os.SEEK_END)
                 self.test(offset == N+1030, "lseek - offset: 2GB+22, whence: SEEK_END succeeds")
             posix.close(fd)
 
             self.dprint('DBG3', "Open file %s for reading" % self.absfile)
             fd = posix.open(self.absfile, posix.O_RDONLY)
             self.dprint('DBG3', "Set file pointer lseek(4, SEEK_SET)")
-            offset = posix.lseek(fd, 4, os.SEEK_SET)
+            offset = self.run_func(posix.lseek, fd, 4, os.SEEK_SET)
             self.dprint('DBG3', "Read 4 bytes")
             data = posix.read(fd, 4)
             self.test(data == 'BBBB', "lseek - read data at offset = 4 should be correct")
             self.dprint('DBG3', "Set file pointer lseek(16, SEEK_SET)")
-            offset = posix.lseek(fd, 16, os.SEEK_SET)
+            offset = self.run_func(posix.lseek, fd, 16, os.SEEK_SET)
             self.dprint('DBG3', "Read 6 bytes")
             data = posix.read(fd, 6)
             self.test(data == 'CCCCCC', "lseek - read data at offset = 16 should be correct")
             self.dprint('DBG3', "Set file pointer lseek(1022, SEEK_SET)")
-            offset = posix.lseek(fd, 1022, os.SEEK_SET)
+            offset = self.run_func(posix.lseek, fd, 1022, os.SEEK_SET)
             self.dprint('DBG3', "Read 8 bytes")
             data = posix.read(fd, 8)
             self.test(data == 'DDDDDDDD', "lseek - read data at offset = 1022 should be correct")
@@ -846,10 +840,10 @@ class PosixTest(TestUtil):
 
         if stat_mode == 1:
             self.dprint('DBG3', "stat %s [%s]" % (type, self.absfile))
-            fstat = posix.stat(self.absfile)
+            fstat = self.run_func(posix.stat, self.absfile)
         elif stat_mode == 2:
             self.dprint('DBG3', "lstat %s [%s]" % (type, self.absfile))
-            fstat = posix.lstat(self.absfile)
+            fstat = self.run_func(posix.lstat, self.absfile)
             if srcfile != None:
                 mode = 0777
                 size = len(srcfile)
@@ -865,7 +859,7 @@ class PosixTest(TestUtil):
                 else:
                     self.dprint('DBG3', "Open file %s for reading" % self.absfile)
                     fd = posix.open(self.absfile, posix.O_RDONLY)
-                fstat = posix.fstat(fd)
+                fstat = self.run_func(posix.fstat, fd)
                 posix.close(fd)
             finally:
                 self.close_files(fd)
@@ -946,7 +940,8 @@ class PosixTest(TestUtil):
             mode = 0754
             self.get_dirname(dir=topdir)
             self.dprint('DBG3', "Creating directory [%s]" % self.absdir)
-            posix.mkdir(self.absdir, mode)
+            amsg = "mkdir - mkdir() should succeed"
+            self.run_func(posix.mkdir, self.absdir, mode, msg=amsg)
             dstat = os.stat(self.absdir)
             self.test(os.path.exists(self.absdir), "mkdir - directory should be created")
             self.test(dstat.st_mode & 0777 == mode, "mkdir - mode permissions of created directory should be correct")
@@ -955,27 +950,18 @@ class PosixTest(TestUtil):
             self.test(dstat.st_ctime > dstat_b.st_ctime, "mkdir - parent directory st_ctime should be updated")
             self.test(dstat.st_mtime > dstat_b.st_mtime, "mkdir - parent directory st_mtime should be updated")
 
-            try:
-                posix.mkdir(self.absdir, mode)
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 17, "mkdir - create directory should return an error if name already exists as a directory")
+            amsg = "mkdir - create directory should return an error if name already exists as a directory"
+            self.run_func(posix.mkdir, self.absdir, mode, msg=amsg, err=errno.EEXIST)
 
             self.create_file()
-            try:
-                posix.mkdir(self.absfile, mode)
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 17, "mkdir - create directory should return an error if name already exists as a file")
+            amsg = "mkdir - create directory should return an error if name already exists as a file"
+            self.run_func(posix.mkdir, self.absfile, mode, msg=amsg, err=errno.EEXIST)
 
             self.get_filename()
             self.dprint('DBG3', "Creating symbolic link to directory [%s -> %s]" % (self.absfile, abstopdir))
             os.symlink(abstopdir, self.absfile)
-            try:
-                posix.mkdir(self.absfile, mode)
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 17, "mkdir - create directory should return an error if name already exists as a symbolic link")
+            amsg = "mkdir - create directory should return an error if name already exists as a symbolic link"
+            self.run_func(posix.mkdir, self.absfile, mode, msg=amsg, err=errno.EEXIST)
         except Exception:
             self.test(False, traceback.format_exc())
 
@@ -1388,10 +1374,11 @@ class PosixTest(TestUtil):
             sleep(1)
 
             self.dprint('DBG3', "Read data from file %s using POSIX API read()" % absfile)
-            data = posix.read(fd, 0)
+            amsg = "read - read() should succeed"
+            data = self.run_func(posix.read, fd, 0, msg=amsg)
             self.test(len(data) == 0, "read - reading 0 bytes should return 0")
-            data = posix.read(fd, self.filesize)
-            self.test(data == self.data_pattern(0, len(data)), "read - reading file should succeed")
+            data = self.run_func(posix.read, fd, self.filesize, msg=amsg)
+            self.test(data == self.data_pattern(0, len(data)), "read - data returned should be correct")
             posix.close(fd)
             fstat = os.stat(absfile)
             self.test(fstat.st_atime > fstat_b.st_atime, "read - file st_atime should be updated")
@@ -1437,15 +1424,9 @@ class PosixTest(TestUtil):
             for stype in self.setup_readlink_types:
                 srcpath, symlink = self.setup_readlink.get(stype)
                 self.dprint('DBG3', "Reading symbolic link to %s [%s]" % (stype, symlink))
-                error = 0
-                fmsg = ""
-                try:
-                    data = posix.readlink(symlink)
-                except OSError as ioerr:
-                    error = ioerr.errno
-                    fmsg = ", got error [%s] %s" % (errno.errorcode.get(error,error), os.strerror(error))
-                self.test(error == 0, "readlink - reading symbolic link to a %s should succeed" % stype, failmsg=fmsg)
-                if error == 0:
+                amsg = "readlink - reading symbolic link to a %s should succeed" % stype
+                data = self.run_func(posix.readlink, symlink, msg=amsg)
+                if self.oserror is None:
                     src_str = "source " if stype in ("file", "directory") else ""
                     self.test(data == srcpath, "readlink - data of symbolic link should be the name of the %s%s" % (src_str, stype))
         except Exception:
@@ -1464,7 +1445,8 @@ class PosixTest(TestUtil):
             oldname = self.absfile
             self.get_filename()
             self.dprint('DBG3', "Rename file %s to %s using POSIX API rename()" % (oldname, self.absfile))
-            posix.rename(oldname, self.absfile)
+            amsg = "rename - rename() should succeed"
+            self.run_func(posix.rename, oldname, self.absfile, msg=amsg)
             self.test(os.path.exists(self.absfile), "rename - new file name should exist")
             self.test(not os.path.exists(oldname), "rename - old file name should not exist")
 
@@ -1473,7 +1455,7 @@ class PosixTest(TestUtil):
             oldname = self.absdir
             self.get_dirname()
             self.dprint('DBG3', "Rename directory %s to %s using POSIX API rename()" % (oldname, self.absdir))
-            posix.rename(oldname, self.absdir)
+            self.run_func(posix.rename, oldname, self.absdir, msg=amsg)
             self.test(os.path.exists(self.absdir), "rename - new directory name should exist")
             self.test(not os.path.exists(oldname), "rename - old directory name should not exist")
 
@@ -1485,7 +1467,7 @@ class PosixTest(TestUtil):
             oldname = self.absfile
             self.get_filename()
             self.dprint('DBG3', "Rename symbolic link %s to %s using POSIX API rename()" % (oldname, self.absfile))
-            posix.rename(oldname, self.absfile)
+            self.run_func(posix.rename, oldname, self.absfile, msg=amsg)
             self.test(os.path.exists(self.absfile), "rename - new symbolic link name should exist")
             self.test(not os.path.exists(oldname), "rename - old symbolic link name should not exist")
             self.test(os.path.islink(self.absfile), "rename - new name should be a symbolic link")
@@ -1496,7 +1478,7 @@ class PosixTest(TestUtil):
             oldname = self.absfile
             self.dprint('DBG3', "Rename file %s to an existing symbolic link %s using POSIX API rename()" % (oldname, newname))
             try:
-                posix.rename(oldname, newname)
+                self.run_func(posix.rename, oldname, newname, msg=amsg)
                 self.test(os.path.exists(newname), "rename - new file name should exist")
                 self.test(not os.path.exists(oldname), "rename - old file name should not exist")
                 self.test(os.path.isfile(newname) and not os.path.islink(newname), "rename - new name should be a regular file")
@@ -1527,25 +1509,20 @@ class PosixTest(TestUtil):
             sleep(1)
 
             self.dprint('DBG3', "Remove directory %s using POSIX API rmdir()" % self.absdir)
-            posix.rmdir(self.absdir)
+            amsg = "rmdir - rmdir() should succeed"
+            self.run_func(posix.rmdir, self.absdir, msg=amsg)
             dstat = os.stat(topdir)
             self.test(not os.path.exists(self.absdir),   "rmdir - directory should be removed")
             self.test(dstat.st_ctime > dstat_b.st_ctime, "rmdir - parent directory st_ctime should be updated")
             self.test(dstat.st_mtime > dstat_b.st_mtime, "rmdir - parent directory st_mtime should be updated")
 
-            try:
-                posix.rmdir(self.absdir+'bogus')
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 2, "rmdir - removing non-existent directory should return an error")
+            amsg = "rmdir - removing non-existent directory should return an error"
+            self.run_func(posix.rmdir, self.absdir+'_bogus', msg=amsg, err=errno.ENOENT)
 
             self.create_dir(dir=dir)
             self.create_file(dir=dir)
-            try:
-                posix.rmdir(topdir)
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 39, "rmdir - removing non-empty directory should return an error")
+            amsg = "rmdir - removing non-empty directory should return an error"
+            self.run_func(posix.rmdir, topdir, msg=amsg, err=errno.ENOTEMPTY)
         except Exception:
             self.test(False, traceback.format_exc())
 
@@ -1585,7 +1562,8 @@ class PosixTest(TestUtil):
             srcfile = self.abspath(self.files[0])
             self.get_filename()
             self.dprint('DBG3', "Create symbolic link %s -> %s using POSIX API symlink()" % (self.absfile, srcfile))
-            posix.symlink(srcfile, self.absfile)
+            amsg = "symlink - symlink() should succeed"
+            self.run_func(posix.symlink, srcfile, self.absfile, msg=amsg)
             lstat = os.lstat(self.absfile)
             rlink = os.readlink(self.absfile)
             self.test(lstat != None, "symlink - symbolic link should be created")
@@ -1618,27 +1596,24 @@ class PosixTest(TestUtil):
             offset += count
 
             self.dprint('DBG3', "Sync data to file")
+            amsg = "%s - sync should succeed" % objtype
             if objtype == 'sync':
-                self.libc.sync()
+                out = self.libc.sync()
+                self.test(out == 0, amsg)
             elif objtype == 'fsync':
-                posix.fsync(fd)
+                self.run_func(posix.fsync, fd, msg=amsg)
             else:
-                posix.fdatasync(fd)
-            self.test(True, "%s - sync should succeed" % objtype)
+                self.run_func(posix.fdatasync, fd, msg=amsg)
             posix.close(fd)
 
+            amsg = "%s - sync after close should return an error" % objtype
             if objtype == 'sync':
-                self.libc.sync()
-                self.test(True, "%s - sync after close should succeed" % objtype)
-                return
-            try:
-                if objtype == 'fsync':
-                    posix.fsync(fd)
-                elif objtype == 'fdatasync':
-                    posix.fdatasync(fd)
-            except OSError as e:
-                pass
-            self.test(e != None and e.errno == 9, "%s - sync after close should return an error" % objtype)
+                out = self.libc.sync()
+                self.test(out == 0, "%s - sync after close should succeed" % objtype)
+            elif objtype == 'fsync':
+                self.run_func(posix.fsync, fd, msg=amsg, err=errno.EBADF)
+            elif objtype == 'fdatasync':
+                self.run_func(posix.fdatasync, fd, msg=amsg, err=errno.EBADF)
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -1730,7 +1705,8 @@ class PosixTest(TestUtil):
 
             self.test_info("Unlink file")
             self.dprint('DBG3', "Remove file %s using POSIX API unlink()" % self.absfile)
-            posix.unlink(self.absfile)
+            amsg = "unlink - unlink() should succeed"
+            self.run_func(posix.unlink, self.absfile, msg=amsg)
             dstat = os.stat(self.mtdir)
             self.test(not os.path.exists(self.absfile), "unlink - file should be removed")
             self.test(dstat.st_ctime > dstat_b.st_ctime, "unlink - parent directory st_ctime should be updated")
@@ -1742,7 +1718,7 @@ class PosixTest(TestUtil):
             self.get_filename()
             os.symlink(srcfile, self.absfile)
             self.dprint('DBG3', "Remove symbolic link %s using POSIX API unlink()" % self.absfile)
-            posix.unlink(self.absfile)
+            self.run_func(posix.unlink, self.absfile, msg=amsg)
             self.test(not os.path.exists(self.absfile), "unlink - symbolic link should be removed")
             self.test(os.path.exists(srcfile), "unlink - symbolic link source file should not be removed")
 
@@ -1751,7 +1727,7 @@ class PosixTest(TestUtil):
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd = posix.open(self.absfile, posix.O_WRONLY|posix.O_CREAT)
             self.dprint('DBG3', "Remove file %s using POSIX API unlink()" % self.absfile)
-            posix.unlink(self.absfile)
+            self.run_func(posix.unlink, self.absfile, msg=amsg)
             self.test(not os.path.exists(self.absfile), "unlink - opened file should be removed")
             self.dprint('DBG3', "Write file %s %s@0" % (self.absfile, self.filesize))
             count = posix.write(fd, self.data_pattern(0, self.filesize))
@@ -1769,7 +1745,7 @@ class PosixTest(TestUtil):
             sleep(1)
 
             self.dprint('DBG3', "Remove file %s using POSIX API unlink()" % srcfile)
-            posix.unlink(srcfile)
+            self.run_func(posix.unlink, srcfile, msg=amsg)
             fstat = os.stat(self.absfile)
             self.test(not os.path.exists(srcfile), "unlink - original file should be removed")
             self.test(os.path.exists(self.absfile), "unlink - hard link file should not be removed")
@@ -1798,16 +1774,17 @@ class PosixTest(TestUtil):
             sleep(1)
 
             self.dprint('DBG3', "Write 0 bytes to file %s using POSIX API write()" % self.absfile)
-            count = posix.write(fd, '')
+            amsg = "write - write() should succeed"
+            count = self.run_func(posix.write, fd, '', msg=amsg)
             self.test(count == 0, "write - writing 0 bytes should return 0")
 
             self.dprint('DBG3', "Write data to file %s at offset = 0 using POSIX API write()" % self.absfile)
-            count = posix.write(fd, self.data_pattern(0, self.filesize))
+            count = self.run_func(posix.write, fd, self.data_pattern(0, self.filesize), msg=amsg)
             self.test(count == self.filesize, "write - writing N bytes should return N")
 
             offset = posix.lseek(fd, self.filesize, os.SEEK_CUR)
             self.dprint('DBG3', "Write data to file %s at different offset = N using POSIX API write()" % self.absfile)
-            count = posix.write(fd, self.data_pattern(offset, self.filesize))
+            count = self.run_func(posix.write, fd, self.data_pattern(offset, self.filesize), msg=amsg)
             posix.close(fd)
 
             fstat = os.stat(self.absfile)
