@@ -136,6 +136,11 @@ class FcmpTest(TestUtil):
             fmsg = ", difference at offset %d" % offset
         elif error == 2:
             fmsg = ", file size (%d) is shorter than expected (%d)" % (self.filesize - size, self.filesize)
+        else:
+            fstat = os.stat(self.absfile)
+            if fstat.st_size > self.filesize:
+                error = 3
+                fmsg = ", file size (%d) is larger than expected (%d)" % (fstat.st_size, self.filesize)
         self.test(error == 0, msg, failmsg=fmsg)
 
     def test01_test(self):
