@@ -144,6 +144,7 @@ class FcmpTest(TestUtil):
             self.test_group("Verify data read from file is correct")
             self.test_info("Create file using second mount options")
 
+            self.trace_start()
             self.clientobj.mount()
             self.create_file(verbose=1, dlevels=["DBG2"])
         except Exception:
@@ -154,7 +155,6 @@ class FcmpTest(TestUtil):
 
         try:
             self.test_info("Compare file's data using main mount options")
-            self.trace_start()
             self.mount()
             self.verify_file("Data read from file is correct")
         except Exception:
@@ -182,7 +182,6 @@ class FcmpTest(TestUtil):
             return
         finally:
             self.umount()
-            self.trace_stop()
 
         if error is None:
             self.test(True, "File successfully created")
@@ -198,6 +197,7 @@ class FcmpTest(TestUtil):
             self.test(False, traceback.format_exc())
         finally:
             self.clientobj.umount()
+            self.trace_stop()
 
 ################################################################################
 # Entry point
