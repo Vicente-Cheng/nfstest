@@ -815,7 +815,7 @@ class NFSUtil(Host):
         """Get the NFS operation object from the given packet"""
         if pkt:
             # Start looking for the operation after NFSidx if it exists
-            if hasattr(pkt, "NFSidx"):
+            if getattr(pkt, "NFSidx", None) is not None:
                 idx = pkt.NFSidx + 1
             else:
                 idx = 0
