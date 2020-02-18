@@ -70,6 +70,8 @@ _ordinal_map = {
 }
 _ordinal_max = max(_ordinal_map.keys())
 
+_vowels = ('a', 'e', 'i', 'o', 'u')
+
 # Unit modifiers
 UNIT_NAME = 0
 UNIT_BYTE = "B"
@@ -155,6 +157,22 @@ def ordinal_number(value, short=0):
             # Change suffix for number ending in *11, *12 and *13
             suffix = "th"
     return str(value) + suffix
+
+def plural(word, count=2):
+    """Return the plural of the word according to the given count"""
+    if count != 1:
+        wlen = len(word)
+        if wlen > 0 and word[-1] in ('s', 'x', 'z'):
+            word += "es"
+        elif wlen > 1 and word[-2:] in ('sh', 'ch'):
+            word += "es"
+        elif wlen > 1 and word[-2] not in _vowels and word[-1] == 'y':
+            word = word[:-1] + "ies"
+        elif wlen > 1 and word[-2] not in _vowels and word[-1] == 'o':
+            word += "es"
+        else:
+            word += 's'
+    return word
 
 def crc32(value):
     """Convert string to its crc32 representation"""
