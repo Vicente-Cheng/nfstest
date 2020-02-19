@@ -327,6 +327,22 @@ class NFSUtil(Host):
         nfsver += " and " if post else ""
         return nfsver
 
+    def nfs_op(self, nfs4, nfs3):
+        """Return the item according to what NFS version is mounted"""
+        if self.nfs_version < 4:
+            return nfs3
+        else:
+            return nfs4
+
+    def nfs_op_name(self, op):
+        """Return the name for the given NFSv4 operation or NFSv3 procedure"""
+        name = ""
+        if self.nfs_version < 4:
+            name = nfs_proc3.get(op, "").replace("NFSPROC3_", "", 1)
+        else:
+            name = nfs_opnum4.get(op, "").replace("OP_", "", 1)
+        return name
+
     def find_nfs_op(self, op, **kwargs):
         """Find the call and its corresponding reply for the specified NFSv4
            operation going to the server specified by the ipaddr and port.
