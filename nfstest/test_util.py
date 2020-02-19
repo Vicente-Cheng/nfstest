@@ -503,7 +503,7 @@ class TestUtil(NFSUtil):
                 if tgroup is not None:
                     desc = tgroup.get("desc")
                 if desc is None:
-                    desc = getattr(self, tname+'_test').__doc__
+                    desc = self.test_description(tname)
                 if desc is not None:
                     lines = desc.lstrip().split('\n')
                     desc = lines.pop(0)
@@ -549,6 +549,12 @@ class TestUtil(NFSUtil):
             return [nmap[x] for x in TestUtil.str_list(value, sep=sep)]
         except:
             return
+
+    def test_description(self, tname=None):
+        """Return the test description for the current test"""
+        if tname is None:
+            tname = self.testname
+        return getattr(self, tname+'_test').__doc__
 
     def need_run_test(self, testname):
         """Return True only if user explicitly requested to run this test"""
