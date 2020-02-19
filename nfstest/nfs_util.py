@@ -205,7 +205,7 @@ class NFSUtil(Host):
         self.clients.append(self.clientobj)
         return self.clientobj
 
-    def set_pktlist(self, ops=None, cbs=None, procs=None, maxindex=None, pktdisp=False):
+    def set_pktlist(self, **kwargs):
         """Set the current packet list for buffered matching in which the
            match method will only use this list instead of getting the next
            packet from the packet trace file. The default is to get all
@@ -214,12 +214,17 @@ class NFSUtil(Host):
            NOTE: all READ reply data and all WRITE request data is discarded
            to avoid having memory issues.
 
+           layer:
+               Comma separated list of layers to include [default: 'nfs']
            ops:
                List of NFSv4 operations to include in the packet list
+               [default: None]
            cbs:
                List of NFSv4 callback operations to include in the packet list
+               [default: None]
            procs:
                List of NFSv3 procedures to include in the packet list
+               [default: None]
            maxindex:
                Include packets up to but not including the packet indexed
                by this argument [default: None]
@@ -228,6 +233,16 @@ class NFSUtil(Host):
                Display all cached packets [default: False]
         """
         pktlist = []
+        layer    = kwargs.get("layer",   "nfs")
+        ops      = kwargs.get("ops",      None)
+        cbs      = kwargs.get("cbs",      None)
+        procs    = kwargs.get("procs",    None)
+        maxindex = kwargs.get("maxindex", None)
+        pktdisp  = kwargs.get("pktdisp",  False)
+
+        # Get layers into a list
+        layers = layer.replace(' ', '').split(',')
+
         # Default behavior when no list is given
         defexpr = ops is None and cbs is None and procs is None
         # Boolean expressions for each of the lists
@@ -235,11 +250,13 @@ class NFSUtil(Host):
         cbs_expr   = not defexpr and cbs   is not None
         procs_expr = not defexpr and procs is not None
         for pkt in self.pktt:
-            # Get list of NFS packets
-            if pkt == "nfs":
-                if maxindex is not None and pkt.record.index >= maxindex:
-                    break
+            if maxindex is not None and pkt.record.index >= maxindex:
+                break
+            if layer != "all" and pkt not in layers:
+                continue
 
+            if pkt == "nfs":
+                # Get list of NFS packets
                 rpc = pkt.rpc
                 if rpc.procedure == 0:
                     # NULL procedure
@@ -286,9 +303,9 @@ class NFSUtil(Host):
                             pkt.nfs.opread.resok.data = ""
                     elif procedure == NFSPROC3_WRITE and rpc.type == 0:
                         pkt.nfs.opwrite.data = ""
-                pktlist.append(pkt)
-                if pktdisp:
-                    self.test_info(str(pkt))
+            pktlist.append(pkt)
+            if pktdisp:
+                self.test_info(str(pkt))
         self.pktt.set_pktlist(pktlist)
 
     def match_nfs_version(self, nfs_version, post=True):
