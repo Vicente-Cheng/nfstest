@@ -1407,7 +1407,7 @@ class TestUtil(NFSUtil):
                     # No subtests, include just the test results
                     gcounts[item[0]] += 1
             (total, tmsg) = self._total_counts(gcounts)
-            if total > 1:
+            if total > 0:
                 # Fail the current test group if at least one of the tests within
                 # this group fails
                 tid = FAIL if gcounts[FAIL] > 0 else PASS
