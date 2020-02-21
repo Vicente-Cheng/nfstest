@@ -144,6 +144,7 @@ class RPC(GSS):
                    ]
                ]
            ]
+           psize = int,    # payload data size
            [data = string] # raw data of payload if unable to decode
        )
     """
@@ -151,7 +152,7 @@ class RPC(GSS):
     _attrlist = ("xid", "type", "rpc_version", "program", "version",
                  "procedure", "reply_status", "credential", "verifier",
                  "accepted_status", "prog_mismatch", "rejected_status",
-                 "rpc_mismatch", "auth_status")
+                 "rpc_mismatch", "auth_status", "psize")
 
     def __init__(self, pktt, proto, state=True):
         """Constructor
@@ -269,6 +270,7 @@ class RPC(GSS):
             self.fragment_hdr.data_size = self.fragment_hdr.size - hsize
 
         self._rpc = True
+        self.psize = unpack.size()
         if not self._state:
             # Do not save state
             return

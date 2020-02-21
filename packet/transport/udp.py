@@ -46,11 +46,12 @@ class UDP(BaseObj):
            dst_port = int,
            length   = int,
            checksum = int,
+           psize    = int,       # payload data size
            data     = string,    # raw data of payload if unable to decode
        )
     """
     # Class attributes
-    _attrlist = ("src_port", "dst_port", "length", "checksum", "data")
+    _attrlist = ("src_port", "dst_port", "length", "checksum", "psize", "data")
     _strfmt1  = "UDP {0} -> {1}, len: {2}"
     _strfmt2  = "src port {0} -> dst port {1}, len: {2}, checksum: {3}"
 
@@ -71,6 +72,7 @@ class UDP(BaseObj):
         self.dst_port = ulist[1]
         self.length   = ulist[2]
         self.checksum = ShortHex(ulist[3])
+        self.psize    = unpack.size()
 
         pktt.pkt.add_layer("udp", self)
         self._decode_payload(pktt)

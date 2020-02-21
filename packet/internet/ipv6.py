@@ -48,13 +48,14 @@ class IPv6(IPv4):
            hop_limit     = int,
            src           = IPv6Addr(),
            dst           = IPv6Addr(),
+           psize         = int,     # payload data size
            data          = string,  # raw data of payload if protocol
                                     # is not supported
        )
     """
     # Class attributes
     _attrlist = ("version", "traffic_class", "flow_label", "total_size",
-                 "protocol", "hop_limit", "src", "dst", "data")
+                 "protocol", "hop_limit", "src", "dst", "psize", "data")
 
     def __init__(self, pktt):
         """Constructor
@@ -77,6 +78,9 @@ class IPv6(IPv4):
         self.dst           = IPv6Addr(ulist[5].encode('hex'))
 
         pktt.pkt.add_layer("ip", self)
+
+        # Get the payload data size
+        self.psize = unpack.size()
 
         if self.protocol == 6:
             # Decode TCP

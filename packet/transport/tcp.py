@@ -195,13 +195,14 @@ class TCP(BaseObj):
            urgent_ptr  = int, # Urgent pointer
            seq         = int, # Relative sequence number
            options = list,    # List of TCP options
+           psize = int,       # Payload data size
            data = string,     # Raw data of payload if unable to decode
        )
     """
     # Class attributes
     _attrlist = ("src_port", "dst_port", "seq_number", "ack_number", "hl",
                  "header_size", "flags", "window_size", "checksum",
-                 "urgent_ptr", "options", "length", "data")
+                 "urgent_ptr", "options", "psize", "data")
 
     def __init__(self, pktt):
         """Constructor
@@ -267,6 +268,7 @@ class TCP(BaseObj):
 
         # Save length of TCP segment
         self.length = unpack.size()
+        self.psize = self.length
 
         if seq < stream.last_seq and not stream.missing_fragment(seq):
             # This is a re-transmission, do not process

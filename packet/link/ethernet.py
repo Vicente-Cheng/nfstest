@@ -46,11 +46,12 @@ class ETHERNET(BaseObj):
            dst   = MacAddr(),  # destination MAC address
            src   = MacAddr(),  # source MAC address
            type  = int,        # payload type
+           psize = int,        # payload data size
            data  = string,     # raw data of payload if type is not supported
        )
     """
     # Class attributes
-    _attrlist = ("dst", "src", "type", "data")
+    _attrlist = ("dst", "src", "type", "psize", "data")
 
     def __init__(self, pktt):
         """Constructor
@@ -66,6 +67,7 @@ class ETHERNET(BaseObj):
         self.dst  = MacAddr(ulist[0].encode('hex'))
         self.src  = MacAddr(ulist[1].encode('hex'))
         self.type = ulist[2]
+        self.psize = unpack.size()
         pktt.pkt.add_layer("ethernet", self)
 
         etype = self.type

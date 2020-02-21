@@ -60,10 +60,11 @@ class ERF(BaseObj):
            rlen      = int,    # Record length
            lctr      = int,    # Loss counter/color field
            wlen      = int,    # Wire length
+           psize     = int,    # Payload data size
        )
     """
     # Class attributes
-    _attrlist = ("timestamp", "rtype", "flags", "rlen", "lctr", "wlen")
+    _attrlist = ("timestamp", "rtype", "flags", "rlen", "lctr", "wlen", "psize")
 
     def __init__(self, pktt):
         """Constructor
@@ -92,6 +93,7 @@ class ERF(BaseObj):
                 break
 
         pktt.pkt.add_layer("erf", self)
+        self.psize = unpack.size()
 
         if self.rtype == 21:
             # Decode InfiniBand

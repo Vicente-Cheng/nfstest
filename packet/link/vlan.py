@@ -62,10 +62,11 @@ class VLAN(BaseObj):
            dei   = int,  # Drop Eligible Indicator
            vid   = int,  # VLAN Identifier
            etype = int,  # Payload Type
+           psize = int,  # Payload Data Size
        )
     """
     # Class attributes
-    _attrlist = ("pcp", "dei", "vid", "etype")
+    _attrlist = ("pcp", "dei", "vid", "etype", "psize")
     _strname = "VLAN"
 
     def __init__(self, pktt):
@@ -83,6 +84,7 @@ class VLAN(BaseObj):
         self.dei   = (ulist[0] >> 12) & 0x01
         self.vid   = ulist[0] & 0x0FFF
         self.etype = ulist[1]
+        self.psize = unpack.size()
 
     def __str__(self):
         """String representation of object

@@ -982,6 +982,7 @@ class IB(BaseObj):
            atomicacketh = AtomicAckETH, # Atomic Acknowledge Extended Transport Header
            immdt        = ImmDt,        # Immediate Extended Transport Header
            ieth         = IETH,         # Invalidate Extended Transport Header
+           psize        = int,          # Payload data size
            icrc         = int,          # Invariant CRC
            vcrc         = int,          # Variant CRC
        )
@@ -989,7 +990,7 @@ class IB(BaseObj):
     # Class attributes
     _attrlist = ("lrh", "grh", "bth", "rdeth", "deth", "xrceth", "reth",
                  "atomiceth", "aeth", "atomicacketh", "immdt", "ieth",
-                 "icrc", "vcrc")
+                 "psize", "icrc", "vcrc")
     _fattrs   = ("bth",)
     _strname  = "IB" # Layer name (IB, RoCE or RRoCE) to display
     _senddata = {}
@@ -1112,6 +1113,7 @@ class IB(BaseObj):
 
         # Decode InfiniBand payload
         offset = unpack.tell()
+        self.psize = unpack.size()
         out = self._decode_payload(pktt)
 
         if out and unpack.tell() > offset:

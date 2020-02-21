@@ -71,6 +71,7 @@ class IPv4(BaseObj):
            src             = "%d.%d.%d.%d", # source IP address
            dst             = "%d.%d.%d.%d", # destination IP address
            options = string, # IP options if available
+           psize = int       # Payload data size
            data = string,    # Raw data of payload if protocol
                              # is not supported
        )
@@ -78,7 +79,7 @@ class IPv4(BaseObj):
     # Class attributes
     _attrlist = ("version", "IHL", "header_size", "DSCP", "ECN", "total_size",
                  "id", "flags", "fragment_offset", "TTL", "protocol",
-                 "checksum", "src", "dst", "options", "data")
+                 "checksum", "src", "dst", "options", "psize", "data")
 
     def __init__(self, pktt):
         """Constructor
@@ -113,6 +114,9 @@ class IPv4(BaseObj):
             # Save IP options
             osize = self.header_size - 20
             self.options = unpack.read(osize)
+
+        # Get the payload data size
+        self.psize = unpack.size()
 
         if self.flags.MF:
             # This is an IP fragment
