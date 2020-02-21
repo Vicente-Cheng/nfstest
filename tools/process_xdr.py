@@ -91,7 +91,7 @@ using the following syntax:
     CLASSATTR: name[;disp]=value[,...]
         Add name as a class attribute
         The disp modifier is to make it a displayable attribute
-    OBJATTR: name=value[,...]
+    OBJATTR: name[;disp]=value[,...]
         Add extra attribute having the given value. If value is the name of
         another attribute in the object a "self." is added to the value, e.g.:
         /* OBJATTR op=argop, fh=self.nfs4_fh, id="123" */
@@ -100,6 +100,7 @@ using the following syntax:
         self.fh = self.nfs4_fh
         self.id = "123"
         If argop and nfs4_fh is an attribute for the object.
+        The disp modifier is to make it a displayable attribute
     GLOBAL: name[=value][,...]
         Set global attribute using set_global(). The value is processed the
         same as OBJATTR.
@@ -876,12 +877,17 @@ class XDRobject:
                the attributes to the output file. This is used to include
                these names when calculating maxlen.
         """
+        attrs = []
         nlist = []
         vdnames = deftags.get("OBJATTR")
         if vdnames is not None:
             for vardup in vdnames.split(","):
                 newname, oldname = vardup.split("=")
+                data = newname.split(";")
+                newname = data[0]
                 nlist.append(newname)
+                if len(data) > 1 and data[1] == "disp":
+                    attrs.append(newname)
                 if not namesonly:
                     sps = ""
                     if maxlen > 0:
@@ -893,7 +899,7 @@ class XDRobject:
                     else:
                         # Literal value
                         fd.write("%sself.%s %s= %s\n" % (indent, newname, sps, oldname))
-        return nlist
+        return nlist, attrs
 
     def get_strfmt(self, level, deftags):
         """Process the STRFMT1 and STRFMT2 tags and return the string
@@ -1218,10 +1224,16 @@ class XDRobject:
                 else:
                     xarg_nodisp_names.append(xarg[0])
 
+        # Process the OBJATTR tag to get a list of names to include into
+        # the calculation for maxlen. Also add attributes with the ";disp"
+        # modifier to the attribute list
+        oattrlist, attr_list = self.set_objattr(fd, deftags, dnames, "", namesonly=True)
+
         if not isbitdict:
             # Process CLASSATTR
             classattr, attrlist = self.process_classattr(deftags)
             dnames = attrlist + dnames
+            dnames += attr_list
 
             # Process _fattrs
             out = []
@@ -1304,9 +1316,6 @@ class XDRobject:
                 if len(data) == 1:
                     global_list.append(data[0])
 
-        # Process the OBJATTR tag and just get a list of names only
-        # to include these into the calculation for maxlen
-        oattrlist = self.set_objattr(fd, deftags, dnames, "", namesonly=True)
         omaxlen = 0
         if oattrlist:
             omaxlen = len(max(oattrlist, key=len))
