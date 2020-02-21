@@ -714,10 +714,10 @@ class Pktt(BaseObj):
 
     def _match(self, layer, uargs):
         """Default match function."""
-        if not hasattr(self.pkt, layer):
-            return False
-
-        if layer == "nfs":
+        if getattr(self.pkt, layer, None) is None:
+            # Layer is not defined
+            texpr = False
+        elif layer == "nfs":
             # Use special matching function for NFS
             texpr = self.match_nfs(uargs)
         else:
