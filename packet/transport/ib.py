@@ -301,7 +301,8 @@ class RETH(BaseObj):
     """
     # Class attributes
     _attrlist = ("va", "r_key", "dma_len")
-    _strfmt1  = "dma_len: {2}"
+    _strfmt1  = "rkey={1} dmalen={2}"
+    _strfmt2  = "rkey: {1}, va: {0:#018x}, dmalen: {2}"
 
     def __init__(self, unpack):
         ulist = unpack.unpack(16, "!Q2I")
@@ -992,7 +993,8 @@ class IB(BaseObj):
                  "atomiceth", "aeth", "atomicacketh", "immdt", "ieth",
                  "psize", "icrc", "vcrc")
     _fattrs   = ("bth",)
-    _strname  = "IB" # Layer name (IB, RoCE or RRoCE) to display
+    _strfmt1  = "{1}{1:? }{0}{0:? }{_strname:<5} {2}{_size:? size={_size}}{6:? }{6}{8:? }{8}"
+    _strfmt2  = "{2}{_size:?, size\: {_size}}{6:?, }{6}{8:?, }{8}"
     _senddata = {}
 
     def __init__(self, pktt):
@@ -1007,6 +1009,7 @@ class IB(BaseObj):
         self.lrh    = None
         self.grh    = None
         self._ib    = False  # This object is valid when True
+        self._size  = None   # To display payload size
         icrc_offset = None
         vcrc_offset = None
         crc_bytes   = 0
@@ -1018,6 +1021,7 @@ class IB(BaseObj):
         # reassembly. Dereference the Pktt attribute for ease of use.
         self._rdma_info = pktt._rdma_info
 
+        self._strname  = "IB" # Layer name (IB, RoCE or RRoCE) to display
         if pkt.ethernet:
             if pkt.ip:
                 # RoCE v2 or Routable RoCE
@@ -1030,12 +1034,7 @@ class IB(BaseObj):
                 if self.grh is None:
                     # This is not a IB packet
                     return
-            self._strfmt1 = "%-5s {0} {2} {8}" % self._strname
-            self._strfmt2 = "{2} {8}"
         else:
-            self._strfmt1 = "{0} %-5s {2} {8}" % self._strname
-            self._strfmt2 = "{0} {2} {8}"
-
             # Decode the IB LRH layer header
             self.lrh = LRH(unpack)
 
@@ -1053,11 +1052,6 @@ class IB(BaseObj):
             if d_offset == 2:
                 vcrc_offset = self.lrh._vcrc_offset
                 crc_bytes += 2
-
-        if self.grh:
-            # The GRH payload length includes the ICRC
-            self._strfmt1 = "{1} %-5s {2} {8}" % self._strname
-            self._strfmt2 = "{1} {2} {8}"
 
         if ((self.lrh is None and self.grh is None) or
             (self.lrh and self.lrh.lnh == 0x02) or
@@ -1127,6 +1121,9 @@ class IB(BaseObj):
                 self._strfmt1 = "{0} "
             else:
                 self._strfmt1 = ""
+        elif self.psize > 0:
+            # Display payload size
+            self._size = self.psize
 
     def __nonzero__(self):
         """Truth value testing for the built-in operation bool()"""
