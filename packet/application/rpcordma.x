@@ -179,8 +179,9 @@ union rdma_body switch (rdma_proc proc) {
  * Fixed header fields
  */
 /* STRFMT1: RPCoRDMA {3.proc} xid: {0} */
-/* STRFMT2: {3.proc}, xid: {0}, credits: {2} {3} */
+/* STRFMT2: {3.proc}, xid: {0}, credits: {2}, {3} */
 /* CLASSATTR: _strname="RPCoRDMA" */
+/* OBJATTR: psize;disp=unpack.size() */
 struct RPCoRDMA {
     uint32     xid;     /* Mirrors the RPC header xid */ /* STRHEX:1 */
     uint32     vers;    /* Version of this protocol */
