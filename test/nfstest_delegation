@@ -1289,10 +1289,7 @@ class DelegTest(TestUtil):
             if conflict_op == OP_OPEN:
                 self.test(openreply.NFSop.delegation.deleg_type == OPEN_DELEGATE_NONE, "Delegation should not be granted for the second client")
             elif conflict_type == OP_REMOVE or (conflict_type == OP_RENAME and target):
-                if deleg_type == OPEN_DELEGATE_WRITE:
-                    ds_stat = [NFS4ERR_STALE, NFS4ERR_BAD_STATEID]
-                else:
-                    ds_stat = [NFS4ERR_BAD_STATEID]
+                ds_stat  = [NFS4ERR_STALE, NFS4ERR_BAD_STATEID]
                 mds_stat = [NFS4ERR_STALE]
 
             # Verify I/O packets
