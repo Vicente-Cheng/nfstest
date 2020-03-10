@@ -1,0 +1,1239 @@
+#!/usr/bin/env python
+#===============================================================================
+# Copyright 2020 NetApp, Inc. All Rights Reserved,
+# contribution by Jorge Mora <mora@netapp.com>
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#===============================================================================
+import os
+import errno
+import traceback
+from formatstr import *
+import nfstest_config as c
+from packet.transport.ib import *
+from packet.nfs.nfs3_const import *
+from packet.nfs.nfs4_const import *
+from nfstest.test_util import TestUtil
+from packet.application.rpcordma_const import *
+import packet.application.rpc_const as rpc_const
+
+# Module constants
+__author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
+__copyright__ = "Copyright (C) 2020 NetApp, Inc."
+__license__   = "GPL v2"
+__version__   = "1.0"
+
+USAGE = """%prog --server <server> [options]
+
+NFS-over-RDMA functional tests
+==============================
+Verify correct functionality of NFS-over-RDMA
+
+Remote Direct Memory Access (RDMA) provides fast data transfers between
+servers and storage. NFS over RDMA is best used when a large amount of data
+needs to be transferred with higher performance than regular NFS. NFS over
+RDMA is usually used over InfiniBand which provides higher performance and
+a lower latency.
+
+Although NFS over RDMA is mostly used over InfiniBand, Ethernet could be
+used as the link protocol as well. RDMA over Converged Ethernet (RoCE) which
+allows RDMA over Ethernet by encapsulating the InfiniBand transport packet
+over Ethernet. RoCE provides a couple of variants: RoCEv1 and RoCEv2.
+One is RoCEv1 which is an Ethernet link layer protocol and provides RDMA
+functionality between two hosts in the same Ethernet broadcast domain.
+While the second is RoCEv2 or RRoCE (Remote RoCE) which is an internet
+layer protocol so these packets can be routed. RoCEv2 runs over UDP/IPv4
+or UDP/IPv6. There is also another variant called iWARP which runs over
+the TCP protocol. Testing is currently supported for all of these variants
+except for iWARP.
+
+NFS over RDMA has a couple of extra layers in the packet: InfiniBand layer
+and RPC-over-RDMA or RPCoRDMA layer. The InfiniBand layer contains the
+OpCode which specifies the type of RDMA operation to perform and the PSN
+which is the packet sequence number. The RPCoRDMA layer contains the XID
+and the RDMA chunk lists. The RDMA read chunk list is used to transfer
+DDP (Direct Data Placement) data from the NFS client to the server, e.g.,
+NFS write call. On the other hand, the RDMA write chunk list is used to
+transfer DDP data from the NFS server back to the client, e.g., NFS read
+reply. Only certain NFS operations can be transferred using DDP and only
+the opaque part of the operation is transferred using either RDMA reads
+or writes while the rest of the NFS packet is transferred via the receive
+buffer using the RDMA SEND operation. Finally, the RDMA reply chunk is
+used to transfer replies having a variable length reply which could be
+larger than the receive buffer and could not be transferred using the
+write chunk list because it does not contain a single large opaque item.
+
+Tests are divided into three groups: basic, read and write. The basic tests
+deal mostly with verifying NFS packets using the reply chunk and some other
+basic RDMA functionality. The read tests deal with verifying NFS read which
+in turn verify the RDMA write functionality. Finally, the write tests deal
+with verifying NFS write which in turn verify the RDMA read functionality.
+Also, if the NFS read or write is small enough the client could not use the
+RDMA write or read functionality, but instead could use the receive buffer
+and transfer the data using the RDMA SEND operations.
+
+Tests verify the RPCoRDMA layer is sent when necessary and that the RDMA
+chunk lists are sent with the correct information which includes the number
+of chunks, number of segments in each chunk and the correct information for
+each segment. Tests verify each segment information is correct and their
+corresponding RDMA read or write information which includes correct handle,
+virtual offset, DMA length and the XDR position for the case of RDMA reads.
+In addition, the correct number of RDMA I/O fragments is also verified and
+their corresponding lengths and packet sequence numbers.
+
+Examples:
+    The only required option is --server
+    $ %prog --server 192.168.0.11
+
+Notes:
+    The user id in the local host must have access to run commands as root
+    using the 'sudo' command without the need for a password."""
+
+# Test script ID
+SCRIPT_ID = "RDMA"
+
+TESTNAMES_BASIC = ["basic01", "basic02", "basic03", "basic04", "basic05"]
+TESTNAMES_READ  = ["read01",  "read02",  "read03",  "read04"]
+TESTNAMES_WRITE = ["write01", "write02", "write03", "write04"]
+TESTNAMES = ["basic"] + TESTNAMES_BASIC + \
+            ["read"]  + TESTNAMES_READ + \
+            ["write"] + TESTNAMES_WRITE
+
+TESTGROUPS = {
+    "basic": {
+         "tests": TESTNAMES_BASIC,
+         "desc": "Run all NFS-over-RDMA basic functionality tests: ",
+    },
+    "read": {
+         "tests": TESTNAMES_READ,
+         "desc": "Run all NFS-over-RDMA functionality tests where file " +
+                 "is opened for reading: ",
+    },
+    "write": {
+         "tests": TESTNAMES_WRITE,
+         "desc": "Run all NFS-over-RDMA functionality tests where file " +
+                 "is opened for writing: ",
+    },
+}
+
+# Line separator
+LINE_SEP = "="*80
+
+# I/O operations for both NFSv3 and NFSv4
+NFSread  = { "nfs4":(OP_READ,),          "nfs3":(NFSPROC3_READ,) }
+NFSwrite = { "nfs4":(OP_WRITE,),         "nfs3":(NFSPROC3_WRITE,) }
+NFSrdwr  = { "nfs4":(OP_READ, OP_WRITE), "nfs3":(NFSPROC3_READ, NFSPROC3_WRITE) }
+
+# NFS test types
+NFS_BASIC        = 0
+NFS_READ         = 1
+NFS_WRITE        = 2
+NFS_EXCHANGE_ID  = 3
+NFS_READDIR      = 4
+NFS_READLINK     = 5
+NFS_GETACL       = 6
+
+# NFSv3/NFSv4 operations for each NFS test type
+NFSoperations = {
+    NFS_READ         : NFSread,
+    NFS_WRITE        : NFSwrite,
+    NFS_EXCHANGE_ID  : { "nfs4":(OP_EXCHANGE_ID, OP_SETCLIENTID) },
+    NFS_READDIR      : { "nfs4":(OP_READDIR,),  "nfs3":(NFSPROC3_READDIR, NFSPROC3_READDIRPLUS) },
+    NFS_READLINK     : { "nfs4":(OP_READLINK,), "nfs3":(NFSPROC3_READLINK,) },
+    NFS_GETACL       : { "nfs4":(OP_GETATTR,) },
+}
+
+# Tests only supported in NFSv4.x
+NFSv4_Only_List = ("basic02", "basic05")
+
+# RDMA SEND opcode lists
+SendOnlyList = (SEND_Only, SEND_Only_Immediate, SEND_Only_Invalidate)
+SendLastList = (SEND_Last, SEND_Last_Immediate, SEND_Last_Invalidate)
+SendFMList   = (SEND_First, SEND_Middle)
+SendList     = SendFMList + SendLastList
+
+# RDMA Read Response opcode lists
+ReadRespFMList   = (RDMA_READ_Response_First, RDMA_READ_Response_Middle)
+ReadRespLastList = (RDMA_READ_Response_Last,)
+ReadResponseList = ReadRespFMList + ReadRespLastList
+
+# RDMA Write opcode lists
+WriteOnlyList    = (RDMA_WRITE_Only,  RDMA_WRITE_Only_Immediate)
+WriteLastList    = (RDMA_WRITE_Last,  RDMA_WRITE_Last_Immediate)
+WriteFMList      = (RDMA_WRITE_First, RDMA_WRITE_Middle)
+WriteFOList      = (RDMA_WRITE_First,) + WriteOnlyList
+WriteList        = WriteFMList + WriteLastList
+
+# RDMA opcode lists
+FirstMiddleList  = SendFMList   + ReadRespFMList + WriteFMList
+OnlyList         = SendOnlyList + WriteOnlyList  + (RDMA_READ_Response_Only,)
+RWLastList       = WriteLastList + ReadRespLastList
+
+# RDMA I/O types
+RDMA_READ  = 0
+RDMA_WRITE = 1
+RDMA_SEND  = 2
+
+# RDMA opcodes for each I/O type
+RDMA_IO_MAP = {
+    RDMA_READ: {
+        "only":   (RDMA_READ_Response_Only,),
+        "first":  (RDMA_READ_Response_First,),
+        "middle": (RDMA_READ_Response_Middle,),
+        "last":   (RDMA_READ_Response_Last,),
+    },
+    RDMA_WRITE: {
+        "only":   WriteOnlyList,
+        "first":  (RDMA_WRITE_First,),
+        "middle": (RDMA_WRITE_Middle,),
+        "last":   WriteLastList,
+    },
+    RDMA_SEND: {
+        "only":   SendOnlyList,
+        "first":  (SEND_First,),
+        "middle": (SEND_Middle,),
+        "last":   SendLastList,
+    },
+}
+
+# Dictionary to convert a number to its name
+NumNames = {1:"one", 2:"two", 3:"three"}
+
+def num_name(num):
+    """Return the name of the given number"""
+    return NumNames.get(num, num)
+
+def chunk_str(count):
+    """Return string representation of the number of chunks given by count"""
+    if count == 0:
+        return "no RDMA"
+    else:
+        return "%s RDMA %s in the" % (num_name(count), plural("chunk", count))
+
+def get_padding(size):
+    """Get the number of padding bytes"""
+    ndiff = size % 4
+    if ndiff > 0:
+        return (4 - ndiff)
+    return 0
+
+class RdmaTest(TestUtil):
+    """RdmaTest object
+
+       RdmaTest() -> New test object
+
+       Usage:
+           x = RdmaTest(testnames=['write01', ...])
+
+           # Run all the tests
+           x.run_tests()
+           x.exit()
+    """
+    def __init__(self, **kwargs):
+        """Constructor
+
+           Initialize object's private data.
+        """
+        TestUtil.__init__(self, **kwargs)
+
+        # Set default script options
+        self.opts.version = "%prog " + __version__
+        self.opts.set_defaults(nfiles=0)
+        self.opts.set_defaults(mtopts="hard")
+        self.opts.set_defaults(proto="rdma")
+        self.opts.set_defaults(port=20049)
+
+        # Options specific for this test script
+        hmsg = "File size to use for small files [default: %default]"
+        self.test_opgroup.add_option("--small-filesize", default="4k", help=hmsg)
+        hmsg = "File size to use for large files [default: %default]"
+        self.test_opgroup.add_option("--large-filesize", default="1m", help=hmsg)
+
+        self.scan_options()
+
+        # Disable createtraces option
+        self.createtraces = False
+
+        self.iosize          = None # RDMA I/O size
+        self.maxresponsesize = None # Session max response size
+        self.nfs_read_count  = 0    # Number of NFS reads already processed
+        self.nfs_write_xid   = {}   # XIDs of NFS writes already processed
+        self.read_file_dict  = {}   # Map size to file name to use for reading
+        self.symlink_list    = []   # List of symbolic link names
+        self.testdir_list    = []   # List of directory names
+
+        # Calculate file size to use for tests
+        self.small_filesize = int_units(self.small_filesize)
+        self.large_filesize = int_units(self.large_filesize)
+        deltafsize = int(self.small_filesize / 4)
+        self.file_size_list = [int(deltafsize/2)] + [x*deltafsize for x in range(1,4)]
+        self.basic_size_list = self.file_size_list + [self.small_filesize]
+
+        # Files to be created at setup for each test, use either a size or a
+        # list. If size is 0 then the size will be the value in --filesize
+        self.setup_files = {
+            "basic01": self.basic_size_list,
+            "basic02": self.small_filesize,
+            "basic05": self.small_filesize,
+            "read01":  self.file_size_list,
+            "read02":  self.small_filesize,
+            "read03":  self.filesize,
+            "read04":  self.large_filesize,
+        }
+
+        # Directories to be created for each test with the number of files
+        # to create in each directory
+        self.setup_dirs = {"basic01":[0], "basic03":[0,10]}
+
+        # Symbolic links to be created at setup, the source file is given by the
+        # size given
+        self.setup_symlinks = {"basic01":self.filesize, "basic04":self.filesize}
+
+        if self.nfs_version < 4:
+            # Remove all tests not supported for NFS version < 4
+            for tname in NFSv4_Only_List:
+                while tname in self.testlist:
+                    self.testlist.remove(tname)
+        # Make sure there is at least one test left to run
+        if len(self.testlist) == 0:
+            self.opts.error("tests given in --runtest are not supported for --nfsversion=%s" % self.nfsversion)
+
+    def get_file_size(self, testname=None):
+        """Get file size list for the current test or for the given test name"""
+        results = []
+        if testname is None:
+            # Test name not given so use the current test
+            testname = self.testname
+        # Get the list of file sizes for given test
+        fsize_list = self.setup_files.get(testname, [])
+        # Convert tuple of a single size to a list
+        if isinstance(fsize_list, tuple):
+            fsize_list = list(fsize_list)
+        elif not isinstance(fsize_list, list):
+            fsize_list = [fsize_list]
+        # Convert file sizes to integers, also if size is 0 then
+        # use the size given in --filesize
+        for fsize in fsize_list:
+            results.append(self.filesize if fsize == 0 else int_units(fsize))
+        return results
+
+    def setup(self, **kwargs):
+        """Setup test environment"""
+        dir_list   = []
+        fsize_list = []
+        symlk_list = []
+        # Get list of directories, files and symbolic links to create
+        # according to the tests which will be running
+        for testname in self.testlist:
+            dir_list += self.setup_dirs.get(testname, [])
+            fsize_list += self.get_file_size(testname)
+            ssize = self.setup_symlinks.get(testname)
+            if ssize is not None:
+                # Create source file for symbolic link if necessary
+                ssize = self.filesize if ssize == 0 else int_units(ssize)
+                symlk_list.append(ssize)
+                fsize_list.append(ssize)
+
+        testdir_h = {}
+        symlink_h = {}
+        if len(fsize_list) or len(dir_list):
+            # Create file system objects
+            self.umount()
+            self.mount()
+            for fsize in fsize_list:
+                # Create file using the given size if it does not exist yet
+                if self.read_file_dict.get(fsize) is None:
+                    self.create_file(size=fsize)
+                    self.read_file_dict[fsize] = self.filename
+            for nfiles in dir_list:
+                # Create directory if it does not exist yet
+                if testdir_h.get(nfiles) is None:
+                    dirname = self.create_dir()
+                    self.testdir_list.append(dirname)
+                    # Create all the files given for this directory
+                    for i in range(nfiles):
+                        self.create_file(size=1024, dir=dirname)
+                testdir_h[nfiles] = 1
+            for fsize in symlk_list:
+                # Create symbolic link if it does not exist yet
+                if symlink_h.get(fsize) is None:
+                    # Get file to use as the source
+                    filename = self.read_file_dict.get(fsize)
+                    srcpath = self.abspath(filename)
+                    self.get_filename()
+                    self.dprint('DBG3', "Creating symbolic file %s -> %s" % (self.absfile, srcpath))
+                    os.symlink(srcpath, self.absfile)
+                    self.symlink_list.append(self.filename)
+                symlink_h[fsize] = 1
+            self.umount()
+
+    def get_nfs_ops(self, nfs_iotype):
+        """Get list of operations for the given NFS test type according
+           to the current NFS version mounted
+        """
+        nargs = NFSoperations.get(nfs_iotype)
+        if nargs is None:
+            return ()
+        elif self.nfs_version < 4:
+            return nargs.get("nfs3", ())
+        else:
+            return nargs.get("nfs4", ())
+
+    def read_file(self, **kwargs):
+        """Read the file given by the size"""
+        fd = None
+        size = kwargs.get("size", self.filesize)
+        # Get file path to read matching the size given
+        self.filename = self.read_file_dict.get(size)
+        self.absfile = self.abspath(self.filename)
+        try:
+            self.dprint('DBG2', "Reading file [%s] %d@0" % (self.absfile, size))
+            fd = os.open(self.absfile, os.O_RDONLY)
+            data = os.read(fd, size)
+        finally:
+            if fd:
+                os.close(fd)
+        return data
+
+    def get_iosize(self):
+        """Get the I/O size by inspecting any of the First or Middle fragments"""
+        save_index = self.pktt.get_index()
+        if self.pktt.match("ib.opcode in %s" % (FirstMiddleList,)):
+            self.iosize = self.pktt.pkt.ib.psize
+        else:
+            # No First or Middle fragments so get the maximum payload size
+            # in all the Only messages
+            iosize = 100
+            while self.pktt.match("ib.opcode in %s" % (OnlyList,)):
+                iosize = max(iosize, self.pktt.pkt.ib.psize)
+            self.iosize = iosize
+        self.pktt.rewind(save_index)
+        return self.iosize
+
+    def get_maxresponsesize(self):
+        """Get the session maximum response size"""
+        if self.nfs_version > 4:
+            save_index = self.pktt.get_index()
+            pktcall, pktreply = self.find_nfs_op(OP_CREATE_SESSION)
+            if pktreply:
+                self.maxresponsesize = pktreply.NFSop.fore_chan_attrs.maxresponsesize
+            self.pktt.rewind(save_index)
+        return self.maxresponsesize
+
+    def get_chunk_lists(self, rpcordma, rpctype=rpc_const.CALL, display=True):
+        """Return the chunk lists"""
+        if rpcordma is None:
+            return [], [], []
+        read_h = {} # Group each read chunk using the XDR position
+        cname_list = ("reads", "writes", "reply")
+        chunk_lists = {x:[] for x in cname_list}
+
+        # Get the chunk lists from the RPC-over-RDMA layer
+        for cname in cname_list:
+            clist = chunk_lists.get(cname)
+            chunk_list = getattr(rpcordma, cname, [])
+            if chunk_list is None:
+                continue
+            if cname == "reply":
+                # Convert the reply chunk into a list of lists
+                chunk_list = [chunk_list]
+            for chunkobj in chunk_list:
+                if cname == "reads":
+                    # This is the read chunk list
+                    xdrpos = chunkobj.position
+                    cargs = (xdrpos, chunkobj.handle, chunkobj.offset, chunkobj.length)
+                    read_h.setdefault(xdrpos, []).append(cargs)
+                elif cname in ("writes", "reply"):
+                    # This is the write/reply chunk list
+                    clist.append([])
+                    for obj in chunkobj.target:
+                        clist[-1].append((obj.handle, obj.offset, obj.length))
+
+        # Convert the read list into a list of lists
+        chunk_lists["reads"] = [read_h[x] for x in sorted(read_h.keys())]
+
+        if display:
+            # Display debug info
+            rpctype_str = rpc_const.msg_type[rpctype].lower()
+            for cname in cname_list:
+                clist = chunk_lists.get(cname)
+                cname = cname[:-1] if cname != "reply" else cname
+                rmsg = "xdrpos=%d, " if cname == "read" else ""
+                dmsg = "  RDMA %s chunk segment: " + rmsg + "handle=%s, offset=0x%016x, length=%d"
+                if len(clist) > 0:
+                    self.dprint('DBG2', "RDMA %s chunks in %s: %d" % (cname, rpctype_str, len(clist)))
+                    for chunkobj in clist:
+                        self.dprint('DBG2', "* RDMA %s chunk segments: %d" % (cname, len(chunkobj)))
+                        for segment in chunkobj:
+                            self.dprint('DBG2', dmsg % ((cname,) + segment))
+        return [chunk_lists[x] for x in cname_list]
+
+    def verify_rw_request(self, request, expected):
+        """Verify Read Request or Write First fragment"""
+        opcode, psn, size, handle, offset, dma_len = request
+        dma_psn, dma_offset, dma_length = expected
+        opstr = ib_op_codes.get(opcode)
+
+        self.dprint('DBG2', "%s: psn=%d, size=%d, handle=%s, offset=0x%016x, length=%d" % request)
+        self.test(True, "%s should be sent to client" % opstr)
+
+        expr = offset == dma_offset
+        fmsg =  ": expecting 0x%016x, got 0x%016x" % (dma_offset, offset)
+        self.test(expr, "%s should have correct virtual address" % opstr, failmsg=fmsg)
+
+        expr = dma_len <= dma_length
+        fmsg =  ": expecting %d, got %d" % (dma_length, dma_len)
+        self.test(expr, "%s should have correct DMA length" % opstr, failmsg=fmsg)
+
+        expr = psn == dma_psn
+        fmsg =  ": expecting %s, got %s" % (dma_psn, psn)
+        self.test(expr, "%s should have correct PSN" % opstr, failmsg=fmsg)
+
+        if opcode == RDMA_READ_Request:
+            expr = size == 0
+            fmsg =  ": expecting no payload, got %s bytes" % size
+            self.test(expr, "%s should not have any payload data" % opstr, failmsg=fmsg)
+        else:
+            esize = (self.iosize if opcode == RDMA_WRITE_First else dma_length)
+            esize += get_padding(esize)
+            expr = size == esize
+            fmsg =  ": expecting %s, got %s" % (esize, size)
+            self.test(expr, "%s should have correct payload size" % opstr, failmsg=fmsg)
+
+    def verify_fragments(self, iotype, iolist, count, expected=()):
+        """Verify RDMA I/O fragments"""
+        results = ()
+        rdma_h = RDMA_IO_MAP.get(iotype)
+        # Direction of RDMA I/O fragments
+        srv_clnt = "server" if iotype == RDMA_READ else "client"
+        if count > 2:
+            # Results should have First, Middle and Last fragments
+            results = ((rdma_h["first"], 1), (rdma_h["middle"], count-2), (rdma_h["last"], 1))
+        elif count > 1:
+            # Results should only have First and Last fragments
+            results = ((rdma_h["first"], 1), (rdma_h["last"], 1))
+        elif count == 1:
+            # Results should only have one Only fragment
+            results = ((rdma_h["only"], 1),)
+
+        if len(iolist[0]) == 6 and len(expected):
+            # Verify Read Request or Write First fragment
+            self.verify_rw_request(iolist[0], expected)
+
+        # Get maximum length of opcode name
+        if len(iolist) == 1 and len(iolist[0]) != 3:
+            maxlen = 0
+        else:
+            maxlen = len(max([str(x[0]) for x in iolist if len(x) == 3], key=len))
+
+        # Display all fragments other than the Read Request and Write First
+        # fragment which were already been displayed in verify_rw_request
+        for seg in iolist:
+            if len(seg) == 3:
+                self.dprint('DBG3', "%-*s: psn=%d, size=%d" % ((maxlen,) + seg))
+
+        # Verify all the fragments
+        for item in results:
+            oplist, ecount = item
+            # Get the number of fragments actually sent for the given OpCode
+            op_list = [x for x in iolist if x[0] in oplist]
+            io_count = len(op_list)
+            if io_count > 0:
+                opcode = op_list[0][0]
+            else:
+                opcode = oplist[0]
+
+            # Verify all fragments other than the Read Request and Write First
+            # fragment which were already been verified in verify_rw_request
+            if opcode not in WriteFOList or len(iolist[0]) != 6:
+                amsg = "%s should be sent to %s" % (ib_op_codes.get(opcode), srv_clnt)
+                fmsg =  ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), io_count)
+                self.test(io_count == ecount, amsg, failmsg=fmsg)
+
+                if io_count > 0:
+                    expr = True
+                    # Get expected I/O size
+                    if opcode in SendOnlyList:
+                        # There is only one fragment: should be the payload size
+                        iosize = iolist[0][2]
+                    elif opcode in SendLastList:
+                        # Last SEND fragment: should be the payload size since
+                        # there is no way to find out the size of the whole I/O
+                        iosize = iolist[-1][2]
+                    elif opcode in RWLastList:
+                        # Last Read/Write fragment: it should be the remainder
+                        # size of the whole I/O
+                        nbytes = iolist[0][5] % self.iosize
+                        iosize = nbytes if nbytes > 0 else iosize
+                    else:
+                        # Use the RDMA I/O size of the mount
+                        iosize = self.iosize
+                    iosize += get_padding(iosize) # Add padding bytes if any
+                    # Verify size of each fragment for given OpCode is correct
+                    for item in op_list:
+                        size = item[2]
+                        expr = expr and size == iosize
+                        if not expr:
+                            break
+                    amsg = "%s should have correct payload size" % ib_op_codes.get(opcode)
+                    fmsg = ": expecting %d, got %d" % (iosize, size)
+                    self.test(expr, amsg, failmsg=fmsg)
+
+    def verify_segment(self, iotype, handle, offset, length, epsn=None):
+        """Verify segment and all its fragments for the given handle"""
+        # Get correct info according to RDMA I/O type (either READ or WRITE)
+        if iotype == RDMA_READ:
+            opreq = (RDMA_READ_Request,)
+            oplist = ReadResponseList
+            epsnstr = "" # Last PSN is unknown for RDMA reads
+        else:
+            opreq = WriteFOList # The Write First fragment has the request info
+            oplist = WriteList
+            epsnstr = "ib.psn < %d and " % epsn
+
+        # Search for all read/write requests in the segment
+        requests = []
+        match_str = "ib.opcode in %s and %sib.reth.r_key == %s" % (opreq, epsnstr, handle)
+        while self.pktt.match(match_str):
+            pindex = self.pktt.get_index()
+            ibobj = self.pktt.pkt.ib
+            reth = ibobj.reth
+            # Include the packet index in the request
+            requests.append((ibobj.opcode, ibobj.psn, ibobj.psize, reth.r_key, reth.va, reth.dma_len, pindex))
+
+        iostr = "read requests" if iotype == RDMA_READ else "write firsts"
+        self.dprint('DBG2', "RDMA %s for handle %s: %d" % (iostr, handle, len(requests)))
+
+        # Verify all fragments for each request
+        dma_psn = None
+        dma_length = None
+        for req_info in requests:
+            pindex  = req_info[-1]
+            reqinfo = req_info[:-1]
+            (opcode, psn, size, handle, dma_off, dma_len) = reqinfo
+            if dma_psn is None:
+                # Use the PSN on the request for the first expected PSN
+                dma_psn = psn
+            if dma_length is None:
+                # Use the DMA length on the request for the first expected length
+                dma_length = dma_len
+
+            # Get the number of expected fragments for this request
+            count = int(dma_len/self.iosize) + (1 if dma_len%self.iosize else 0)
+
+            # Get all fragments starting with the PSN from the request and
+            # up to the last expected PSN
+            fragment_list = [reqinfo] # Include the request in the fragment list
+            self.pktt.rewind(pindex)
+            mstr = "ib.opcode in %s and ib.psn >= %d and ib.psn < %d" % (oplist, psn, psn+count)
+            while self.pktt.match(mstr):
+                ib = self.pktt.pkt.ib
+                fragment_list.append((ib.opcode, ib.psn, ib.psize))
+
+            # Verify RDMA I/O fragments
+            self.verify_fragments(iotype, fragment_list, count, (dma_psn, offset, dma_length))
+
+            dma_psn += count   # Expected PSN for next request
+            offset  += dma_len # Expected offset for next request
+            length  -= dma_len # Remaining bytes for whole segment
+            # Expected DMA length of next request, the last request for the
+            # segment could be shorter than dma_length and it should be the
+            # remaining bytes for the whole segment
+            dma_length = min(dma_length, length)
+
+    def verify_io_op(self, pkt, optype=None, rpctype=None, isrpcordma=True, rdmaproc=RDMA_MSG):
+        """Verify I/O call/reply operation"""
+        if pkt is None:
+            # Not a valid packet
+            return
+
+        if self.nfs_version < 4:
+            # For NFSv3, the NFS read/write is the NFS object
+            nfsop = pkt.nfs
+        elif getattr(pkt, "NFSop", None) is not None:
+            # For NFSv4, the NFS read/write is the NFSop object
+            nfsop = pkt.NFSop
+        else:
+            # NFSop is None so NFS was not matched directly so look
+            # for the NFS read/write operation object
+            nfsop = self.getop(pkt, optype)
+
+        optype = nfsop.op if optype is None else optype
+        rpctype = pkt.rpc.type if rpctype is None else rpctype
+        iostr = "%s %s" % (self.nfs_op_name(optype), rpc_const.msg_type[rpctype].lower())
+        srv_clnt = "server" if rpctype == rpc_const.CALL else "client"
+
+        if optype in self.nfs_op(**NFSrdwr):
+            # NFS read or write
+            offstr = "" if rpctype == rpc_const.REPLY else "offset=%d, " % nfsop.offset
+            self.dprint('DBG2', "Found NFS %s: %scount=%d" % (iostr, offstr, nfsop.count))
+        else:
+            self.dprint('DBG2', "Found NFS %s" % iostr)
+        self.test(pkt, "NFS %s should be sent to %s" % (iostr, srv_clnt))
+        self.test(pkt == "ib", "NFS %s should be sent over RDMA" % iostr)
+        if pkt == "ib":
+            if isrpcordma:
+                expr = pkt == "rpcordma"
+                self.test(expr, "NFS %s should be sent with RPCoRDMA layer" % iostr)
+                if expr:
+                    procstr = rdma_proc.get(rdmaproc)
+                    expr = pkt.rpcordma.proc == rdmaproc
+                    self.test(expr, "NFS %s should be sent with %s proc" % (iostr, procstr))
+                    if pkt.rpcordma.proc == RDMA_MSG:
+                        expr = pkt.rpcordma.psize > 0
+                        self.test(expr, "NFS %s should be sent with payload data for %s" % (iostr, procstr))
+                    else:
+                        expr = pkt.rpcordma.psize == 0
+                        self.test(expr, "NFS %s should be sent with no payload data for %s" % (iostr, procstr))
+            else:
+                expr = pkt != "rpcordma"
+                self.test(expr, "NFS %s should be sent with no RPCoRDMA layer" % iostr)
+                if optype in self.nfs_op(**NFSwrite) and rpctype == rpc_const.CALL:
+                    expr = pkt.ib.opcode == RDMA_READ_Response_Last
+                    self.test(expr, "NFS %s should be reassembled in the last read response fragment " % iostr)
+
+    def verify_chunk_lists(self, rpcordma, optype, rpctype, nreads=0, nwrites=0, nreply=0):
+        """Verify the RDMA chunk lists"""
+        if rpcordma is None:
+            return
+        iostr = "%s %s" % (self.nfs_op_name(optype), rpc_const.msg_type[rpctype].lower())
+
+        ncount = nreads + nwrites
+        if optype in self.nfs_op(**NFSread) or rpctype == rpc_const.REPLY or ncount == 0:
+            tmsg = "NFS %s should be sent with " % iostr
+        else:
+            tmsg = "RPCoRDMA (NFS %s) should be sent with " % iostr
+
+        # Get the RDMA chunk lists
+        reads, writes, reply = self.get_chunk_lists(rpcordma, display=False)
+
+        # Verify the number of chunks in each chunk list
+        amsg = tmsg + "%s read chunk list" % chunk_str(nreads)
+        fmsg = ", there are %d read chunks" % len(reads)
+        self.test(len(reads) == nreads, amsg, failmsg=fmsg)
+        amsg = tmsg + "%s write chunk list" % chunk_str(nwrites)
+        fmsg = ", there are %d write chunks" % len(writes)
+        self.test(len(writes) == nwrites, amsg, failmsg=fmsg)
+        amsg = tmsg + "%s reply chunk" % chunk_str(nreply)
+        fmsg = ", there are %d write chunks" % len(reply)
+        self.test(len(reply) == nreply, amsg, failmsg=fmsg)
+
+        flat_list = []
+        for clist in reads+writes+reply:
+            flat_list += clist
+
+        if len(flat_list) > 0 and rpctype == rpc_const.CALL:
+            handle_list = [x[-3] for x in flat_list]
+            nhandles = len(handle_list)      # Number of handles
+            uhandles = len(set(handle_list)) # Number of unique handles
+            amsg = tmsg + "all unique RDMA chunk handles"
+            fmsg = ": expecting %d unique handles but got %d" % (nhandles, uhandles)
+            self.test(uhandles == nhandles, amsg, failmsg=fmsg)
+
+            offset_list = [x[-2] for x in flat_list]
+            noffsets = len(offset_list)      # Number of offsets
+            uoffsets = len(set(offset_list)) # Number of unique offsets
+            amsg = tmsg + "all unique RDMA chunk virtual addresses"
+            fmsg = ": expecting %d unique virtual addresses but got %d" % (noffsets, uoffsets)
+            self.test(uoffsets == noffsets, amsg, failmsg=fmsg)
+
+        afmt = "%sDDP (using %s opcodes)"
+        msg_h = {0:("no ", "SEND")}
+        if rpctype == rpc_const.CALL:
+            if optype in self.nfs_op(**NFSwrite):
+                # Verify if using DDP and correct XDR position on NFS WRITE call
+                if len(reads) and len(reads[0]):
+                    expr = reads[0][0][0] <= rpcordma.psize
+                    fmsg = ": xdrpos(%d) should be less than or equal to RPCoRDMA " \
+                           "payload length(%d)" % (reads[0][0][0], rpcordma.psize)
+                    self.test(expr, tmsg + "correct XDR position", failmsg=fmsg)
+                amsg = afmt % msg_h.get(nreads, ("", "RDMA_READ"))
+                self.test(len(reads) == nreads, tmsg + amsg)
+            elif len(reply):
+                # Verify correct DMA length
+                tsize = min([x[2] for x in reply[0]])
+                expr = tsize > 0
+                self.test(expr, tmsg + "a non-zero DMA length")
+                if self.maxresponsesize is not None:
+                    tsize = sum([x[2] for x in reply[0]])
+                    expr = tsize < self.maxresponsesize
+                    fmsg = ": %d is not less than %d" % (tsize, self.maxresponsesize)
+                    amsg = tmsg + "a DMA length less than maxresponsesize"
+                    self.test(expr, amsg, failmsg=fmsg)
+        elif optype in self.nfs_op(**NFSread):
+            # Verify if using DDP on NFS READ reply
+            amsg = afmt % msg_h.get(nwrites, ("", "RDMA_WRITE"))
+            self.test(len(writes) == nwrites, tmsg + amsg)
+
+    def verify_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
+        """Verify I/O is sent using RDMA SENDs instead of a chunk list"""
+        if pkt and pkt == "ib":
+            send_list = []
+            # Index of NFS write call or read reply
+            io_index = pkt.record.index
+            opcode   = pkt.ib.opcode
+            if opcode in SendOnlyList:
+                # Nothing to do here, there is only one packet
+                # for the whole NFS read/write
+                count = 1
+                send_list.append((opcode, pkt.ib.psn, pkt.ib.psize))
+            elif opcode in SendList:
+                # Find all SEND First, Middle and Last fragments
+                match_str = "ib.opcode in %s" % (SendList,)
+                while self.pktt.match(match_str, maxindex=io_index+1):
+                    ibobj     = self.pktt.pkt.ib
+                    ib_psn    = ibobj.psn
+                    ib_count  = ibobj.psize
+                    ib_opcode = ibobj.opcode
+                    send_list.append((ib_opcode, ib_psn, ib_count))
+                # Make sure to get the SEND_First closest to SEND_Last
+                index = len(send_list) - 1
+                for item in reversed(send_list):
+                    if item[0] == SEND_First:
+                        break
+                    index -= 1
+                if index > 0:
+                    # Remove beginning of list
+                    send_list = send_list[index:]
+                count = send_list[-1][1] - send_list[0][1] + 1
+            else:
+                return
+
+            if len(send_list):
+                if chunkverify:
+                    # Verify the RDMA chunk lists
+                    if rpcordma is None and pkt == "rpcordma":
+                        rpcordma = pkt.rpcordma
+                    self.verify_chunk_lists(rpcordma, optype, rpctype)
+                # Verify the list of SEND fragments
+                self.verify_fragments(RDMA_SEND, send_list, count)
+
+    def verify_chunk_in_reply(self, pktcall, pktreply, optype, nreads=0, nwrites=0, nreply=0):
+        """Verify RDMA write chunk list or RDMA reply chunk in the NFS reply"""
+        if pktreply is None or pktreply != "rpcordma":
+            # Not an RPC-over-RDMA packet
+            return
+
+        # Get the RDMA chunk lists for both the NFS call and reply
+        rpcordma_r  = pktreply.rpcordma
+        creads, cwrites, creply = self.get_chunk_lists(pktcall.rpcordma, rpc_const.CALL, display=False)
+        rreads, rwrites, rreply = self.get_chunk_lists(rpcordma_r, rpc_const.REPLY)
+        self.verify_chunk_lists(rpcordma_r, optype, rpc_const.REPLY, nreads, nwrites, nreply)
+
+        opstr = "NFS %s" % self.nfs_op_name(optype)
+        tmsg = "%s reply should have correct RDMA segment " % opstr
+
+        # Verify either the write chunk list or the reply chunk
+        call_chunk_list  = cwrites if nwrites > 0 else creply
+        reply_chunk_list = rwrites if nwrites > 0 else rreply
+
+        while len(call_chunk_list) and len(reply_chunk_list):
+            call_chunk  = call_chunk_list.pop(0)
+            reply_chunk = reply_chunk_list.pop(0)
+
+            # Verify the reply has the same number of segments as the call
+            c_count = len(call_chunk)
+            r_count = len(reply_chunk)
+            expr = c_count == r_count
+            fmsg = ": reply "
+            amsg = "%s reply should be sent with the same number of RDMA chunk segments as the call" % opstr
+            if c_count > r_count:
+                count  = c_count - r_count
+                fmsg += "is missing %s %s" % (num_name(count), plural("segment", count))
+            elif c_count < r_count:
+                count  = r_count - c_count
+                fmsg += "has %s extra %s" % (num_name(count), plural("segment", count))
+            self.test(expr, amsg, failmsg=fmsg)
+
+            # Verify all segments in the RMA chunk
+            while len(call_chunk) and len(reply_chunk):
+                chandle, coffset, clength = call_chunk.pop(0)
+                rhandle, roffset, rlength = reply_chunk.pop(0)
+                rstr = "reply" if nreply > 0 else "write"
+                dargs = (rstr, rhandle, roffset, rlength)
+                self.dprint('DBG2', "RDMA %s chunk segment: handle=%s, offset=0x%016x, length=%d" % dargs)
+                fmsg = ": reply handle does not match the call handle"
+                self.test(rhandle == chandle, tmsg + "handle", failmsg=fmsg)
+                fmsg = ": reply RDMA offset (%d) should be equal to call RDMA offset (%d)" % (roffset, coffset)
+                self.test(roffset == coffset, tmsg + "virtual address", failmsg=fmsg)
+                if nreply > 0 and rpcordma_r.proc == RDMA_MSG:
+                    emsg = " of zero when proc is RDMA_MSG"
+                    expr = rlength == 0
+                else:
+                    emsg = ""
+                    expr = rlength <= clength
+                fmsg = ": reply length (%d) should be <= call length (%d)" % (rlength, clength)
+                self.test(expr, tmsg + "length%s" % emsg, failmsg=fmsg)
+                self.verify_segment(RDMA_WRITE, rhandle, roffset, rlength, pktreply.ib.psn)
+
+    def verify_rdma_write(self, pktcall):
+        """Verify RDMA WRITEs whether for a reply chunk or write chunk list"""
+        self.test_info(LINE_SEP)
+        self.verify_io_op(pktcall)
+        save_index = self.pktt.get_index()
+        if pktcall and pktcall == "ib":
+            # This packet is NFS-over-RDMA
+            optype   = pktcall.NFSop.argop
+            rpcordma = pktcall.rpcordma
+
+            # Display RDMA write chunk segments in the call
+            self.get_chunk_lists(rpcordma, rpc_const.CALL)
+
+            # Find the NFS reply
+            xid = pktcall.rpc.xid
+            match_str = "rpc.xid == %s or rpcordma.xid == %s" % (xid, xid)
+            pktreply = self.pktt.match(match_str)
+            self.pktt.rewind(save_index)
+
+            tsize = 0
+            ck_args = {}
+            nio_args = {}
+            if optype in self.nfs_op(**NFSread) and len(rpcordma.writes):
+                ck_args = {"nwrites":1}
+            elif rpcordma.reply is not None:
+                ck_args = {"nreply":1}
+                if pktreply.rpcordma.reply:
+                    tsize = sum([x.length for x in pktreply.rpcordma.reply.target])
+                if tsize > 0:
+                    nio_args = {"rdmaproc":RDMA_NOMSG}
+
+            # Verify the RDMA chunk lists for the call
+            self.verify_chunk_lists(rpcordma, optype, rpc_const.CALL, **ck_args)
+
+            # Verify NFS operation for the reply
+            self.verify_io_op(pktreply, optype, rpc_const.REPLY, **nio_args)
+
+            if len(ck_args):
+                # NFS operation using the write chunk list or reply chunk
+                self.verify_chunk_in_reply(pktcall, pktreply, optype, **ck_args)
+                if rpcordma.reply is not None and tsize == 0:
+                    # The RDMA segment length is zero, thus there are no
+                    # RDMA WRITEs and the reply is sent over SEND_Only
+                    self.verify_sends(pktreply, optype, rpc_const.REPLY, chunkverify=False)
+            else:
+                # NFS call does not have a write chunk list or reply chunk
+                # so verify the reply is sent using SEND operations
+                self.verify_sends(pktreply, optype, rpc_const.REPLY, rpcordma)
+        self.pktt.rewind(save_index)
+
+    def verify_rdma_reply_chunk(self, nfs_iotype):
+        """Verify RDMA reply chunk for the given NFS operation"""
+        # Get correct list of NFSv4 operations or NFSv3 procedures
+        op_list = self.get_nfs_ops(nfs_iotype)
+        save_index = self.pktt.get_index()
+
+        match_str = "nfs.argop in %s" % (op_list,)
+        while self.pktt.match(match_str):
+            nfsop = self.pktt.pkt.NFSop
+            if self.nfs_version >= 4 and nfsop.argop == OP_GETATTR:
+                if FATTR4_ACL not in nfsop.attributes:
+                    # Skip all GETATTR packets with no ACL
+                    continue
+            self.verify_rdma_write(self.pktt.pkt)
+
+        self.pktt.rewind(save_index)
+
+    def verify_nfs_read(self):
+        """Verify NFS read is sent over RDMA"""
+        self.find_nfs_op(self.nfs_op(OP_READ, NFSPROC3_READ), call_only=True)
+        if self.pktcall:
+            # Verify RDMA WRITEs for the write chunk list
+            self.verify_rdma_write(self.pktcall)
+            self.nfs_read_count += 1
+        elif self.nfs_read_count == 0:
+            # Fail only when there are no NFS reads in the packet trace
+            self.test(False, "NFS READ call should be sent to server")
+        return bool(self.pktcall)
+
+    def verify_nfs_write(self):
+        """Verify NFS write is sent over RDMA"""
+        start_index = self.pktt.get_index()
+        write_count = len(self.nfs_write_xid)
+        # Search for the NFS write or an RPCoRDMA layer having a read chunk
+        # list. If the NFS write is matched is because it is small enough to
+        # use RDMA SENDs instead since the RPCoRDMA layer having the read
+        # chunk list must come before the NFS write call has been reassembled
+        mstr1 = "nfs.argop == %d" % self.nfs_op(OP_WRITE, NFSPROC3_WRITE)
+        mstr2 = "rpcordma.proc == %d and len(rpcordma.reads) > 0" % RDMA_MSG
+        match_str = "%s or (%s)" % (mstr1, mstr2)
+
+        # Search for the first NFS write or the start of an NFS write which
+        # has not already been processed
+        rpcordma = None
+        pkt_rdma_msg = None
+        while self.pktt.match(match_str):
+            pkt = self.pktt.pkt
+            if pkt == "rpc":
+                xid = pkt.rpc.xid
+            else:
+                xid = pkt.rpcordma.xid
+            if self.nfs_write_xid.get(xid):
+                # This NFS write has already been processed
+                continue
+            else:
+                # Found next NFS write to process
+                pkt_rdma_msg = pkt
+                self.nfs_write_xid[xid] = 1
+                break
+        save_index = self.pktt.get_index()
+        if pkt_rdma_msg:
+            self.test_info("="*80)
+        if pkt_rdma_msg and pkt_rdma_msg.NFSop is None:
+            # NFSop is None so an RPCoRDMA layer with a read chunk list
+            # was matched -- verity NFS write is sent using RDMA READs
+            self.dprint('DBG2', "Found RPC-over-RDMA packet with RDMA_MSG and a read chunk list")
+            rpcordma = pkt_rdma_msg.rpcordma
+            self.get_chunk_lists(rpcordma, rpc_const.CALL)
+            self.verify_chunk_lists(rpcordma, OP_WRITE, rpc_const.CALL, nreads=1)
+
+            # Get and verify all read chunk segments
+            for readobj in rpcordma.reads:
+                self.pktt.rewind(save_index)
+                self.verify_segment(RDMA_READ, readobj.handle, readobj.offset, readobj.length)
+
+            # Search for the NFS write
+            self.pktt.rewind(pkt_rdma_msg.record.index)
+            self.find_nfs_op(self.nfs_op(OP_WRITE, NFSPROC3_WRITE), call_only=True)
+            writecall = self.pktt.pkt
+            self.verify_io_op(writecall, OP_WRITE, rpc_const.CALL, isrpcordma=False)
+        elif pkt_rdma_msg and pkt_rdma_msg.NFSop is not None:
+            # The NFS write was matched so verify NFS write is sent using
+            # RDMA SENDs instead
+            writecall = pkt_rdma_msg
+            self.verify_io_op(writecall, OP_WRITE, rpc_const.CALL)
+            # Index of NFS write call
+            write_index = writecall.record.index
+            self.pktt.rewind(start_index)
+            self.verify_sends(writecall, OP_WRITE, rpc_const.CALL)
+            self.pktt.rewind(write_index+1)
+        elif write_count == 0:
+            # No NFS writes has been processed so far thus fail the test
+            # because there is not a sing NFS write or RPCoRDMA with a
+            # read chunk list in the packet trace
+            self.test(False, "RPC-over-RDMA packet should be sent with RDMA_MSG and a read chunk list")
+
+        # Result is True if an NFS write was processed
+        result = len(self.nfs_write_xid) > write_count
+        if result and writecall:
+            # Find the NFS reply and verify it
+            xid = writecall.rpc.xid
+            match_str = "rpc.xid == %s or rpcordma.xid == %s" % (xid, xid)
+            self.pktt.rewind(writecall.record.index+1)
+            writereply = self.pktt.match(match_str)
+            self.verify_io_op(writereply, OP_WRITE, rpc_const.REPLY)
+            self.verify_chunk_lists(writereply.rpcordma, OP_WRITE, rpc_const.REPLY)
+
+        self.pktt.rewind(save_index)
+        return result
+
+    def verify_nfs_over_rdma(self):
+        """Verify all NFS packets are sent over RDMA"""
+        count   = 0  # The number of NFS packets in packet trace
+        ibcount = 0  # The number of NFS-over-RDMA packets in packet trace
+        save_index = self.pktt.get_index()
+        self.pktt.rewind(0)
+        # Get all NFS packets
+        while self.pktt.match("nfs.op > 0"):
+            count += 1
+            if self.pktt.pkt == "ib":
+                ibcount += 1
+        self.dprint('DBG2', "NFS packets: %d" % count)
+        self.dprint('DBG2', "NFS-over-RDMA packets: %d" % ibcount)
+        if count > 0:
+            # Verify all NFS packets are sent over RDMA
+            fmsg = ", NFS-over-RDMA packets(%d) != NFS packets(%d)" % (ibcount, count)
+            amsg = "All NFS packets should be sent over RDMA"
+            self.test(ibcount == count, amsg, failmsg=fmsg)
+        self.pktt.rewind(save_index)
+
+    def test_rdma_io(self, nfs_iotype, filesizes=None):
+        """Verify NFS-over-RDMA functionality"""
+        try:
+            self.trace_start()
+            self.mount()
+
+            if filesizes is not None:
+                # Argument filesizes is only used for testing NFS reads or
+                # NFS writes -- the argument could be either a list, a tuple
+                # or an integer (if using a single file)
+                if isinstance(filesizes, list) or isinstance(filesizes, tuple):
+                    filesize_list = filesizes
+                else:
+                    # Single file size -- convert it into a list
+                    filesize_list = [filesizes]
+                for fsize in filesize_list:
+                    # For each file size, convert size into an integer if any
+                    # size is given as a string with units
+                    fsize = int_units(fsize)
+                    try:
+                        fmsg = ""
+                        expr = True
+                        if nfs_iotype == NFS_READ:
+                            self.read_file(size=fsize)
+                        elif nfs_iotype == NFS_WRITE:
+                            self.create_file(size=fsize, verbose=1, dlevels=["DBG2"])
+                    except OSError as error:
+                        expr = False
+                        err = error.errno
+                        fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
+                    if nfs_iotype == NFS_READ:
+                        self.test(expr, "File should be read correctly", failmsg=fmsg)
+                    elif nfs_iotype == NFS_WRITE:
+                        self.test(expr, "File should be created", failmsg=fmsg)
+                    if not expr:
+                        return
+            elif nfs_iotype == NFS_GETACL:
+                # Verify RDMA reply chunk for a GETATTR asking for ACLs
+                self.filename = self.read_file_dict.get(self.get_file_size()[0])
+                self.absfile = self.abspath(self.filename)
+                self.run_cmd("nfs4_getfacl " + self.absfile)
+            elif nfs_iotype == NFS_READDIR:
+                # Verify RDMA reply chunk while reading the contents of
+                # the directories specified for this test
+                for dirname in self.testdir_list:
+                    dirpath = self.abspath(dirname)
+                    self.dprint('DBG2', "Reading directory [%s]" % dirpath)
+                    os.listdir(dirpath)
+            elif nfs_iotype == NFS_READLINK:
+                # Verify RDMA reply chunk by reading the contents of a
+                # symbolic link -- which file it is pointing to
+                symlink = self.abspath(self.symlink_list[0])
+                self.dprint('DBG2', "Reading symbolic link [%s]" % symlink)
+                os.readlink(symlink)
+            elif nfs_iotype == NFS_EXCHANGE_ID:
+                # Verify RDMA reply chunk on the EXCHANGE_ID or SETCLIENTID
+                self.read_file(size=self.get_file_size()[0])
+            elif nfs_iotype == NFS_BASIC:
+                # Just generate some traffic for this test
+                dirpath = self.abspath(self.testdir_list[0])
+                self.dprint('DBG2', "Reading directory [%s]" % dirpath)
+                os.listdir(self.abspath(self.testdir_list[0]))
+
+                symlink = self.abspath(self.symlink_list[0])
+                self.dprint('DBG2', "Reading symbolic link [%s]" % symlink)
+                os.readlink(symlink)
+
+                for fsize in self.basic_size_list:
+                    self.read_file(size=fsize)
+                    self.create_file(size=fsize)
+        except Exception:
+            self.test(False, traceback.format_exc())
+            return
+        finally:
+            self.umount()
+            self.trace_stop()
+
+        try:
+            self.trace_open()
+            # Use buffered matching -- get all NFS and RDMA packets
+            self.set_pktlist(layer="ib,nfs")
+            self.get_iosize() # Get the RDMA I/O size if possible
+            self.get_maxresponsesize() # Get the session maximum response size
+
+            # Verify all NFS packets are sent over RDMA
+            self.verify_nfs_over_rdma()
+
+            if nfs_iotype == NFS_READ:
+                # Verify NFS read is sent over RDMA using either RDMA READs
+                # or SENDs
+                self.nfs_read_count = 0
+                while self.verify_nfs_read(): pass
+            elif nfs_iotype == NFS_WRITE:
+                # Verify NFS write is sent over RDMA using either RDMA WRITEs
+                # or SENDs
+                self.nfs_write_xid = {}
+                while self.verify_nfs_write(): pass
+            elif nfs_iotype != NFS_BASIC:
+                # Verify RDMA reply chunk on the NFS operation other
+                # than NFS read or write
+                self.verify_rdma_reply_chunk(nfs_iotype)
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            self.pktt.close()
+
+    def basic01_test(self):
+        """Verify basic NFS-over-RDMA functionality"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_BASIC)
+
+    def basic02_test(self):
+        """Verify NFS-over-RDMA reply chunk on EXCHANGE_ID/SETCLIENTID"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_EXCHANGE_ID)
+
+    def basic03_test(self):
+        """Verify NFS-over-RDMA reply chunk on READDIR"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_READDIR)
+
+    def basic04_test(self):
+        """Verify NFS-over-RDMA reply chunk on READLINK"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_READLINK)
+
+    def basic05_test(self):
+        """Verify NFS-over-RDMA reply chunk on GETATTR(FATTR4_ACL)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_GETACL)
+
+    def read01_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for reading (very small file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_READ, filesizes=self.get_file_size())
+
+    def read02_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for reading (small file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_READ, filesizes=self.get_file_size())
+
+    def read03_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for reading (medium file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_READ, filesizes=self.get_file_size())
+
+    def read04_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for reading (large file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_READ, filesizes=self.get_file_size())
+
+    def write01_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for writing (very small file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_WRITE, filesizes=self.file_size_list)
+
+    def write02_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for writing (small file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_WRITE, filesizes=self.small_filesize)
+
+    def write03_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for writing (medium file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_WRITE, filesizes=self.filesize)
+
+    def write04_test(self):
+        """Verify NFS-over-RDMA functionality on a file opened for writing (large file)"""
+        self.test_group(self.test_description())
+        self.test_rdma_io(NFS_WRITE, filesizes=self.large_filesize)
+
+################################################################################
+# Entry point
+x = RdmaTest(usage=USAGE, testnames=TESTNAMES, testgroups=TESTGROUPS, sid=SCRIPT_ID)
+
+try:
+    x.setup()
+
+    # Run all the tests
+    x.run_tests()
+except Exception:
+    x.test(False, traceback.format_exc())
+finally:
+    x.exit()

@@ -115,6 +115,7 @@ NFSTEST_SCRIPTS = [
     'test/nfstest_pkt',
     'test/nfstest_pnfs',
     'test/nfstest_posix',
+    'test/nfstest_rdma',
     'test/nfstest_sparse',
     'test/nfstest_ssc',
     'test/nfstest_xid',
