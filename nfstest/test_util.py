@@ -519,7 +519,6 @@ class TestUtil(NFSUtil):
         if len(usage) > 0:
             self.opts.set_usage(usage)
         self._cmd_line = " ".join(sys.argv)
-        self._opts = {}
 
     @staticmethod
     def str_list(value, vtype=str, sep=","):
@@ -955,10 +954,13 @@ class TestUtil(NFSUtil):
             self.dprint('OPTS', "\n".join(_lines))
             self.dprint('OPTS', "")
             for key in sorted(vars(opts)):
+                optname = "--" + key
+                if not self.opts.has_option(optname):
+                    optname = optname.replace("_", "-")
+                    if not self.opts.has_option(optname):
+                        continue
                 value = getattr(opts,key)
-                self._opts[key] = value
-                line = "%s = %s" % (key, value)
-                self.dprint('OPTS', line)
+                self.dprint('OPTS', "%s = %s" % (optname[2:], value))
             self.dprint('OPTS', "")
 
             if len(opts.tag) > 0:
