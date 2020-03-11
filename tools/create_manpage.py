@@ -248,7 +248,9 @@ def create_manpage(src, dst):
             continue
         elif len(summary) == 0:
             if len(line) > 0:
-                if re.search(r'^FILE', line):
+                if line == 'FILE':
+                    # The FILE label is given by pydoc so there is no summary
+                    # text if we are here
                     summary = ' '
                     continue
                 else:
@@ -257,55 +259,55 @@ def create_manpage(src, dst):
             continue
         elif len(line) > 0 and line[0] == '=':
             continue
-        elif re.search(r'^Requirements and limitations', line):
+        elif line == 'Requirements and limitations':
             section = 'requirements'
             continue
-        elif re.search(r'^Tests', line):
+        elif line == 'Tests':
             section = 'tests'
             continue
-        elif re.search(r'^Tools', line):
+        elif line == 'Tools':
             section = 'tools'
             continue
-        elif re.search(r'^Installation', line):
+        elif line == 'Installation':
             section = 'installation'
             continue
-        elif re.search(r'^Run the tests', line):
+        elif line == 'Run the tests':
             section = 'examples'
             continue
-        elif re.search(r'^Useful options', line):
+        elif line == 'Useful options':
             section = 'options'
             continue
-        elif re.search(r'^Examples:', line):
+        elif line == 'Examples:':
             section = 'examples'
             continue
-        elif re.search(r'^Notes:', line):
+        elif line == 'Notes:':
             section = 'notes'
             continue
-        elif re.search(r'^Available tests:', line):
+        elif line == 'Available tests:':
             section = 'tests'
             continue
-        elif re.search(r'^Options:', line):
+        elif line == 'Options:':
             section = 'options'
             continue
-        elif re.search(r'^NAME', line):
+        elif line == 'NAME':
             section = 'name'
             continue
-        elif re.search(r'^DESCRIPTION', line):
+        elif line == 'DESCRIPTION':
             section = 'desc'
             continue
-        elif re.search(r'^CLASSES', line):
+        elif line == 'CLASSES':
             section = 'class'
             continue
-        elif re.search(r'^FUNCTIONS', line):
+        elif line == 'FUNCTIONS':
             section = 'funcs'
             continue
-        elif re.search(r'^DATA', line):
+        elif line == 'DATA':
             section = 'data'
             continue
-        elif re.search(r'^VERSION', line):
+        elif line == 'VERSION':
             section = 'version'
             continue
-        elif re.search(r'^AUTHOR', line):
+        elif line == 'AUTHOR':
             section = 'author'
             continue
 
