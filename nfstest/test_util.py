@@ -457,6 +457,8 @@ class TestUtil(NFSUtil):
         self.dbg_opgroup = OptionGroup(self.opts, "Debug options")
         hmsg = "Do not cleanup created files"
         self.dbg_opgroup.add_option("--nocleanup", action="store_true", default=False, help=hmsg)
+        hmsg = "Do not display timestamps in debug messages"
+        self.dbg_opgroup.add_option("--notimestamps", action="store_true", default=False, help=hmsg)
         hmsg = "File containing test messages to mark as bugs if they failed"
         self.dbg_opgroup.add_option("--bugmsgs", default=self.bugmsgs, help=hmsg)
         hmsg = "Do not mount server and run the tests on local disk space"
@@ -926,6 +928,10 @@ class TestUtil(NFSUtil):
                 long_opts = [x for x in self.opts._long_opt.keys() if x not in hidden_opts]
                 print "\n".join(self.opts._short_opt.keys() + long_opts)
                 sys.exit(0)
+
+            if opts.notimestamps:
+                # Disable timestamps in debug messages
+                self.tstamp(enable=False)
 
             del opts.list__tests
             del opts.list__options
