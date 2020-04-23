@@ -728,14 +728,8 @@ class Host(BaseObj):
             if self.traceproc:
                 self.dprint('DBG2', "Trace stop")
                 time.sleep(self.trcdelay)
-                try:
-                    # Try killall first
-                    self.run_cmd("killall tcpdump", sudo=True, dlevel='DBG2')
-                    time.sleep(0.1)
-                except:
-                    pass
                 # Make sure the process gets killed and wait for it to finish
-                self.stop_cmd(self.traceproc)
+                self.stop_cmd(self.traceproc, dlevel='DBG2', msg="Stopping packet trace capture: ")
                 self.traceproc = None
             if not self.notrace and self._nfsdebug:
                 self.nfs_debug_reset()
