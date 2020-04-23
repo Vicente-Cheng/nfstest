@@ -270,6 +270,39 @@ class Host(BaseObj):
         path = "%s/%s%s" % (self.mtdir, bdir, filename)
         return path
 
+    def get_pids(self, pid):
+        """Get all descendant PIDs for the given PID"""
+        # Get all process ids with their respective parent process ids
+        out = self.run_cmd("ps -ef", dlevel='DBG2', msg="Get all processes: ")
+        pids = {}
+        for line in out.split("\n"):
+            info = line.split()
+            if len(info) > 3:
+                try:
+                    p_id = int(info[1])
+                    ppid = int(info[2])
+                    pids[p_id] = ppid
+                except:
+                    pass
+
+        # Get all descendants for the given process id
+        plist = []
+        clist = []
+        if pids.get(pid) is not None:
+            # Include the given PID in the results
+            clist.append(pid)
+        while len(clist):
+            idx = len(plist)
+            plist += clist
+            clist = []
+            # Get next level of descendants
+            for cpid in plist[idx:]:
+                for p_id in pids.keys():
+                    if cpid == pids[p_id]:
+                        # Add child process id to current level list
+                        clist.append(p_id)
+        return plist
+
     def sudo_cmd(self, cmd):
         """Prefix the SUDO command if effective user is not root."""
         if os.getuid() != 0:
@@ -380,15 +413,23 @@ class Host(BaseObj):
                     if proc.pid in self.process_smap:
                         # This process was started with sudo so kill it with
                         # sudo since terminate() will fail
-                        count = 0
-                        while proc.poll() is None and count < 10:
-                            try:
-                                if count > 0:
-                                    time.sleep(0.25)
-                                self.run_cmd("kill %d" % proc.pid, sudo=True, dlevel=dlevel, msg=msg)
-                            except:
-                                pass
-                            count += 1
+                        for killsig in ("SIGINT", "SIGTERM", "SIGKILL"):
+                            count = 0
+                            pidlist = []
+                            while count < 5 and proc.poll() is None:
+                                pidlist = self.get_pids(proc.pid)
+                                if len(pidlist) == 0:
+                                    break
+                                for pid in reversed(pidlist):
+                                    try:
+                                        cmd = "kill -%s %d" % (killsig, pid)
+                                        self.run_cmd(cmd, sudo=True, dlevel=dlevel, msg=msg)
+                                    except Exception as e:
+                                        pass
+                                count += 1
+                                time.sleep(0.1)
+                            if len(pidlist) == 0:
+                                break
                         self.process_smap.pop(proc.pid)
                     else:
                         self.dprint(dlevel, msg + "stopping process %d" % proc.pid)
