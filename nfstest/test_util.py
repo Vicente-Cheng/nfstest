@@ -1189,7 +1189,7 @@ class TestUtil(NFSUtil):
 
         for rfile in reversed(self.remove_list):
             try:
-                if os.path.exists(rfile):
+                if os.path.lexists(rfile):
                     if os.path.isfile(rfile):
                         self.dprint('DBG5', "    Removing file [%s]" % rfile)
                         os.unlink(rfile)
