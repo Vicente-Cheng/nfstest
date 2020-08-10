@@ -755,7 +755,7 @@ class RDMAinfo(RDMAbase):
                         rsegment.add_data(psn, unpack.read(size))
                     return rsegment
 
-    def reassemble_rdma_reads(self, psn, unpack):
+    def reassemble_rdma_reads(self, psn, unpack, only=False):
         """Reassemble RDMA read chunks
            The RDMA read chunks are reassembled in the read last operation
         """
@@ -776,7 +776,7 @@ class RDMAinfo(RDMAbase):
         # xdrpos1 ---^              xdrpos2 --^
 
         # Add RDMA read fragment
-        rsegment = self.add_rdma_data(psn, unpack)
+        rsegment = self.add_rdma_data(psn, unpack, only=only, read=only)
         if rsegment is None:
             return
 
@@ -1169,15 +1169,14 @@ class IB(BaseObj):
             self._rdma_info.add_rdma_data(self.bth.psn, unpack)
         elif self.opcode == RC+RDMA_READ_Request:
             self._rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, False)
-        elif self.opcode == RC+RDMA_READ_Response_Only:
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack, only=True, read=True)
         elif self.opcode == RC+RDMA_READ_Response_First:
             self._rdma_info.add_rdma_data(self.bth.psn, unpack, only=False, read=True)
         elif self.opcode == RC+RDMA_READ_Response_Middle:
             self._rdma_info.add_rdma_data(self.bth.psn, unpack)
-        elif self.opcode == RC+RDMA_READ_Response_Last:
-            # The RDMA read chunks are reassembled in the read last operation
-            data = self._rdma_info.reassemble_rdma_reads(self.bth.psn, unpack)
+        elif self.opcode in (RC+RDMA_READ_Response_Last, RC+RDMA_READ_Response_Only):
+            only = (self.opcode == RC+RDMA_READ_Response_Only)
+            # The RDMA read chunks are reassembled in the last read operation
+            data = self._rdma_info.reassemble_rdma_reads(self.bth.psn, unpack, only=only)
             if data is not None:
                 # Decode RPC layer
                 pktt.unpack = Unpack(data)
