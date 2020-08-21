@@ -152,7 +152,7 @@ class NFSbase(utils.RPCload):
                     out += "%-25s" % ";".join(oplist)
                 if utils.LOAD_body or utils.NFS_mainop:
                     # Order operations by their priority
-                    item_list = sorted(self.array, key=lambda x: priority.get(x.op ,0))
+                    item_list = sorted(self.array, key=lambda x: priority.get(x.op, 0))
                     if utils.NFS_mainop:
                         # Display only the highest priority operation name
                         out += "%-10s" % str(item_list[-1].op)[3:]
@@ -178,6 +178,23 @@ class NFSbase(utils.RPCload):
             return out
         else:
             return BaseObj.__str__(self)
+
+    def main_op(self):
+        """Get the main NFS operation"""
+        rpc = self._rpc
+        if rpc.program >= 0x40000000 and rpc.program < 0x60000000:
+            cb_flag  = True
+            priority = CBpriority
+        else:
+            cb_flag  = False
+            priority = NFSpriority
+        if rpc.procedure > 0 and (rpc.version == 4 or cb_flag):
+            # Get the main operation for NFSv4.x
+            item_list = sorted(self.array, key=lambda x: priority.get(x.op, 0))
+            return item_list.pop()
+        else:
+            # Main operation for NULL/CB_NULL is the object for the procedure
+            return self
 
 class NULL(NFSbase):
     """NFS NULL object"""

@@ -304,6 +304,10 @@ class RPCload(BaseObj):
             out += "xid:0x%08x " % rpc.xid
         return out
 
+    def main_op(self):
+        """Get the main NFS operation"""
+        return self
+
     def __str__(self):
         """Informal string representation"""
         rdebug = self.debug_repr()
