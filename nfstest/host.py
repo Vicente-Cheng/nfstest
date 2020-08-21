@@ -682,7 +682,7 @@ class Host(BaseObj):
         if tracefile:
             self.tracefile = tracefile
         else:
-            self.tracefile = "%s/%s_%d.cap" % (self.tmpdir, self.tracename, self.traceidx)
+            self.tracefile = "%s/%s_%03d.cap" % (self.tmpdir, self.tracename, self.traceidx)
             self.traceidx += 1
         if not self.notrace:
             if len(self.nfsdebug) or len(self.rpcdebug):
@@ -770,7 +770,7 @@ class Host(BaseObj):
         if dbgfile is not None:
             self.dbgfile = dbgfile
         else:
-            self.dbgfile = "%s/%s_%d.msg" % (self.tmpdir, self.dbgname, self.dbgidx)
+            self.dbgfile = "%s/%s_%03d.msg" % (self.tmpdir, self.dbgname, self.dbgidx)
             self.dbgidx += 1
 
         if modmsgs['nfs'] is None and modmsgs['rpc'] is None:
