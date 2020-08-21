@@ -1107,7 +1107,7 @@ class TestUtil(NFSUtil):
     def get_logname(self, remote=False):
         """Get next log file name."""
         tmpdir = c.NFSTEST_TMPDIR if remote else self.tmpdir
-        logfile = "%s/%s_%d.log" % (tmpdir, self.get_name(), self.logidx)
+        logfile = "%s/%s_%02d.log" % (tmpdir, self.get_name(), self.logidx)
         self.logidx += 1
         return logfile
 
@@ -1624,13 +1624,13 @@ class TestUtil(NFSUtil):
     def get_name(self):
         """Get unique name for this instance."""
         if not self._name:
-            timestr = self.timestamp("{0:date:%Y%m%d%H%M%S}")
+            timestr = self.timestamp("{0:date:%Y%m%d_%H%M%S}")
             self._name = "%s_%s" % (self.progname, timestr)
         return self._name
 
     def get_dirname(self, dir=None):
         """Return a unique directory name under the given directory."""
-        self.dirname = "%s_d_%d" % (self.get_name(), self.diridx)
+        self.dirname = "%s_d_%03d" % (self.get_name(), self.diridx)
         self.diridx += 1
         self.absdir = self.abspath(self.dirname, dir=dir)
         self.dirs.append(self.dirname)
@@ -1639,7 +1639,7 @@ class TestUtil(NFSUtil):
 
     def get_filename(self, dir=None):
         """Return a unique file name under the given directory."""
-        self.filename = "%s_f_%d" % (self.get_name(), self.fileidx)
+        self.filename = "%s_f_%03d" % (self.get_name(), self.fileidx)
         self.fileidx += 1
         self.absfile = self.abspath(self.filename, dir=dir)
         self.files.append(self.filename)
