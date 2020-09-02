@@ -234,7 +234,7 @@ class RPC(GSS):
             self.verifier = rpc_credential(unpack, True)
             if self.rpc_version != 2 or (self.credential.flavor in [0,1] and not self.verifier):
                 return
-        elif self.type == REPLY:
+        elif self.type == REPLY and pktt.rpc_replies:
             # RPC reply
             self.reply_status = unpack.unpack_uint()
             if self.reply_status == MSG_ACCEPTED:
@@ -271,7 +271,7 @@ class RPC(GSS):
 
         self._rpc = True
         self.psize = unpack.size()
-        if not self._state:
+        if not self._state or not pktt.rpc_replies:
             # Do not save state
             return
 

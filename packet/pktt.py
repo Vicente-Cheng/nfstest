@@ -111,7 +111,7 @@ class Pktt(BaseObj):
            for pkt in x:
                print pkt
     """
-    def __init__(self, tfile, live=False):
+    def __init__(self, tfile, live=False, rpc_replies=True):
         """Constructor
 
            Initialize object's private data, note that this will not check the
@@ -164,6 +164,7 @@ class Pktt(BaseObj):
         self.timestart = time.time() # Time reference base
         self.reply_matched = False   # Matching a reply
         self._cleanup_done = False   # Cleanup of attributes has been done
+        self.rpc_replies = rpc_replies  # Dissect RPC replies
 
         # TCP stream map: to keep track of the different TCP streams within
         # the trace file -- used to deal with RPC packets spanning multiple
@@ -191,7 +192,7 @@ class Pktt(BaseObj):
             else:
                 # Create all packet trace objects
                 for tfile in self.tfiles:
-                    self.pktt_list.append(Pktt(tfile))
+                    self.pktt_list.append(Pktt(tfile, rpc_replies=self.rpc_replies))
 
     def close(self):
         """Gracefully close the tcpdump trace file and cleanup attributes."""
