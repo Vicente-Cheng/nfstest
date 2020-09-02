@@ -111,7 +111,7 @@ class Pktt(BaseObj):
            for pkt in x:
                print pkt
     """
-    def __init__(self, tfile, live=False, state=True):
+    def __init__(self, tfile, live=False):
         """Constructor
 
            Initialize object's private data, note that this will not check the
