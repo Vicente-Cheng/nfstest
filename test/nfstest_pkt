@@ -216,6 +216,8 @@ hhelp = "If set to True, enums are strictly enforced [default: %default]"
 debug.add_option("--enum-check", default=str(utils.ENUM_CHECK), help=hhelp)
 hhelp = "If set to True, enums are displayed as numbers [default: %default]"
 debug.add_option("--enum-repr", default=str(utils.ENUM_REPR), help=hhelp)
+hhelp = "Do not dissect RPC replies"
+debug.add_option("--no-rpc-replies", action="store_true", default=False, help=hhelp)
 hhelp = "Set debug level messages"
 debug.add_option("--debug-level", default="", help=hhelp)
 opts.add_option_group(debug)
@@ -255,6 +257,14 @@ utils.ENUM_CHECK   = eval(vopts.enum_check)
 utils.ENUM_REPR    = eval(vopts.enum_repr)
 formatstr.CRC16    = eval(vopts.crc16)
 formatstr.CRC32    = eval(vopts.crc32)
+
+# Do not dissect RPC replies if command line option is given
+rpc_replies = not vopts.no_rpc_replies
+
+if vopts.reply and vopts.no_rpc_replies:
+    opts.error("Options --reply and --no-rpc-replies are mutually exclusive")
+if vopts.call and vopts.no_rpc_replies:
+    opts.error("Options --call and --no-rpc-replies are mutually exclusive")
 
 # Re-open stdout to set file descriptor to unbuffered
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
@@ -348,7 +358,7 @@ else:
 for tfile in trace_files:
     if vopts.serial:
         print "Processing", tfile
-    pkttobj = Pktt(tfile)
+    pkttobj = Pktt(tfile, rpc_replies=rpc_replies)
     pkttobj.showprog = vopts.progress
     if vopts.start > 1:
         pkttobj[vopts.start - 1]
