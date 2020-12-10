@@ -301,7 +301,7 @@ class DelegTest(TestUtil):
                 "a list of arguments separated by a ':' given in the following " \
                 "order if positional arguments is used (see examples): " \
                 "clientname:server:export:nfsversion:port:proto:sec:mtpoint " \
-                "[default:%default]"
+                "[default: '%default']"
         self.test_opgroup.add_option("--client", default='nfsversion=3:proto=tcp:port=2049', help=hhelp)
         hhelp = "Starting offset for lock [default: %default]"
         self.test_opgroup.add_option("--lock-offset", type="int", default=0, help=hhelp)
