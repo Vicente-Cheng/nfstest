@@ -444,6 +444,8 @@ class TestUtil(NFSUtil):
         self.path_opgroup = OptionGroup(self.opts, "Path options")
         hmsg = "Full path of binary for sudo [default: '%default']"
         self.path_opgroup.add_option("--sudo", default=self.sudo, help=hmsg)
+        hmsg = "Full path of binary for kill [default: '%default']"
+        self.path_opgroup.add_option("--kill", default=self.kill, help=hmsg)
         hmsg = "Full path of binary for tcpdump [default: '%default']"
         self.path_opgroup.add_option("--tcpdump", default=self.tcpdump, help=hmsg)
         hmsg = "Full path of binary for iptables [default: '%default']"

@@ -198,6 +198,7 @@ NFSTEST_MTPOINT      = '/mnt/t'
 NFSTEST_MTOPTS       = 'hard,rsize=4096,wsize=4096'
 NFSTEST_INTERFACE    = 'eth0'
 NFSTEST_SUDO         = _find_exec('sudo')
+NFSTEST_KILL         = _find_exec('kill')
 NFSTEST_IPTABLES     = _find_exec('iptables')
 NFSTEST_TCPDUMP      = _find_exec('tcpdump')
 NFSTEST_CMD_IP       = _find_exec('ip')

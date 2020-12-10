@@ -199,6 +199,7 @@ class NFSUtil(Host):
             messages     = kwargs.pop("messages",     self.messages),
             tmpdir       = kwargs.pop("tmpdir",       c.NFSTEST_TMPDIR if len(host) else self.tmpdir),
             iptables     = kwargs.pop("iptables",     self.iptables),
+            kill         = kwargs.pop("kill",         self.kill),
             sudo         = kwargs.pop("sudo",         self.sudo),
         )
 

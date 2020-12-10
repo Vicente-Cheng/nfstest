@@ -138,6 +138,8 @@ class Host(BaseObj):
                [default: '/tmp']
            iptables:
                Iptables command [default: '/usr/sbin/iptables']
+           kill:
+               kill command [default: '/usr/bin/kill']
            sudo:
                Sudo command [default: '/usr/bin/sudo']
         """
@@ -166,6 +168,7 @@ class Host(BaseObj):
         self.messages     = kwargs.pop("messages",     c.NFSTEST_MESSAGESLOG)
         self.tmpdir       = kwargs.pop("tmpdir",       c.NFSTEST_TMPDIR)
         self.iptables     = kwargs.pop("iptables",     c.NFSTEST_IPTABLES)
+        self.kill         = kwargs.pop("kill",         c.NFSTEST_KILL)
         self.sudo         = kwargs.pop("sudo",         c.NFSTEST_SUDO)
 
         # Initialize object variables
@@ -358,7 +361,7 @@ class Host(BaseObj):
         if not wait:
             self.process_list.append(self.process)
             self.process_dmap[self.process.pid] = dlevel
-            if sudo:
+            if sudo and os.getuid() != 0:
                 self.process_smap[self.process.pid] = 1
             return
         self.pstdout, self.pstderr = self.process.communicate()
@@ -422,7 +425,7 @@ class Host(BaseObj):
                                     break
                                 for pid in reversed(pidlist):
                                     try:
-                                        cmd = "kill -%s %d" % (killsig, pid)
+                                        cmd = "%s -%s %d" % (self.kill, killsig, pid)
                                         self.run_cmd(cmd, sudo=True, dlevel=dlevel, msg=msg)
                                     except Exception as e:
                                         pass
