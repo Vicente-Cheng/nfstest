@@ -1018,7 +1018,7 @@ class AllocTest(TestUtil):
                 return
 
             # Use the rest of the remaining space and a little bit more
-            filesize = self.get_freebytes() + self.filesize
+            filesize = 2*self.get_freebytes() + self.filesize
 
             # Try creating a file to make sure there is no more disk space
             try:
