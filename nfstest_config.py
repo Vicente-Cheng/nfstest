@@ -203,4 +203,6 @@ NFSTEST_IPTABLES     = _find_exec('iptables')
 NFSTEST_TCPDUMP      = _find_exec('tcpdump')
 NFSTEST_CMD_IP       = _find_exec('ip')
 NFSTEST_MESSAGESLOG  = '/var/log/messages'
+NFSTEST_TRCEVENTS    = '/sys/kernel/debug/tracing/events'
+NFSTEST_TRCPIPE      = '/sys/kernel/debug/tracing/trace_pipe'
 NFSTEST_TMPDIR       = '/tmp'

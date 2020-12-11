@@ -129,10 +129,18 @@ class Host(BaseObj):
                Set RPC kernel debug flags and save log messages [default: '']
            nfsdebug:
                Set NFS kernel debug flags and save log messages [default: '']
+           tracepoints:
+               List of trace points modules to enable [default: '']
            dbgname:
                Base name for log messages files to create [default: 'dbgfile']
+           trcpname:
+               Base name for trace point files to create [default: 'trcpfile']
            messages:
                Location of file for system messages [default: '/var/log/messages']
+           trcevents:
+               Tracing events directory [default: '/sys/kernel/debug/tracing/events']
+           trcpipe:
+               Trace pipe file [default: '/sys/kernel/debug/tracing/trace_pipe']
            tmpdir:
                Temporary directory where trace/debug files are created
                [default: '/tmp']
@@ -164,8 +172,12 @@ class Host(BaseObj):
         self.notrace      = kwargs.pop("notrace",      False)
         self.rpcdebug     = kwargs.pop("rpcdebug",     '')
         self.nfsdebug     = kwargs.pop("nfsdebug",     '')
+        self.tracepoints  = kwargs.pop("tracepoints",  '')
         self.dbgname      = kwargs.pop("dbgname",      'dbgfile')
+        self.trcpname     = kwargs.pop("trcpname",     'trcpfile')
         self.messages     = kwargs.pop("messages",     c.NFSTEST_MESSAGESLOG)
+        self.trcevents    = kwargs.pop("trcevents",    c.NFSTEST_TRCEVENTS)
+        self.trcpipe      = kwargs.pop("trcpipe",      c.NFSTEST_TRCPIPE)
         self.tmpdir       = kwargs.pop("tmpdir",       c.NFSTEST_TMPDIR)
         self.iptables     = kwargs.pop("iptables",     c.NFSTEST_IPTABLES)
         self.kill         = kwargs.pop("kill",         c.NFSTEST_KILL)
@@ -176,13 +188,17 @@ class Host(BaseObj):
         self.mtdir = self.mtpoint
         self.mounted = False
         self._nfsdebug = False
+        self._tracestate = {}
         self.dbgidx = 1
         self.dbgfile = ''
+        self.trcpidx = 1
+        self.trcpfile = ''
         self.traceidx = 1
         self.clients = []
         self.tracefile = ''
         self.tracefiles = []
         self.traceproc = None
+        self.trcpointproc = None
         self.process_list = []
         self.process_smap = {}
         self.process_dmap = {}
@@ -690,6 +706,7 @@ class Host(BaseObj):
         if not self.notrace:
             if len(self.nfsdebug) or len(self.rpcdebug):
                 self.nfs_debug_enable()
+            self.trace_points_enable()
             self.tracefiles.append(self.tracefile)
 
             if clients is None:
@@ -736,6 +753,7 @@ class Host(BaseObj):
                 self.traceproc = None
             if not self.notrace and self._nfsdebug:
                 self.nfs_debug_reset()
+            self.trace_points_reset()
         except:
             return
 
@@ -820,6 +838,45 @@ class Host(BaseObj):
                 if fdw:
                     fdw.close()
                 os.system(self.sudo_cmd("chmod %o %s" % (self.dbgmode, self.messages)))
+
+    def trace_points_enable(self):
+        """Enable trace points."""
+        if self.tracepoints == '':
+            return
+        tracelist = [x.strip() for x in self.tracepoints.split(",")]
+        self.trcpfile = "%s/%s_%03d.out" % (self.tmpdir, self.trcpname, self.trcpidx)
+        self.trcpidx += 1
+        count = 0
+        for trace_name in tracelist:
+            try:
+                epath = os.path.join(self.trcevents, trace_name, "enable")
+                cmd = 'sh -c "echo 1 > %s"' % epath
+                self.run_cmd(cmd, sudo=True, dlevel='DBG2', msg="Enable trace points: ")
+                self._tracestate[trace_name] = 1
+                count += 1
+            except Exception as err:
+                self.dprint('DBG2', "Error: " + str(err))
+        if count > 0:
+            # Start collecting data
+            cmd = 'sh -c "cat %s > %s"' % (self.trcpipe, self.trcpfile)
+            self.run_cmd(cmd, sudo=True, dlevel='DBG2', msg="Capturing trace points: ", wait=False)
+            self.trcpointproc = self.process
+
+    def trace_points_reset(self):
+        """Reset trace points."""
+        for trace_name in self._tracestate.keys():
+            try:
+                if self._tracestate.get(trace_name, 0):
+                    epath = os.path.join(self.trcevents, trace_name, "enable")
+                    cmd = 'sh -c "echo 0 > %s"' % epath
+                    self.run_cmd(cmd, sudo=True, dlevel='DBG2', msg="Disable trace points: ")
+                    self._tracestate[trace_name] = 0
+            except:
+                self.dprint('DBG2', "Error: " + str(err))
+        if self.trcpointproc is not None:
+            self.stop_cmd(self.trcpointproc, dlevel='DBG2', msg="Stopping trace points capture: ")
+            self.trcpointproc = None
+
 
     def network_drop(self, ipaddr, port):
         """Simulate a network drop by dropping all tcp packets going to the

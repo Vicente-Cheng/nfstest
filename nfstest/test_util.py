@@ -452,6 +452,10 @@ class TestUtil(NFSUtil):
         self.path_opgroup.add_option("--iptables", default=self.iptables, help=hmsg)
         hmsg = "Full path of log messages file [default: '%default']"
         self.path_opgroup.add_option("--messages", default=self.messages, help=hmsg)
+        hmsg = "Full path of tracing events directory [default: '%default']"
+        self.path_opgroup.add_option("--trcevents", default=self.trcevents, help=hmsg)
+        hmsg = "Full path of trace pipe file [default: '%default']"
+        self.path_opgroup.add_option("--trcpipe", default=self.trcpipe, help=hmsg)
         hmsg = "Temporary directory [default: '%default']"
         self.path_opgroup.add_option("--tmpdir", default=self.tmpdir, help=hmsg)
         self.opts.add_option_group(self.path_opgroup)
@@ -471,6 +475,8 @@ class TestUtil(NFSUtil):
         self.dbg_opgroup.add_option("--nfsdebug", default=self.nfsdebug, help=hmsg)
         hmsg = "Set RPC kernel debug flags and save log messages [default: '%default']"
         self.dbg_opgroup.add_option("--rpcdebug", default=self.rpcdebug, help=hmsg)
+        hmsg = "List of trace points modules to enable [default: '%default']"
+        self.dbg_opgroup.add_option("--tracepoints", default=self.tracepoints, help=hmsg)
         hmsg = "Display main packets related to the given test"
         self.dbg_opgroup.add_option("--pktdisp", action="store_true", default=False, help=hmsg)
         hmsg = "Fail every NFS error found in the packet trace"
@@ -1066,6 +1072,7 @@ class TestUtil(NFSUtil):
             # Set base name for trace files and log message files
             self.tracename = self.get_name()
             self.dbgname = self.get_name()
+            self.trcpname = self.get_name()
 
             self._opts_done = True
 
