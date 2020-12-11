@@ -1141,12 +1141,12 @@ class RdmaTest(TestUtil):
             self.verify_nfs_over_rdma()
 
             if nfs_iotype == NFS_READ:
-                # Verify NFS read is sent over RDMA using either RDMA READs
+                # Verify NFS read is sent over RDMA using either RDMA WRITEs
                 # or SENDs
                 self.nfs_read_count = 0
                 while self.verify_nfs_read(): pass
             elif nfs_iotype == NFS_WRITE:
-                # Verify NFS write is sent over RDMA using either RDMA WRITEs
+                # Verify NFS write is sent over RDMA using either RDMA READs
                 # or SENDs
                 self.nfs_write_xid = {}
                 while self.verify_nfs_write(): pass
