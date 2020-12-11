@@ -270,6 +270,7 @@ class PosixTest(TestUtil):
     def setup(self, **kwargs):
         """Setup test environment"""
         self.umount()
+        x.trace_start()
         self.mount()
         super(PosixTest, self).setup(**kwargs)
 
@@ -291,6 +292,9 @@ class PosixTest(TestUtil):
                 self.dprint('DBG3', "Creating symbolic link to %s [%s -> %s]" % (stype, self.absfile, srcpath))
                 os.symlink(srcpath, self.absfile)
                 self.setup_readlink[stype] = (srcpath, self.absfile)
+        x.umount()
+        x.mount()
+        x.trace_stop()
 
     def access(self, path, mode, test, msg=""):
         """Test file access.
@@ -1836,8 +1840,6 @@ x = PosixTest(usage=USAGE, testnames=TESTNAMES, sid=SCRIPT_ID)
 
 try:
     x.setup(nfiles=2)
-    x.umount()
-    x.mount()
 
     # Run all the tests
     x.run_tests()
