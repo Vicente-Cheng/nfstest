@@ -446,6 +446,8 @@ class TestUtil(NFSUtil):
         self.path_opgroup.add_option("--sudo", default=self.sudo, help=hmsg)
         hmsg = "Full path of binary for kill [default: '%default']"
         self.path_opgroup.add_option("--kill", default=self.kill, help=hmsg)
+        hmsg = "Full path of binary for nfsstat [default: '%default']"
+        self.path_opgroup.add_option("--nfsstat", default=self.nfsstat, help=hmsg)
         hmsg = "Full path of binary for tcpdump [default: '%default']"
         self.path_opgroup.add_option("--tcpdump", default=self.tcpdump, help=hmsg)
         hmsg = "Full path of binary for iptables [default: '%default']"
@@ -477,6 +479,8 @@ class TestUtil(NFSUtil):
         self.dbg_opgroup.add_option("--rpcdebug", default=self.rpcdebug, help=hmsg)
         hmsg = "List of trace points modules to enable [default: '%default']"
         self.dbg_opgroup.add_option("--tracepoints", default=self.tracepoints, help=hmsg)
+        hmsg = "Get NFS stats [default: '%default']"
+        self.dbg_opgroup.add_option("--nfsstats", action="store_true", default=False, help=hmsg)
         hmsg = "Display main packets related to the given test"
         self.dbg_opgroup.add_option("--pktdisp", action="store_true", default=False, help=hmsg)
         hmsg = "Fail every NFS error found in the packet trace"
@@ -1073,6 +1077,7 @@ class TestUtil(NFSUtil):
             self.tracename = self.get_name()
             self.dbgname = self.get_name()
             self.trcpname = self.get_name()
+            self.nfsstatname = self.get_name()
 
             self._opts_done = True
 

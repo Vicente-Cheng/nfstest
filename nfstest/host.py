@@ -26,6 +26,7 @@ import re
 import time
 import ctypes
 import socket
+import tempfile
 import subprocess
 import nfstest_config as c
 from baseobj import BaseObj
@@ -131,10 +132,14 @@ class Host(BaseObj):
                Set NFS kernel debug flags and save log messages [default: '']
            tracepoints:
                List of trace points modules to enable [default: '']
+           nfsstats:
+               Get NFS stats [default: False]
            dbgname:
                Base name for log messages files to create [default: 'dbgfile']
            trcpname:
                Base name for trace point files to create [default: 'trcpfile']
+           nfsstatname:
+               Base name for NFS stats files to create [default: 'nfsstatfile']
            messages:
                Location of file for system messages [default: '/var/log/messages']
            trcevents:
@@ -148,6 +153,8 @@ class Host(BaseObj):
                Iptables command [default: '/usr/sbin/iptables']
            kill:
                kill command [default: '/usr/bin/kill']
+           nfsstat:
+               nfsstat command [default: '/usr/bin/nfsstat']
            sudo:
                Sudo command [default: '/usr/bin/sudo']
         """
@@ -173,14 +180,17 @@ class Host(BaseObj):
         self.rpcdebug     = kwargs.pop("rpcdebug",     '')
         self.nfsdebug     = kwargs.pop("nfsdebug",     '')
         self.tracepoints  = kwargs.pop("tracepoints",  '')
+        self.nfsstats     = kwargs.pop("nfsstats",      False)
         self.dbgname      = kwargs.pop("dbgname",      'dbgfile')
         self.trcpname     = kwargs.pop("trcpname",     'trcpfile')
+        self.nfsstatname  = kwargs.pop("nfsstatname",  'nfsstatfile')
         self.messages     = kwargs.pop("messages",     c.NFSTEST_MESSAGESLOG)
         self.trcevents    = kwargs.pop("trcevents",    c.NFSTEST_TRCEVENTS)
         self.trcpipe      = kwargs.pop("trcpipe",      c.NFSTEST_TRCPIPE)
         self.tmpdir       = kwargs.pop("tmpdir",       c.NFSTEST_TMPDIR)
         self.iptables     = kwargs.pop("iptables",     c.NFSTEST_IPTABLES)
         self.kill         = kwargs.pop("kill",         c.NFSTEST_KILL)
+        self.nfsstat      = kwargs.pop("nfsstat",      c.NFSTEST_NFSSTAT)
         self.sudo         = kwargs.pop("sudo",         c.NFSTEST_SUDO)
 
         # Initialize object variables
@@ -193,6 +203,9 @@ class Host(BaseObj):
         self.dbgfile = ''
         self.trcpidx = 1
         self.trcpfile = ''
+        self.nfsstatidx = 1
+        self.nfsstatfile = ''
+        self.nfsstattemp = ''
         self.traceidx = 1
         self.clients = []
         self.tracefile = ''
@@ -707,6 +720,7 @@ class Host(BaseObj):
             if len(self.nfsdebug) or len(self.rpcdebug):
                 self.nfs_debug_enable()
             self.trace_points_enable()
+            self.nfsstat_init()
             self.tracefiles.append(self.tracefile)
 
             if clients is None:
@@ -754,6 +768,7 @@ class Host(BaseObj):
             if not self.notrace and self._nfsdebug:
                 self.nfs_debug_reset()
             self.trace_points_reset()
+            self.nfsstat_get()
         except:
             return
 
@@ -877,6 +892,38 @@ class Host(BaseObj):
             self.stop_cmd(self.trcpointproc, dlevel='DBG2', msg="Stopping trace points capture: ")
             self.trcpointproc = None
 
+    def nfsstat_init(self):
+        """Initialize NFS stats."""
+        if not self.nfsstats:
+            return
+
+        # Create a temporary file to save current NFS stats
+        fd, self.nfsstattemp = tempfile.mkstemp(prefix="nfsstat_")
+        os.close(fd)
+        cmd = "%s > %s" % (self.nfsstat, self.nfsstattemp)
+        out = self.run_cmd(cmd, dlevel='DBG2', msg="Capture reference NFS stats: ")
+
+    def nfsstat_get(self):
+        """Get NFS stats."""
+        if not self.nfsstats or len(self.nfsstattemp) == 0:
+            return
+
+        self.nfsstatfile = "%s/%s_%03d.stat" % (self.tmpdir, self.nfsstatname, self.nfsstatidx)
+        self.nfsstatidx += 1
+        if os.path.getsize(self.nfsstattemp) == 0:
+            # NFS stats reference file is empty so save all NFS stats
+            cmd = "%s -l" % self.nfsstat
+        else:
+            # Save NFS stats relative to the reference file
+            cmd = "%s -l -S %s" % (self.nfsstat, self.nfsstattemp)
+        cmd += ' > %s' % self.nfsstatfile
+        try:
+            self.run_cmd(cmd, dlevel='DBG2', msg="Capture relative NFS stats: ")
+        finally:
+            # Remove temporary file
+            self.dprint('DBG5', "Remove reference NFS stats file [%s]" % self.nfsstattemp)
+            os.unlink(self.nfsstattemp)
+            self.nfsstattemp = ""
 
     def network_drop(self, ipaddr, port):
         """Simulate a network drop by dropping all tcp packets going to the
