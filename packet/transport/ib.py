@@ -816,7 +816,10 @@ class RDMAinfo(RDMAbase):
                     # Get the bytes for the segment including the padding
                     # bytes because this is part of the message that will
                     # be dissected and the opaque needs a 4-byte boundary
-                    data += rsegment.get_data(padding=True)
+                    # except if this is a Position-Zero Read Chunk (PZRC)
+                    # in which the payload has already been padded
+                    padding = False if xdrpos == 0 else True
+                    data += rsegment.get_data(padding=padding)
             if len(reduced_data) > offset:
                 # Add last fragment from the reduced message
                 data += reduced_data[offset:]
