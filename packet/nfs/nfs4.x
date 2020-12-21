@@ -3446,13 +3446,13 @@ enum data_content4 {
     NFS4_CONTENT_HOLE = 1
 };
 
-/* STRFMT1: off:{0:umax64} count:{1:umax32} */
+/* STRFMT1: DATA(off:{0:umax64} count:{1:umax32}) */
 struct data4 {
     offset4         offset;
     opaque          data<>; /* FOPAQUE:count */
 };
 
-/* STRFMT1: off:{0:umax64} len:{1:umax64} */
+/* STRFMT1: HOLE(off:{0:umax64} len:{1:umax64}) */
 struct data_info4 {
     offset4         offset;
     length4         count;
