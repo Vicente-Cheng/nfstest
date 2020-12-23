@@ -183,6 +183,7 @@ class NFSUtil(Host):
             proto        = kwargs.pop("proto",        self.proto),
             port         = kwargs.pop("port",         self.port),
             sec          = kwargs.pop("sec",          self.sec),
+            nconnect     = kwargs.pop("nconnect",     self.nconnect),
             export       = kwargs.pop("export",       self.export),
             mtpoint      = kwargs.pop("mtpoint",      self.mtpoint),
             datadir      = kwargs.pop("datadir",      self.datadir),

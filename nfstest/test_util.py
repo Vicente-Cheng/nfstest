@@ -387,6 +387,8 @@ class TestUtil(NFSUtil):
         self.nfs_opgroup.add_option("--proto", default=self.proto, help=hmsg)
         hmsg = "Security flavor [default: '%default']"
         self.nfs_opgroup.add_option("--sec", default=self.sec, help=hmsg)
+        hmsg = "Multiple TCP connections option [default: '%default']"
+        self.nfs_opgroup.add_option("--nconnect", type="int", default=self.nconnect, help=hmsg)
         hmsg = "Mount options [default: '%default']"
         self.nfs_opgroup.add_option("-o", "--mtopts", default=self.mtopts, help=hmsg)
         hmsg = "Data directory where files are created, directory is " + \

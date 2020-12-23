@@ -104,6 +104,8 @@ class Host(BaseObj):
                NFS server port [default: 2049]
            sec:
                Security flavor [default: 'sys']
+           nconnect:
+               Multiple TCP connections option [default: 1]
            export:
                Exported file system to mount [default: '/']
            mtpoint:
@@ -166,6 +168,7 @@ class Host(BaseObj):
         self.proto        = kwargs.pop("proto",        c.NFSTEST_NFSPROTO)
         self.port         = kwargs.pop("port",         c.NFSTEST_NFSPORT)
         self.sec          = kwargs.pop("sec",          c.NFSTEST_NFSSEC)
+        self.nconnect     = kwargs.pop("nconnect",     1)
         self.export       = kwargs.pop("export",       c.NFSTEST_EXPORT)
         self.mtpoint      = kwargs.pop("mtpoint",      c.NFSTEST_MTPOINT)
         self.datadir      = kwargs.pop("datadir",      '')
@@ -601,6 +604,8 @@ class Host(BaseObj):
                NFS server port [default: self.port]
            sec:
                Security flavor [default: self.sec]
+           nconnect:
+               Multiple TCP connections option [default: self.nconnect]
            export:
                Exported file system to mount [default: self.export]
            mtpoint:
@@ -618,6 +623,7 @@ class Host(BaseObj):
         proto        = kwargs.pop("proto",        self.proto)
         port         = kwargs.pop("port",         self.port)
         sec          = kwargs.pop("sec",          self.sec)
+        nconnect     = kwargs.pop("nconnect",     self.nconnect)
         export       = kwargs.pop("export",       self.export)
         mtpoint      = kwargs.pop("mtpoint",      self.mtpoint)
         datadir      = kwargs.pop("datadir",      self.datadir)
@@ -649,6 +655,8 @@ class Host(BaseObj):
             mt_list.append("port=%d" % port)
 
         mt_list.extend(["proto=%s"%proto, "sec=%s"%sec, mtopts])
+        if nconnect > 1:
+            mt_list.append("nconnect=%d" % nconnect)
         mtopts = ",".join(mt_list)
 
         # Mount command
