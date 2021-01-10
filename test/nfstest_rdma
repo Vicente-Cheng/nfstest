@@ -571,7 +571,7 @@ class RdmaTest(TestUtil):
                         # Last Read/Write fragment: it should be the remainder
                         # size of the whole I/O
                         nbytes = iolist[0][5] % self.iosize
-                        iosize = nbytes if nbytes > 0 else iosize
+                        iosize = nbytes if nbytes > 0 else self.iosize
                     else:
                         # Use the RDMA I/O size of the mount
                         iosize = self.iosize
