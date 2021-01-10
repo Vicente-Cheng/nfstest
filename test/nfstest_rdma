@@ -572,6 +572,9 @@ class RdmaTest(TestUtil):
                         # size of the whole I/O
                         nbytes = iolist[0][5] % self.iosize
                         iosize = nbytes if nbytes > 0 else self.iosize
+                    elif opcode == RDMA_READ_Response_Only:
+                        # There is only one fragment: should be the payload size
+                        iosize = iolist[-1][2]
                     else:
                         # Use the RDMA I/O size of the mount
                         iosize = self.iosize
