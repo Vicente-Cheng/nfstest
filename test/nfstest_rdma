@@ -649,7 +649,7 @@ class RdmaTest(TestUtil):
             # Expected DMA length of next request, the last request for the
             # segment could be shorter than dma_length and it should be the
             # remaining bytes for the whole segment
-            dma_length = min(dma_length, length)
+            dma_length = length
 
     def verify_io_op(self, pkt, optype=None, rpctype=None, isrpcordma=True, rdmaproc=RDMA_MSG):
         """Verify I/O call/reply operation"""
