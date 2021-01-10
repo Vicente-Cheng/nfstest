@@ -162,7 +162,7 @@ SendList     = SendFMList + SendLastList
 # RDMA Read Response opcode lists
 ReadRespFMList   = (RDMA_READ_Response_First, RDMA_READ_Response_Middle)
 ReadRespLastList = (RDMA_READ_Response_Last,)
-ReadResponseList = ReadRespFMList + ReadRespLastList
+ReadResponseList = ReadRespFMList + ReadRespLastList + (RDMA_READ_Response_Only,)
 
 # RDMA Write opcode lists
 WriteOnlyList    = (RDMA_WRITE_Only,  RDMA_WRITE_Only_Immediate)
@@ -696,7 +696,7 @@ class RdmaTest(TestUtil):
                 expr = pkt != "rpcordma"
                 self.test(expr, "NFS %s should be sent with no RPCoRDMA layer" % iostr)
                 if optype in self.nfs_op(**NFSwrite) and rpctype == rpc_const.CALL:
-                    expr = pkt.ib.opcode == RDMA_READ_Response_Last
+                    expr = pkt.ib.opcode in (RDMA_READ_Response_Last, RDMA_READ_Response_Only)
                     self.test(expr, "NFS %s should be reassembled in the last read response fragment " % iostr)
 
     def verify_chunk_lists(self, rpcordma, optype, rpctype, nreads=0, nwrites=0, nreply=0):
@@ -961,7 +961,7 @@ class RdmaTest(TestUtil):
         # use RDMA SENDs instead since the RPCoRDMA layer having the read
         # chunk list must come before the NFS write call has been reassembled
         mstr1 = "nfs.argop == %d" % self.nfs_op(OP_WRITE, NFSPROC3_WRITE)
-        mstr2 = "rpcordma.proc == %d and len(rpcordma.reads) > 0" % RDMA_MSG
+        mstr2 = "len(rpcordma.reads) > 0"
         match_str = "%s or (%s)" % (mstr1, mstr2)
 
         # Search for the first NFS write or the start of an NFS write which
