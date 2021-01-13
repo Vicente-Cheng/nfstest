@@ -757,6 +757,18 @@ class RdmaTest(TestUtil):
                     fmsg = ": xdrpos(%d) should be less than or equal to RPCoRDMA " \
                            "payload length(%d)" % (reads[0][0][0], rpcordma.psize)
                     self.test(expr, tmsg + "correct XDR position", failmsg=fmsg)
+                    if reads[0][0][0] == 0:
+                        expr = rpcordma.proc == RDMA_NOMSG
+                        self.test(expr, tmsg + "RDMA_NOMSG proc for a long request (PZRC)")
+                    else:
+                        expr = rpcordma.proc == RDMA_MSG
+                        self.test(expr, tmsg + "RDMA_MSG proc")
+                    if rpcordma.proc == RDMA_MSG:
+                        expr = rpcordma.psize > 0
+                        self.test(expr, tmsg + "payload data for RDMA_MSG")
+                    else:
+                        expr = rpcordma.psize == 0
+                        self.test(expr, tmsg + "no payload data for RDMA_NOMSG")
                 amsg = afmt % msg_h.get(nreads, ("", "RDMA_READ"))
                 self.test(len(reads) == nreads, tmsg + amsg)
             elif len(reply):
@@ -990,9 +1002,9 @@ class RdmaTest(TestUtil):
             self.test_info("="*80)
         if pkt_rdma_msg and pkt_rdma_msg.NFSop is None:
             # NFSop is None so an RPCoRDMA layer with a read chunk list
-            # was matched -- verity NFS write is sent using RDMA READs
-            self.dprint('DBG2', "Found RPC-over-RDMA packet with RDMA_MSG and a read chunk list")
+            # was matched -- verify NFS write is sent using RDMA READs
             rpcordma = pkt_rdma_msg.rpcordma
+            self.dprint('DBG2', "Found RPC-over-RDMA packet with %s and a read chunk list" % rpcordma.proc)
             self.get_chunk_lists(rpcordma, rpc_const.CALL)
             self.verify_chunk_lists(rpcordma, OP_WRITE, rpc_const.CALL, nreads=1)
 
