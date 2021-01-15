@@ -1828,6 +1828,154 @@ class TestUtil(NFSUtil):
             os.chmod(self.absfile, mode)
         return self.filename
 
+    def compare_data(self, data, offset=0, pattern=None, nlen=32, fd=None, msg=""):
+        """Compare data to the given pattern and return a three item tuple:
+           absolute offset where data differs from pattern, sample data at
+           diff offset, and the expected data at diff offset according to
+           pattern. If data matches exactly it returns (None, None, None).
+
+           data:
+               Data to compare against the pattern
+           offset:
+               Absolute offset to get the expected data from pattern
+               [default: 0]
+           pattern:
+               Data pattern function or string. If this is a function,
+               it must take offset and size as positional arguments.
+               If given as a string, the pattern repeats over and over
+               starting at offset = 0 [default: self.data_pattern]
+           nlen:
+               Size of sample data to return if a difference is found
+               [default: 32]
+           fd:
+               Opened file descriptor for the data, this is used where
+               the data comes from a file and a difference is found right
+               at the end of the given data. In this case, the data is
+               read from the file to return the sample diff of size given
+               by nlen [default: None]
+           msg:
+               Message to append to debug message if a difference is
+               found. If set to None, debug messages are not displayed
+               [default: '']
+        """
+        if pattern is None:
+            # Default pattern
+            get_data = self.data_pattern
+        elif isinstance(pattern, str):
+            # String pattern
+            get_data = lambda o, s: self.data_pattern(o, s, pattern)
+        else:
+            # User provided function as a pattern
+            get_data = pattern
+
+        count = len(data)
+        edata = get_data(offset, count)
+
+        # Compare data
+        index = 0
+        doffset = None
+        for c in data:
+            if c != edata[index]:
+                # Absolute offset of difference
+                doffset = offset + index
+                break
+            index += 1
+
+        if doffset is not None:
+            doff = doffset - offset
+            if fd is not None and doff + nlen > count:
+                # Not enough data in current buffer to display,
+                # so read file at the given failed offset
+                os.lseek(fd, doffset, os.SEEK_SET)
+                mdata = os.read(fd, nlen)
+                edata = get_data(doffset, len(mdata))
+            else:
+                # Enough data in current buffer
+                mdata = data[doff:doff+nlen]
+                edata = edata[doff:doff+nlen]
+            if msg is not None:
+                self.dprint('DBG2', "Found difference at offset %d%s" % (doffset, msg))
+                self.dprint('DBG2', "    File data:     %r" % mdata)
+                self.dprint('DBG2', "    Expected data: %r" % edata)
+            return doffset, mdata, edata
+        return (None, None, None)
+
+    def verify_file_data(self, msg=None, pattern=None, path=None, filesize=None, nlen=None, cmsg=""):
+        """Verify file by comparing the data to the given pattern.
+           It returns the results from the compare_data method.
+
+           msg:
+               Test assertion message. If set to None, no assertion is
+               done it just returns the results [default: None]
+           pattern:
+               Data pattern function or string. If this is a function,
+               it must take offset and size as positional arguments.
+               If given as a string, the pattern repeats over and over
+               starting at offset = 0 [default: self.data_pattern]
+           path:
+               Absolute path of file to verify [default: self.absfile]
+           filesize:
+               Expected size of file to be verified [default: self.filesize]
+           nlen:
+               Size of sample data to return if a difference is found
+               [default: compare_data default]
+           cmsg:
+               Message to append to debug message if a difference is
+               found. If set to None, debug messages are not displayed
+               [default: '']
+        """
+        doffset = None
+        mdata   = None
+        edata   = None
+        if path is None:
+            path = self.absfile
+
+        if filesize is None:
+            filesize = self.filesize
+        nargs = { 'pattern': pattern, 'msg': cmsg }
+        if nlen is not None:
+            nargs['nlen'] = nlen
+
+        self.dprint('DBG2', "Open file [%s] for reading to validate data" % path)
+        fd = os.open(path, os.O_RDONLY)
+
+        try:
+            offset = 0
+            size = filesize
+            while size > 0:
+                dsize = min(self.rsize, size)
+                self.dprint('DBG5', "    Read file %d@%d" % (dsize, offset))
+                data = os.read(fd, dsize)
+                count = len(data)
+                if count > 0:
+                    doffset, mdata, edata = self.compare_data(data, offset, fd=fd, **nargs)
+                    if doffset is not None:
+                        break
+                else:
+                    size -= count
+                    break
+                size -= count
+                offset += count
+        finally:
+            os.close(fd)
+
+        if msg is not None and len(msg):
+            fmsg = ""
+            expr = False
+            if doffset is not None:
+                fmsg = ", difference at offset %d" % doffset
+            elif size > 0:
+                fmsg = ", file size (%d) is shorter than expected (%d)" % (filesize - size, filesize)
+            else:
+                fstat = os.stat(path)
+                if fstat.st_size > filesize:
+                    fmsg = ", file size (%d) is larger than expected (%d)" % (fstat.st_size, filesize)
+                else:
+                    # Data has been verified correctly
+                    expr = True
+            self.test(expr, msg, failmsg=fmsg)
+        return (doffset, mdata, edata)
+
     def _reset_files(self):
         """Reset state used in *_files() methods."""
         self.roffset = 0
