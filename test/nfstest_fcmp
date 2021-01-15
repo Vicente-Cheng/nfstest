@@ -97,69 +97,6 @@ class FcmpTest(TestUtil):
         client_args["mtopts"] = self.cmpopts
         self.create_host("", **client_args)
 
-    def verify_file(self, msg):
-        """Verify file by comparing the data to a known pattern"""
-
-        error = 0
-        self.dprint('DBG2', "Open file [%s] for reading" % self.absfile)
-        fd = os.open(self.absfile, os.O_RDONLY)
-
-        try:
-            offset = 0
-            size = self.filesize
-            while size > 0:
-                dsize = min(self.rsize, size)
-                self.dprint('DBG5', "    Read file %d@%d" % (dsize, offset))
-                data = os.read(fd, dsize)
-                count = len(data)
-                if count > 0:
-                    base_offset = offset
-                    edata = self.data_pattern(offset, count)
-                    # Compare data
-                    for i in xrange(len(data)):
-                        if data[i] != edata[i]:
-                            error = 1
-                            offset += i
-                            break
-                    if error:
-                        nlen = 32
-                        doff = offset - base_offset
-                        if doff + nlen > count:
-                            # Not enough data in current buffer to display,
-                            # so read file at the given failed offset
-                            os.lseek(fd, offset, os.SEEK_SET)
-                            data = os.read(fd, nlen)
-                            edata = self.data_pattern(offset, len(data))
-                        else:
-                            # Enough data in current buffer
-                            data = data[doff:doff+nlen]
-                            edata = edata[doff:doff+nlen]
-                        self.dprint('DBG2', "Found difference at offset %d" % offset)
-                        self.dprint('DBG2', "    File data:     %r" % data)
-                        self.dprint('DBG2', "    Expected data: %r" % edata)
-                        break
-                else:
-                    size -= count
-                    if size > 0:
-                        error = 2
-                    break
-                size -= count
-                offset += count
-        finally:
-            os.close(fd)
-
-        fmsg = ""
-        if error == 1:
-            fmsg = ", difference at offset %d" % offset
-        elif error == 2:
-            fmsg = ", file size (%d) is shorter than expected (%d)" % (self.filesize - size, self.filesize)
-        else:
-            fstat = os.stat(self.absfile)
-            if fstat.st_size > self.filesize:
-                error = 3
-                fmsg = ", file size (%d) is larger than expected (%d)" % (fstat.st_size, self.filesize)
-        self.test(error == 0, msg, failmsg=fmsg)
-
     def test01_test(self):
         """Verify data read from file is correct"""
         try:
@@ -188,7 +125,7 @@ class FcmpTest(TestUtil):
         try:
             self.test_info("Compare file's data using main mount options")
             self.mount()
-            self.verify_file("Data read from file is correct")
+            self.verify_file_data("Data read from file is correct")
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
@@ -224,7 +161,7 @@ class FcmpTest(TestUtil):
         try:
             self.test_info("Compare file's data using second mount options")
             self.clientobj.mount()
-            self.verify_file("Data written to file is correct")
+            self.verify_file_data("Data written to file is correct")
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
