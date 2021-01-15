@@ -359,7 +359,7 @@ class RdmaTest(TestUtil):
                     self.testdir_list.append(dirname)
                     # Create all the files given for this directory
                     for i in range(nfiles):
-                        self.create_file(size=1024, dir=dirname)
+                        self.create_file(size=int(self.small_filesize/8), dir=dirname)
                 testdir_h[nfiles] = 1
             for fsize in symlk_list:
                 # Create symbolic link if it does not exist yet
