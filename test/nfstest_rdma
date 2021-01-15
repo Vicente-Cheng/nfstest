@@ -346,7 +346,7 @@ class RdmaTest(TestUtil):
         if len(fsize_list) or len(dir_list):
             # Create file system objects
             self.umount()
-            self.mount()
+            self.mount(proto="tcp", port=2049)
             for fsize in fsize_list:
                 # Create file using the given size if it does not exist yet
                 if self.read_file_dict.get(fsize) is None:
@@ -1073,6 +1073,7 @@ class RdmaTest(TestUtil):
         try:
             self.trace_start()
             self.mount()
+            filelist = []
 
             if filesizes is not None:
                 # Argument filesizes is only used for testing NFS reads or
@@ -1091,15 +1092,18 @@ class RdmaTest(TestUtil):
                         fmsg = ""
                         expr = True
                         if nfs_iotype == NFS_READ:
-                            self.read_file(size=fsize)
+                            data = self.read_file(size=fsize)
                         elif nfs_iotype == NFS_WRITE:
                             self.create_file(size=fsize, verbose=1, dlevels=["DBG2"])
+                            filelist.append((self.filename, fsize))
                     except OSError as error:
                         expr = False
                         err = error.errno
                         fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
                     if nfs_iotype == NFS_READ:
                         self.test(expr, "File should be read correctly", failmsg=fmsg)
+                        doffset, mdata, edata = self.compare_data(data)
+                        self.test(doffset is None, "Data read from file using RDMA mount is correct")
                     elif nfs_iotype == NFS_WRITE:
                         self.test(expr, "File should be created", failmsg=fmsg)
                     if not expr:
@@ -1144,6 +1148,18 @@ class RdmaTest(TestUtil):
         finally:
             self.umount()
             self.trace_stop()
+
+        if len(filelist):
+            try:
+                self.test_info("Compare file data using non-RDMA mount")
+                self.mount(proto="tcp", port=2049)
+                for self.filename, fsize in filelist:
+                    self.absfile = self.abspath(self.filename)
+                    self.verify_file_data("Data read from file using non-RDMA mount is correct", filesize=fsize)
+            except Exception:
+                self.test(False, traceback.format_exc())
+            finally:
+                self.umount()
 
         try:
             self.trace_open()
@@ -1251,4 +1267,6 @@ try:
 except Exception:
     x.test(False, traceback.format_exc())
 finally:
+    x.proto = "tcp"
+    x.port = 2049
     x.exit()
