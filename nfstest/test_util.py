@@ -964,6 +964,14 @@ class TestUtil(NFSUtil):
                 self.logfile = "%s/%s.log" % (opts.tmpdir, self.get_name())
                 self.open_log(self.logfile)
 
+            if len(args) > 0:
+                # Extra arguments in the command line create a new --runtest
+                # list of tests overwriting any previous definition
+                opts.runtest = ",".join([x.strip(",") for x in args])
+            elif opts.runtest is None:
+                # Default is to run all tests
+                opts.runtest = "all"
+
             _lines = [self._cmd_line]
             for (optfile, lines) in self.optfiles:
                 # Add the content of each option file that has been processed
@@ -995,19 +1003,6 @@ class TestUtil(NFSUtil):
             self.__dict__.update(opts.__dict__)
             if not self.server:
                 self.opts.error("server option is required")
-
-            # Have all extra arguments in the command line appended
-            # to runtest
-            rtests = ",".join([x.strip(",") for x in args])
-            if self.runtest is None and len(args) == 0:
-                # Default is to run all tests
-                self.runtest = "all"
-            elif self.runtest is None:
-                # Set runtest to the list of extra arguments
-                self.runtest = rtests
-            elif len(args) > 0:
-                # Append all extra arguments to runtest
-                self.runtest = ",".join([x.strip(",") for x in [self.runtest, rtests]])
 
             self._verify_testnames()
             ipv6 = self.proto[-1] == '6'
