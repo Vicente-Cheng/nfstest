@@ -32,6 +32,8 @@ __copyright__ = "Copyright (C) 2017 NetApp, Inc."
 __license__   = "GPL v2"
 __version__   = "1.2"
 
+IB_PSN_MASK = 0x00ffffff
+
 # Operation Code Transport Services (3 most significant bits)
 ib_transport_services = {
     0b00000000 : "RC",  # Reliable Connection
@@ -215,7 +217,7 @@ class BTH(BaseObj):
     _attrlist = ("opcode", "se", "migreq", "padcnt", "tver",
                  "pkey", "destqp", "ackreq", "psn")
     _strfmt1 = "{0} QP={6} PSN={8}"
-    _strfmt2  = "{0}, Pkey: {5}, QP: {6}, PSN: {8}"
+    _strfmt2 = "{0}, Pkey: {5}, QP: {6}, PSN: {8}"
 
     def __init__(self, unpack):
         ulist = unpack.unpack(12, "!2BH2I")
@@ -227,7 +229,7 @@ class BTH(BaseObj):
         self.pkey   = ShortHex(ulist[2])
         self.destqp = ShortHex(ulist[3] & 0x00ffffff)
         self.ackreq = (ulist[4] >> 31) & 0x01
-        self.psn    = ulist[4] & 0x00ffffff
+        self.psn    = ulist[4] & IB_PSN_MASK
 
 # Extended Transport Headers -- Start
 class RDETH(BaseObj):

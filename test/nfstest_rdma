@@ -224,6 +224,23 @@ def get_padding(size):
         return (4 - ndiff)
     return 0
 
+def get_psn_match(spsn, epsn):
+    """Get the PSN match string for the given range [spsn, epsn)"""
+    if epsn == 0:
+        # Match PSN range at upper limit: [spsn, MAX_PSN]
+        matchstr = "ib.psn >= %d" % spsn
+    elif spsn == 0:
+        # Match PSN range at lower limit: [0, epsn)
+        matchstr = "ib.psn < %d" % epsn
+    elif epsn < spsn:
+        # PSN wrapped around, match range at upper and lower limits:
+        # [spsn, MAX_PSN] and [0, epsn)
+        matchstr = "(ib.psn >= %d or ib.psn < %d)" % (spsn, epsn)
+    else:
+        # Match PSN range: [spsn, epsn)
+        matchstr = "ib.psn >= %d and ib.psn < %d" % (spsn, epsn)
+    return matchstr
+
 class RdmaTest(TestUtil):
     """RdmaTest object
 
@@ -589,21 +606,19 @@ class RdmaTest(TestUtil):
                     fmsg = ": expecting %d, got %d" % (iosize, size)
                     self.test(expr, amsg, failmsg=fmsg)
 
-    def verify_segment(self, iotype, handle, offset, length, epsn=None):
+    def verify_segment(self, iotype, handle, offset, length):
         """Verify segment and all its fragments for the given handle"""
         # Get correct info according to RDMA I/O type (either READ or WRITE)
         if iotype == RDMA_READ:
             opreq = (RDMA_READ_Request,)
             oplist = ReadResponseList
-            epsnstr = "" # Last PSN is unknown for RDMA reads
         else:
             opreq = WriteFOList # The Write First fragment has the request info
             oplist = WriteList
-            epsnstr = "ib.psn < %d and " % epsn
 
         # Search for all read/write requests in the segment
         requests = []
-        match_str = "ib.opcode in %s and %sib.reth.r_key == %s" % (opreq, epsnstr, handle)
+        match_str = "ib.opcode in %s and ib.reth.r_key == %s" % (opreq, handle)
         while self.pktt.match(match_str):
             pindex = self.pktt.get_index()
             ibobj = self.pktt.pkt.ib
@@ -635,7 +650,8 @@ class RdmaTest(TestUtil):
             # up to the last expected PSN
             fragment_list = [reqinfo] # Include the request in the fragment list
             self.pktt.rewind(pindex)
-            mstr = "ib.opcode in %s and ib.psn >= %d and ib.psn < %d" % (oplist, psn, psn+count)
+            nextpsn = (psn + count) & IB_PSN_MASK
+            mstr = "ib.opcode in %s and %s" % (oplist, get_psn_match(psn, nextpsn))
             while self.pktt.match(mstr):
                 ib = self.pktt.pkt.ib
                 fragment_list.append((ib.opcode, ib.psn, ib.psize))
@@ -643,7 +659,7 @@ class RdmaTest(TestUtil):
             # Verify RDMA I/O fragments
             self.verify_fragments(iotype, fragment_list, count, (dma_psn, offset, dma_length))
 
-            dma_psn += count   # Expected PSN for next request
+            dma_psn  = nextpsn # Expected PSN for next request
             offset  += dma_len # Expected offset for next request
             length  -= dma_len # Remaining bytes for whole segment
             # Expected DMA length of next request, the last request for the
@@ -886,7 +902,7 @@ class RdmaTest(TestUtil):
                     expr = rlength <= clength
                 fmsg = ": reply length (%d) should be <= call length (%d)" % (rlength, clength)
                 self.test(expr, tmsg + "length%s" % emsg, failmsg=fmsg)
-                self.verify_segment(RDMA_WRITE, rhandle, roffset, rlength, pktreply.ib.psn)
+                self.verify_segment(RDMA_WRITE, rhandle, roffset, rlength)
 
     def verify_rdma_write(self, pktcall):
         """Verify RDMA WRITEs whether for a reply chunk or write chunk list"""
