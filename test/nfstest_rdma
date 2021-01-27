@@ -419,6 +419,10 @@ class RdmaTest(TestUtil):
                 os.close(fd)
         return data
 
+    def get_nfragments(self, dmalen):
+        """Get the number of fragments for the given DMA length"""
+        return int(dmalen/self.iosize) + (1 if dmalen%self.iosize else 0)
+
     def get_iosize(self):
         """Get the I/O size by inspecting any of the First or Middle fragments"""
         save_index = self.pktt.get_index()
@@ -629,6 +633,21 @@ class RdmaTest(TestUtil):
         iostr = "read requests" if iotype == RDMA_READ else "write firsts"
         self.dprint('DBG2', "RDMA %s for handle %s: %d" % (iostr, handle, len(requests)))
 
+        if len(requests) == 0 and length > 0:
+            if iotype == RDMA_READ:
+                opstr = ib_op_codes.get(RDMA_READ_Request)
+            else:
+                if self.get_nfragments(length) == 1:
+                    opstr = ib_op_codes.get(RDMA_WRITE_Only)
+                else:
+                    opstr = ib_op_codes.get(RDMA_WRITE_First)
+            self.test(False, "%s should be sent to client" % opstr)
+        elif length == 0:
+            opstr = "read requests" if iotype == RDMA_READ else "writes"
+            fmsg = ": expecting 0, got %d" % len(requests)
+            amsg = "RDMA %s should not be sent to client for segment with DMA length of zero" % opstr
+            self.test(len(requests) == 0, amsg, failmsg=fmsg)
+
         # Verify all fragments for each request
         dma_psn = None
         dma_length = None
@@ -644,7 +663,7 @@ class RdmaTest(TestUtil):
                 dma_length = dma_len
 
             # Get the number of expected fragments for this request
-            count = int(dma_len/self.iosize) + (1 if dma_len%self.iosize else 0)
+            count = self.get_nfragments(dma_len)
 
             # Get all fragments starting with the PSN from the request and
             # up to the last expected PSN
