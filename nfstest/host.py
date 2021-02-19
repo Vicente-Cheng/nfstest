@@ -227,7 +227,7 @@ class Host(BaseObj):
         ipv6 = self.proto[-1] == '6'
         self.ipaddr = self.get_ip_address(host=self.host, ipv6=ipv6)
 
-        if self.host in (None, "", "127.0.0.1", "localhost"):
+        if self.host in (None, "", "127.0.0.1", "localhost", "::1"):
             self._localhost = True
         else:
             self._localhost = False
@@ -976,7 +976,7 @@ class Host(BaseObj):
         """Get IP address associated with the given host name.
            This could be run as an instance or class method.
         """
-        if host in ("127.0.0.1", "localhost"):
+        if host in (None, "127.0.0.1", "localhost", "::1"):
             host = ""
         if len(host) != 0:
             ipstr = "v6" if ipv6 else "v4"
@@ -992,10 +992,16 @@ class Host(BaseObj):
             raise Exception("Unable to get IP%s address for host '%s'" % (ipstr, host))
         else:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            if ipv6:
-                s.connect(("2001:4860:4860::8888", 53))
-            else:
-                s.connect(("8.8.8.8", 53))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
+            try:
+                if ipv6:
+                    s.connect(("2001:4860:4860::8888", 53))
+                else:
+                    s.connect(("8.8.8.8", 53))
+                ip = s.getsockname()[0]
+                s.close()
+                return ip
+            except:
+                host = os.getenv("HOSTNAME")
+                if host is None:
+                    raise Exception("Unable to get hostname -- environment varible HOSTNAME is not set")
+                return Host.get_ip_address(host, ipv6)
