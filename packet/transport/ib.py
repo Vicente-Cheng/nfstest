@@ -1146,6 +1146,8 @@ class IB(BaseObj):
             rpcordma = RPCoRDMA(unpack)
             if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
                 pkt.add_layer("rpcordma", rpcordma)
+                if rpcordma.proc == rdma.RDMA_ERROR:
+                    return True
                 if rpcordma.reads:
                     # Save RDMA read first fragment
                     rpcordma.data = unpack.read(len(unpack))
