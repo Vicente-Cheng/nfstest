@@ -1167,18 +1167,13 @@ class TestUtil(NFSUtil):
 
            Remove any files created: test files, trace files.
         """
-        if self.nocleanup:
-            # Nothing to clean up
-            return
-        # Cleanup just once
-        self.nocleanup = True
-
-        if newline:
-            self._tverbose()
-            self._print_msg("", single=1)
-        self.dprint('DBG7', "CLEANUP starts")
-        if not self.mounted and self.remove_list:
-            self.mount()
+        cleanup_msg = False
+        if not self.nocleanup or len(self.rexecobj_list):
+            if newline:
+                self._tverbose()
+                self._print_msg("", single=1)
+            self.dprint('DBG7', "CLEANUP starts")
+            cleanup_msg = True
 
         for rexecobj in self.rexecobj_list:
             try:
@@ -1192,6 +1187,17 @@ class TestUtil(NFSUtil):
                 pass
         self.rexecobj = None
         self.rexecobj_list = []
+
+        if self.nocleanup:
+            # Nothing else to clean up
+            if cleanup_msg:
+                self.dprint('DBG7', "CLEANUP done")
+            return
+        # Cleanup just once
+        self.nocleanup = True
+
+        if not self.mounted and self.remove_list:
+            self.mount()
 
         for item in self.remote_files:
             try:
