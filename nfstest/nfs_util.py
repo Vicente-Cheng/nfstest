@@ -1682,18 +1682,25 @@ class NFSUtil(Host):
                Destination port [default: self.port]
            noreset:
                Do not reset the state id map [default: False]
+           write:
+               Search for a write delegation/lock stateid if True or a read
+               delegation/lock stateid if False. Default is to search for
+               any type [default: None]
         """
         if self.nfs_version < 4:
             return None
 
         noreset = kwargs.pop("noreset", False)
+        write = kwargs.pop("write", None)
+        deleg_type = OPEN_DELEGATE_WRITE if write else OPEN_DELEGATE_READ
+        lock_type = (WRITE_LT, WRITEW_LT) if write else (READ_LT, READW_LT)
         if not noreset:
             self.stid_map = {}
         self.lock_stateid = None
         (self.filehandle, self.open_stateid, self.deleg_stateid) = self.find_open(filename=filename, **kwargs)
         if self.open_stateid:
             self.stid_map[self.open_stateid] = "OPEN stateid"
-        if self.deleg_stateid:
+        if self.deleg_stateid and (write is None or self.openreply.NFSop.delegation.deleg_type == deleg_type):
             # Delegation stateid should be used for I/O
             self.stateid = self.deleg_stateid
             self.stid_map[self.deleg_stateid] = "DELEG stateid"
@@ -1704,7 +1711,7 @@ class NFSUtil(Host):
             args = dict((k, kwargs[k]) for k in kwargs if k in argl)
             args["match"] = "NFS.fh == '%s'" % self.pktt.escape(self.filehandle)
             (pktcall, pktreply) = self.find_nfs_op(OP_LOCK, **args)
-            if pktreply:
+            if pktreply and (write is None or pktcall.NFSop.locktype in lock_type):
                 self.lock_stateid = pktreply.NFSop.stateid.other
                 self.stid_map[self.lock_stateid] = "LOCK stateid"
                 self.stateid = self.lock_stateid
