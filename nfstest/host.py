@@ -242,7 +242,7 @@ class Host(BaseObj):
 
         if self.interface is None:
             self.interface = c.NFSTEST_INTERFACE
-            if self.server_ipaddr != "":
+            if self.server_ipaddr != "" and self._localhost:
                 out = self.get_route(self.server_ipaddr)
                 if out[1] is not None:
                     self.interface = out[1]
