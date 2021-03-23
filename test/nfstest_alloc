@@ -474,7 +474,7 @@ class AllocTest(TestUtil):
             self.trace_open()
             self.set_pktlist()
             # Get the correct state id for the ALLOCATE/DEALLOCATE operation
-            self.get_stateid(self.filename)
+            self.get_stateid(self.filename, write=True)
 
             # Verify ALLOCATE/DEALLOCATE packet call and reply
             self.verify_allocate(offset, size, dealloc=dealloc)
