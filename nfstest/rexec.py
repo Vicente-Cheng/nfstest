@@ -90,10 +90,11 @@ class RemoteServer:
         while True:
             msg = self.conn.recv()
             self.log("RECEIVED: %r" % msg)
-            if type(msg) is dict:
+            if isinstance(msg, dict):
                 try:
                     # Get command
                     cmd  = msg.get("cmd")
+                    xid  = msg.get("xid")
                     # Get function/statement/expression and positional arguments
                     kwts = msg.get("kwts", ())
                     fstr = kwts[0]
@@ -103,7 +104,7 @@ class RemoteServer:
 
                     if cmd == "run":
                         # Find if function is defined
-                        if type(fstr) in [types.FunctionType, types.BuiltinFunctionType, types.MethodType]:
+                        if isinstance(fstr, (types.FunctionType, types.BuiltinFunctionType, types.MethodType)):
                             # This is a function
                             func = fstr
                         else:
@@ -116,25 +117,25 @@ class RemoteServer:
                         # Run function with all its arguments
                         out = func(*kwts, **kwds)
                         self.log("RESULT: " + repr(out))
-                        self.conn.send(out)
+                        self.conn.send((xid, out))
                     elif cmd == "eval":
                         # Evaluate expression
                         out = eval(fstr)
                         self.log("RESULT: " + repr(out))
-                        self.conn.send(out)
+                        self.conn.send((xid, out))
                     elif cmd == "exec":
                         # Execute statement
                         exec(fstr)
                         self.log("EXEC done")
-                        self.conn.send(None)
+                        self.conn.send((xid, None))
                     else:
                         emsg = "Unknown procedure"
                         self.log("ERROR: %s" % emsg)
-                        self.conn.send(Exception(emsg))
+                        self.conn.send((xid, Exception(emsg)))
                 except Exception as e:
                     self.log("ERROR: %r" % e)
-                    self.conn.send(e)
-            if msg == "close":
+                    self.conn.send((xid, e))
+            elif msg == "close":
                 # Request to close the connection,
                 # exit the loop and terminate the server
                 self.conn.close()
@@ -223,7 +224,7 @@ class Rexec(BaseObj):
            # Then set the effective user id
            x.run(os.seteuid, 1000)
     """
-    def __init__(self, servername=None, logfile=None, sudo=False, sync_timeout=0.1):
+    def __init__(self, servername=None, logfile=None, sudo=False, timeout=30.0):
         """Constructor
 
            Initialize object's private data.
@@ -237,19 +238,22 @@ class Rexec(BaseObj):
            sudo:
                Run remote procedure server as root
                [Default: False]
-           sync_timeout:
-               Timeout used for synchronizing the connection stream
-               [Default: 0.1]
+           timeout:
+               Timeout for synchronous calls
+               [Default: 30.0]
         """
         global PORT
         self.pid     = None
         self.conn    = None
         self.process = None
         self.remote  = False
+        self._xid    = 0  # Next transaction ID
+        self.xid     = 0  # current transaction ID
+        self.xid_res = {} # Cached results
         self.servername   = servername
         self.logfile      = logfile
         self.sudo         = sudo
-        self.sync_timeout = sync_timeout
+        self.timeout      = timeout
         if os.getuid() == 0:
             # Already running as root
             self.sudo = True
@@ -315,8 +319,10 @@ class Rexec(BaseObj):
 
     def _send_cmd(self, cmd, *kwts, **kwds):
         """Internal method to send commands to remote server"""
+        self.xid = self._xid
+        self._xid += 1
         nowait = kwds.pop("NOWAIT", False)
-        self.conn.send({"cmd": cmd, "kwts": kwts, "kwds": kwds})
+        self.conn.send({"cmd": cmd, "xid": self.xid, "kwts": kwts, "kwds": kwds})
         if nowait:
             # NOWAIT option is specified, so return immediately
             # Use poll() method to check if any data is available
@@ -354,17 +360,34 @@ class Rexec(BaseObj):
         """
         return self.conn.poll(timeout)
 
-    def results(self):
+    def results(self, xid=None):
         """Return pending results"""
-        while True:
-            out = self.conn.recv()
-            if isinstance(out, Exception):
-                raise out
-            elif out is None and self.poll(self.sync_timeout):
-                # Try to re-sync when recv() returns None and there is
-                # still data in the buffer
-                continue
-            return out
+        if xid is None:
+            xid = self.xid
+        res = self.xid_res.pop(xid, None)
+        if res is not None:
+            # Return results in cache
+            return res[1]
+
+        stime = time.time()
+        delta = self.timeout
+        while delta > 0.0:
+            if self.poll(delta):
+                res = self.conn.recv()
+                if res is not None:
+                    rxid, out = res
+                    if xid == rxid:
+                        # Got result for correct transaction
+                        if isinstance(out, Exception):
+                            raise out
+                        else:
+                            return out
+                    else:
+                        # Cache result for any other transactions
+                        self.xid_res[rxid] = res
+            delta = self.timeout - (time.time() - stime)
+
+        raise Exception("Timeout waiting for results, transaction id: %d" % xid)
 
     def rexec(self, expr):
         """Execute statement on remote server"""
