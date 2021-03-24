@@ -1026,17 +1026,16 @@ class DelegTest(TestUtil):
 
             try:
                 fmsg = ""
+                error = None
                 dmsg = "%s file after conflicting operation" % io_str.capitalize()
                 self.dprint("DBG3", "%s [%s]" % (dmsg, self.absfile))
+                # Check for errors since the server may return an error
+                # when the file has been removed by another client
+                expfail = conflict_type == OP_REMOVE or (conflict_type == OP_RENAME and target)
                 # Read/Write file
                 if io_type == OPEN_READ:
-                    # Read should not fail
-                    expfail = False
                     os.read(fd, self.filesize - iosize)
                 else:
-                    # Check for errors on the write since the server may return
-                    # an error when the file has been removed by another client
-                    expfail = conflict_type == OP_REMOVE or (conflict_type == OP_RENAME and target)
                     os.write(fd, self.data_pattern(iosize, self.filesize - iosize, PATTERN))
                     # Flush data so if there is an error on a write it will
                     # happened here instead on the close
@@ -1052,6 +1051,8 @@ class DelegTest(TestUtil):
                     fmsg = ", failed with %s" % exerr
             if not expfail:
                 self.test(len(fmsg) == 0, "%s should succeed" % dmsg, failmsg=fmsg)
+            elif error is None:
+                self.test(len(fmsg) == 0, "%s may succeed" % dmsg, failmsg=fmsg)
             self.delay_io()
         except BaseName:
             pass
