@@ -965,7 +965,7 @@ class SSCTest(TestUtil):
                         sdata = os.read(srcobj.fd, rsize)
                         ddata = os.read(dstobj.fd, rsize)
                         cnt = min(len(sdata), len(ddata))
-                        if sdata[:cnt] != ddata[:cnt]:
+                        if len(sdata) == 0 or len(ddata) == 0 or sdata[:cnt] != ddata[:cnt]:
                             expr = False
                             break
                         soff  += cnt
