@@ -1294,7 +1294,10 @@ class SSCTest(TestUtil):
                     fmsg = ", expecting %s but got %s" % (copyobj.dst_offset, dst_offset)
                     self.test(dst_offset == copyobj.dst_offset, "%s should be sent with correct destination offset" % opstr, failmsg=fmsg)
                     fmsg = ", expecting %s but got %s" % (self.filesize, pktcall.NFSop.count)
-                    self.test(pktcall.NFSop.count == copyobj.nbytes, "%s should be sent with correct number of bytes to copy" % opstr, failmsg=fmsg)
+                    # Old behavior: COPY is sent with all bytes: nbytes
+                    # New behavior: COPY is send with the bytes that it could write: ncount
+                    expr = pktcall.NFSop.count in (copyobj.ncount, copyobj.nbytes)
+                    self.test(expr, "%s should be sent with correct number of bytes to copy" % opstr, failmsg=fmsg)
 
                     if pktreply:
                         status = pktreply.NFSop.status
@@ -1538,10 +1541,10 @@ class SSCTest(TestUtil):
         self.basic_ssc(src_off=self.filesize, copymsg=msg)
 
     def intra12_test(self):
-        """Verify intra server side COPY fails when source offset plus count
+        """Verify intra server side COPY succeeds when source offset plus count
            is beyond the end of the file
         """
-        self.test_group("Verify intra server side COPY fails when source offset plus count is beyond the end of the file")
+        self.test_group("Verify intra server side COPY succeeds when source offset plus count is beyond the end of the file")
         msg = "source offset plus count is beyond the end of the file"
         self.basic_ssc(src_off=self.s_offset, nbytes=self.filesize, copymsg=msg)
 
