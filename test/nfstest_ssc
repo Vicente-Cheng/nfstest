@@ -1104,8 +1104,12 @@ class SSCTest(TestUtil):
                 args["port"]   = self.dst.port
                 for i in range(ncopies):
                     (pktcall, pktreply) = self.find_nfs_op(OP_COPY_NOTIFY, status=None)
-                    if nbytes > 0 or pktcall:
-                        self.test(pktcall, "COPY_NOTIFY should be sent to source server")
+                    # Old behavior: COPY_NOTIFY is sent whether it can copy data or not
+                    # New behavior: COPY_NOTIFY is not sent if data cannot be copied
+                    if ncount == 0 and not pktcall:
+                        self.test(not pktcall, "COPY_NOTIFY may not be sent to source server")
+                    else:
+                        self.test(pktcall, "COPY_NOTIFY may be sent to source server")
                     if pktcall:
                         save_index = pktcall.record.index + 1
                         stateid = pktcall.NFSop.stateid.other
@@ -1630,12 +1634,12 @@ class SSCTest(TestUtil):
         self.basic_ssc(dstopen=os.O_RDONLY, failure=errno.EBADF, dstfail=1, inter=1)
 
     def inter11_test(self):
-        """Verify inter server side COPY fails when source offset is beyond the
+        """Verify inter server side COPY succeeds when source offset is beyond the
            end of the file
         """
-        self.test_group("Verify inter server side COPY fails when source offset is beyond the end of the file")
+        self.test_group("Verify inter server side COPY succeeds when source offset is beyond the end of the file")
         msg = "source offset is beyond the end of the file"
-        self.basic_ssc(src_off=self.filesize, failure=errno.EINVAL, copymsg=msg, inter=1)
+        self.basic_ssc(src_off=self.filesize, copymsg=msg, inter=1)
 
     def inter12_test(self):
         """Verify inter server side COPY fails when source offset plus count
