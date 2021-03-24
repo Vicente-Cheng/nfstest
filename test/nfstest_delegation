@@ -303,6 +303,11 @@ class DelegTest(TestUtil):
                 "clientname:server:export:nfsversion:port:proto:sec:mtpoint " \
                 "[default: '%default']"
         self.test_opgroup.add_option("--client", default='nfsversion=3:proto=tcp:port=2049', help=hhelp)
+        hhelp = "Comma separated list of valid NFS versions to use in the " \
+                "--client option. An NFS version from this list, which is " \
+                "different than that given by --nfsversion, is selected and " \
+                "included in the --client option [default: %default]"
+        self.test_opgroup.add_option("--client-nfsvers", default="4.0,4.1", help=hhelp)
         hhelp = "Starting offset for lock [default: %default]"
         self.test_opgroup.add_option("--lock-offset", type="int", default=0, help=hhelp)
         hhelp = "Starting offset for lock on pending open [default: %default]"
@@ -326,6 +331,17 @@ class DelegTest(TestUtil):
 
         # Process the --client option
         client_list = self.process_client_option(count=nclients, remote=None)
+        if self.client_nfsvers is not None:
+            nfsvers_list = self.str_list(self.client_nfsvers)
+            for client_args in client_list:
+                for nfsver in nfsvers_list:
+                    if nfsver != self.nfsversion:
+                        client_args["nfsversion"] = nfsver
+                        break
+                else:
+                    self.opts.error("At least one NFS version in --client-nfsvers '%s' " \
+                                    "must be different then --nfsversion %s" % \
+                                    (self.client_nfsvers, self.nfsversion))
 
         # Remove all client specs which are not valid -- when mount is 0 that
         # means it is the same client as the main client with the same mount
