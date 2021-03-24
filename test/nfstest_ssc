@@ -1196,8 +1196,12 @@ class SSCTest(TestUtil):
                         opstr    = "COPY"
                         pktcall  = p_call
                         pktreply = p_reply
-                if nbytes > 0 or pktcall:
-                    self.test(pktcall, "%s should be sent to %sserver" % (opstr, svrstr))
+                # Old behavior: COPY is sent whether it can copy data or not
+                # New behavior: COPY is not sent if data cannot be copied
+                if ncount == 0 and not pktcall:
+                    self.test(not pktcall, "%s may not be sent to %sserver" % (opstr, svrstr))
+                else:
+                    self.test(pktcall, "%s may be sent to %sserver" % (opstr, svrstr))
                 if pktcall:
                     save_index  = pktcall.record.index + 1
                     src_fhandle = pktcall.NFSop.sfh
@@ -1522,12 +1526,12 @@ class SSCTest(TestUtil):
         self.basic_ssc(dstopen=os.O_RDONLY, failure=errno.EBADF, dstfail=1)
 
     def intra11_test(self):
-        """Verify intra server side COPY may fail when source offset is beyond the
+        """Verify intra server side COPY succeeds when source offset is beyond the
            end of the file
         """
-        self.test_group("Verify intra server side COPY may fail when source offset is beyond the end of the file")
+        self.test_group("Verify intra server side COPY succeeds when source offset is beyond the end of the file")
         msg = "source offset is beyond the end of the file"
-        self.basic_ssc(src_off=self.filesize, failure=errno.EINVAL, enforce=0, copymsg=msg)
+        self.basic_ssc(src_off=self.filesize, copymsg=msg)
 
     def intra12_test(self):
         """Verify intra server side COPY fails when source offset plus count
