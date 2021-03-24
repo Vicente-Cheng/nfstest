@@ -1645,10 +1645,10 @@ class SSCTest(TestUtil):
         self.basic_ssc(src_off=self.filesize, copymsg=msg, inter=1)
 
     def inter12_test(self):
-        """Verify inter server side COPY fails when source offset plus count
+        """Verify inter server side COPY succeeds when source offset plus count
            is beyond the end of the file
         """
-        self.test_group("Verify inter server side COPY fails when source offset plus count is beyond the end of the file")
+        self.test_group("Verify inter server side COPY succeeds when source offset plus count is beyond the end of the file")
         msg = "source offset plus count is beyond the end of the file"
         self.basic_ssc(src_off=self.s_offset, nbytes=self.filesize, copymsg=msg, inter=1)
 
