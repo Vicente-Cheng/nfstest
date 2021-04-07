@@ -669,7 +669,7 @@ class DelegTest(TestUtil):
         io_list = self.find_ios(op_type, open_fh, self.server_ipaddr, self.port)
         self.verify_io_per_server(io_list, op_type, stid_type, stateid, status, delegret=delegret)
 
-    def verify_lock(self, io_type, mode_str, open_stid, offset, start_index, max_index, msg="", lock_owner=None, lock_stid=None):
+    def verify_lock(self, io_type, mode_str, open_stid, offset, start_index, max_index, msg="", locker=None, lock_stid=None):
         """Verify correct lock is sent to the server"""
         lock_stateid = None
         self.pktt.rewind(start_index)
@@ -682,10 +682,24 @@ class DelegTest(TestUtil):
             ltype = READ_LT if io_type == OPEN_READ else WRITE_LT
             self.test(lockcall.NFSop.locktype == ltype, "LOCK should be sent with correct lock type")
             self.test(lockcall.NFSop.length == self.lock_len, "LOCK should be sent with correct lock range")
-            self.test(lockcall.NFSop.locker.open_owner.stateid == open_stid, "LOCK should be sent with correct OPEN stateid")
-            if lock_owner is not None:
+            pktlocker = lockcall.NFSop.locker
+            if pktlocker.new_lock_owner:
+                lowner = pktlocker.open_owner
+            else:
+                lowner = pktlocker.lock_owner
+            self.test(lowner.stateid == open_stid, "LOCK should be sent with correct OPEN stateid")
+            if locker is not None:
                 # Verify lock has a different lock owner than the one given
-                expr = lock_owner != lockcall.NFSop.locker.open_owner.lock_owner.owner
+                if locker.new_lock_owner and pktlocker.new_lock_owner:
+                    # Both locks are sent with new lock owners
+                    expr = locker.open_owner.lock_owner != pktlocker.open_owner.lock_owner.owner
+                elif not locker.new_lock_owner and not pktlocker.new_lock_owner:
+                    # Both locks are sent with existing lock owners
+                    expr = locker.lock_owner.stateid != pktlocker.lock_owner.lock_owner.stateid
+                else:
+                    # One lock is sent with a new lock owner and the other
+                    # with and existing lock owner
+                    expr = True
                 self.test(expr, "LOCK should be sent with a different open owner")
         if lockreply:
             # Verify lock reply
@@ -1196,12 +1210,33 @@ class DelegTest(TestUtil):
                     self.test(lockcall is None, "LOCK should not be sent when holding a %s delegation on the file" % mode_str)
                 self.pktt.rewind(conflict_index)
 
+            deleg2_stid = None
+            open2_stid = None
+            mode2_str = mode_str
             if read_write:
                 # The client returns the delegation
                 self.test(delegreturncall, "DELEGRETURN should be sent when the file is opened on the same client for writing")
                 if delegreturncall:
                     expr = delegreturncall.NFSop.stateid.other == deleg_stid
                     self.test(expr, "DELEGRETURN should be sent with the %s delegation stateid" % mode_str)
+
+                    # Find if there is an open after DELEGRETURN but before
+                    # the conflicting operation
+                    s_index = self.pktt.get_index()
+                    self.pktt.rewind(delegreturncall.record.index)
+                    (o_fh, o_stid, deleg2_stid) = self.find_open(filename=self.filename, claimfh=open_fh, anyclaim=True, src_ipaddr=self.client_ipaddr, maxindex=opencall.record.index)
+                    if deleg2_stid is not None:
+                        # Server returned a delegation for the new open
+                        open2_stid = o_stid
+                        deleg_type = self.openreply.NFSop.delegation.deleg_type
+                        mode2_str  = deleg_str[self.openreply.NFSop.delegation.deleg_type]
+
+                        # Find the DELEGRETURN for this new delegation
+                        (delegreturncall, delegreturnreply) = self.find_nfs_op(OP_DELEGRETURN, src_ipaddr=self.client_ipaddr)
+                        if delegreturncall:
+                            # Change index to second DELEGRETURN
+                            delegreturn_index = delegreturncall.record.index
+                    self.pktt.rewind(s_index)
 
             self.test(opencall, "%s should be sent from second client" % conflict_str)
             if conflict_op == OP_SETATTR:
@@ -1221,7 +1256,7 @@ class DelegTest(TestUtil):
 
             # Find CB_RECALL sent to client under test
             (cbcall, cbreply) = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, first_call=True, nfs_version=None)
-            if read_write:
+            if read_write and not deleg2_stid:
                 # The client has returned the delegation so no CB_RECALL
                 self.test(cbcall is None, "CB_RECALL should not be sent to the client after a conflicting %s is received from a second client" % conflict_str)
                 self.test(openreply, "%s reply should be sent to the second client" % conflict_str)
@@ -1234,7 +1269,12 @@ class DelegTest(TestUtil):
             if cbcall is None:
                 return
             cbrecall_index = self.pktt.get_index()
-            self.test(cbcall.NFSop.stateid.other == deleg_stid, "CB_RECALL should recall %s delegation granted to client" % mode_str)
+            if deleg2_stid is None:
+                expr = cbcall.NFSop.stateid.other == deleg_stid
+            else:
+                expr = cbcall.NFSop.stateid.other == deleg2_stid
+                mode_str = mode2_str
+            self.test(expr, "CB_RECALL should recall %s delegation granted to client" % mode_str)
             self.test(cbreply, "CB_RECALL reply should be sent to the server")
             if cbreply:
                 self.test(cbreply.NFSop.status == NFS4_OK, "CB_RECALL should return NFS4_OK")
@@ -1243,7 +1283,7 @@ class DelegTest(TestUtil):
             (fh, op_stid2, deleg_stid2) = self.find_open(filename=self.filename, deleg_stateid=deleg_stid, src_ipaddr=self.client_ipaddr, fh=open_fh)
             open_index = self.pktt.get_index()
             if fh is not None or claim_cur in [os.O_RDONLY, os.O_WRONLY]:
-                expr1 = deleg_type == OPEN_DELEGATE_READ and claim_cur == os.O_RDONLY
+                expr1 = deleg_type == OPEN_DELEGATE_READ  and claim_cur == os.O_RDONLY
                 expr2 = deleg_type == OPEN_DELEGATE_WRITE and claim_cur == os.O_WRONLY
                 # OPEN is only sent if main open and pending open are different
                 if not (op_stid2 is None and (expr1 or expr2)):
@@ -1273,23 +1313,26 @@ class DelegTest(TestUtil):
                     self.test(True, "Client has already flushed all written data before CB_RECALL")
                 self.pktt.rewind(open_index)
 
+            lock_stid2 = lock_stid
             lock_stid = None
-            lock_owner = None
+            locker = None
             if lock and delegreturncall:
                 # Verify the LOCK before DELEGRETURN
-                lop_stid = open_stid if op_stid2 is None else op_stid2
+                lop_stid = lock_stid2 if lock_stid2 else open_stid if op_stid2 is None else op_stid2
                 lock_stid = self.verify_lock(io_type, mode_str, lop_stid, self.lock_offset, open_index, delegreturn_index)
                 if self.pktcall:
                     # Save lock owner
-                    lock_owner = self.pktcall.NFSop.locker.open_owner.lock_owner.owner
+                    locker = self.pktcall.NFSop.locker
                 if cio_type is not None:
                     # Verify the LOCK before DELEGRETURN -- second process
                     msg = " for the second process"
-                    self.verify_lock(cio_type, mode_str, lop_stid, self.lock_poffset, open_index, delegreturn_index, msg=msg, lock_owner=lock_owner, lock_stid=lock_stid)
+                    lop_stid = lop_stid if open2_stid is None else open2_stid
+                    self.verify_lock(cio_type, mode_str, lop_stid, self.lock_poffset, open_index, delegreturn_index, msg=msg, locker=locker, lock_stid=lock_stid)
 
             self.test(delegreturncall, "DELEGRETURN should be sent")
             if delegreturncall is None:
                 return
+            deleg_stid = deleg_stid if deleg2_stid is None else deleg2_stid
             expr = delegreturncall.NFSop.stateid.other == deleg_stid
             self.test(expr, "DELEGRETURN should be sent with the stateid of %s delegation being recalled" % mode_str)
 
