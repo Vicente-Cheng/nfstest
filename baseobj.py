@@ -218,7 +218,7 @@ class BaseObj(object):
            does not exist it returns None as if they exist but not
            defined
         """
-        if self._globals.has_key(attr):
+        if attr in self._globals:
             # Shared attribute
             return self._globals[attr]
         if self._attrs is not None:
