@@ -61,7 +61,7 @@ _debug_prefix = {
 
 def _init_debug():
     """Define all debug flags"""
-    for i in xrange(7):
+    for i in range(7):
         dbg = 'dbg%d' % (i+1)
         _debug_map[dbg] = (2 << i)
         _debug_prefix[(2 << i)] = dbg.upper() + ': '

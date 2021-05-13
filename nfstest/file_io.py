@@ -917,7 +917,7 @@ class FileIO(BaseObj):
         self.nclose += 1
 
         if odgrade:
-            for i in xrange(10):
+            for i in range(10):
                 count = self._do_io(fd=fdr, offset=fdroffset, size=self.rsize, fileobj=fileobj)
                 fdroffset += count
             self._dprint("DBG3", "CLOSE   %s" % fileobj.name)
@@ -1077,7 +1077,7 @@ class FileIO(BaseObj):
             # setup interprocess queue
             self.queue = JoinableQueue()
             processes = []
-            for i in xrange(self.nprocs):
+            for i in range(self.nprocs):
                 # Run each subprocess with its own process id (tid)
                 # The process id is used to set the random number generator
                 # and also to have each process work with different files

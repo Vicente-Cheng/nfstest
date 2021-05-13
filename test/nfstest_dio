@@ -331,7 +331,7 @@ class DioTest(TestUtil):
             # Make sure the buffer is not aligned
             align_str = "non-"
             buffers = []
-            for i in xrange(30):
+            for i in range(30):
                 buffers.append(ctypes.c_void_p())
                 buffers[-1].value = self.libc.malloc(size)
                 if buffers[-1].value & (self.PAGESIZE-1) != 0:
@@ -574,7 +574,7 @@ class DioTest(TestUtil):
                 fd = posix.open(self.absfile, posix.O_RDWR|posix.O_CREAT|posix.O_DIRECT)
 
                 offset = 0
-                for i in xrange(3):
+                for i in range(3):
                     count = self.do_write(fd, offset, self.wsize, aligned=aligned)
                     offset += count
 
@@ -788,13 +788,13 @@ class DioTest(TestUtil):
             boffset = 0
             test_hash = []
             N = len(align_hash) if len(align_hash) else 3
-            for i in xrange(N):
+            for i in range(N):
                 b_off = off
                 if len(align_hash):
                     aligned = align_hash[i]
                 else:
                     aligned = True
-                for j in xrange(nio):
+                for j in range(nio):
                     test_hash.append({'offset':b_off, 'size':b_size, 'aligned':aligned, 'grpidx':i})
                     b_off += b_size
                 if write:

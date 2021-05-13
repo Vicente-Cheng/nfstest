@@ -1181,7 +1181,7 @@ class SSCTest(TestUtil):
                 self.pktt.rewind(save_index)
 
             # Verify COPY is sent to destination
-            cindex_list = range(ncopies)
+            cindex_list = list(range(ncopies))
             save_index = self.pktt.get_index()
             for i in range(ncopies):
                 clone = True

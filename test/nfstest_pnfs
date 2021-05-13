@@ -1367,7 +1367,7 @@ try:
     x.trace_start()
     x.setup(nfiles=NFILES)
     x.trace_stop()
-    for i in xrange(NFILES):
+    for i in range(NFILES):
         try:
             x.trace_open()
             x.set_pktlist()
