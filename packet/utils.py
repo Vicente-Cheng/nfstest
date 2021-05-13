@@ -112,7 +112,7 @@ class Enum(int):
         # Instantiate base class (integer class)
         obj = super(Enum, cls).__new__(cls, value)
         if ENUM_CHECK and obj._enumdict.get(value) is None:
-            raise EnumInval, "value=%s not in enum '%s'" % (value, obj.__class__.__name__)
+            raise EnumInval("value=%s not in enum '%s'" % (value, obj.__class__.__name__))
         return obj
 
     def __str__(self):
@@ -176,7 +176,7 @@ def bitmap_info(unpack, bitmap, key_enum=None, func_map=None):
                 func = func_map.get(bitnum)
                 if func is None:
                     if BMAP_CHECK:
-                        raise BitmapInval, "decoding function not found for bit number %d" % bitnum
+                        raise BitmapInval("decoding function not found for bit number %d" % bitnum)
                     else:
                         break
                 else:

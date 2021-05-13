@@ -1010,7 +1010,7 @@ class XDRobject:
                             # Defined indirectly as a variable length opaque
                             isbitdict = True
             if not isbitdict:
-                raise Exception, "BITDICT tag is used incorrectly in definition for '%s'" % defname
+                raise Exception("BITDICT tag is used incorrectly in definition for '%s'" % defname)
         return isbitdict
 
     def process_classattr(self, deftags):

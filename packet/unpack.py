@@ -282,7 +282,7 @@ class Unpack(object):
         """Get a variable length opaque up to a maximum length of maxcount"""
         size = self.unpack_uint()
         if maxcount > 0 and size > maxcount:
-            raise Exception, "Opaque exceeds maximum length"
+            raise Exception("Opaque exceeds maximum length")
         return self.read(size, pad=4)
 
     def unpack_fopaque(self, size):
@@ -303,7 +303,7 @@ class Unpack(object):
         """
         slen = self._get_ltype(ltype)
         if maxcount > 0 and slen > maxcount:
-            raise Exception, "String exceeds maximum length"
+            raise Exception("String exceeds maximum length")
         return self.read(slen, pad)
 
     def unpack_array(self, unpack_item=unpack_uint, ltype=unpack_uint, uargs={}, maxcount=0, islist=False):
@@ -325,7 +325,7 @@ class Unpack(object):
         # Get length of array
         slen = self._get_ltype(ltype)
         if maxcount > 0 and slen > maxcount:
-            raise Exception, "Array exceeds maximum length"
+            raise Exception("Array exceeds maximum length")
         while slen > 0:
             try:
                 # Unpack each item in the array

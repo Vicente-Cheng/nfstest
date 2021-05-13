@@ -970,7 +970,7 @@ class TestUtil(NFSUtil):
             try:
                 # Set verbose level mask
                 self.debug_level(opts.verbose)
-            except Exception, e:
+            except Exception as e:
                 self.opts.error("Invalid verbose level <%s>: %s" % (opts.verbose, e))
 
             if opts.createlog and len(opts.basename) == 0:
@@ -2113,7 +2113,7 @@ class TestUtil(NFSUtil):
                 self.dprint('DBG3', "Lock file F_SETLKW (%s)" % mode_str)
                 rv = fcntl.fcntl(fd, fcntl.F_SETLKW, lockdata)
                 ret.append(rv)
-            except Exception, e:
+            except Exception as e:
                 self.warning("Unable to get lock on file: %r" % e)
         return ret
 

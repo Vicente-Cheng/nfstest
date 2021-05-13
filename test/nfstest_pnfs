@@ -957,7 +957,7 @@ class pNFSTest(TestUtil):
             haslock = True
             lockdata = struct.pack('hhllhh', lock_type, 0, 0, 0, 0, 0)
             rv = fcntl.fcntl(fd, fcntl.F_SETLKW, lockdata)
-        except Exception, e:
+        except Exception as e:
             self.warning("Unable to get lock on file: %r" % e)
             haslock = False
 
