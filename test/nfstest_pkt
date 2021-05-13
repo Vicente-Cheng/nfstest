@@ -228,7 +228,7 @@ vopts, args = opts.parse_args()
 if vopts.list__options:
     hidden_opts = ("--list--options", "--list--pktlayers")
     long_opts = [x for x in opts._long_opt.keys() if x not in hidden_opts]
-    print("\n".join(opts._short_opt.keys() + long_opts))
+    print("\n".join(list(opts._short_opt.keys()) + long_opts))
     sys.exit(0)
 if vopts.list__pktlayers:
     print("\n".join(["all"] + packet.pkt.PKT_layers))

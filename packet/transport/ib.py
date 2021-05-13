@@ -743,7 +743,7 @@ class RDMAinfo(RDMAbase):
         else:
             # The RETH object header is not given, find the correct segment
             # where this fragment should be inserted
-            for rsegment in self._rdma_segments.itervalues():
+            for rsegment in self._rdma_segments.values():
                 if rsegment.valid_psn(psn):
                     size = len(unpack)
                     if read:

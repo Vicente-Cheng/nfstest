@@ -75,7 +75,7 @@ def _get_modules(script):
                     for mods in mod_entries[0]:
                         for item in mod_entries[1]:
                             modules['.'.join([mods, item])] = 1
-    return modules.keys()
+    return list(modules.keys())
 
 def _get_see_also(src, manpage, modules, local_mods):
     parent_objs = {}

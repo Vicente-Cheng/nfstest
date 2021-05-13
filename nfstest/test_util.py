@@ -948,12 +948,12 @@ class TestUtil(NFSUtil):
             self.scan_options()
         else:
             if opts.list__tests:
-                print("\n".join(self.testnames + self.testgroups.keys()))
+                print("\n".join(self.testnames + list(self.testgroups.keys())))
                 sys.exit(0)
             if opts.list__options:
                 hidden_opts = ("--list--tests", "--list--options")
                 long_opts = [x for x in self.opts._long_opt.keys() if x not in hidden_opts]
-                print("\n".join(self.opts._short_opt.keys() + long_opts))
+                print("\n".join(list(self.opts._short_opt.keys()) + long_opts))
                 sys.exit(0)
 
             if opts.notimestamps:
@@ -1130,7 +1130,7 @@ class TestUtil(NFSUtil):
                 # already given by static name match making sure the
                 # options given by the exact name are not overwritten
                 # by the ones found from a regular expression
-                opts = dict(self.testopts[key].items() + opts.items())
+                opts = dict(list(self.testopts[key].items()) + list(opts.items()))
         return opts
 
     def get_logname(self, remote=False):

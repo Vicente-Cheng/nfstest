@@ -72,7 +72,7 @@ BaseObj.debug_map(0x800000000, 'pkt4', "PKT4: ")
 BaseObj.debug_map(0xF00000000, 'pktt', "PKTT: ")
 
 # Map of tokens
-_token_map = dict(token.tok_name.items() + symbol.sym_name.items())
+_token_map = dict(list(token.tok_name.items()) + list(symbol.sym_name.items()))
 # Map of items not in the array of the compound
 _nfsopmap = {'status': 1, 'tag': 1, 'minorversion': 1}
 # Match function map

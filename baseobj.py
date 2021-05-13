@@ -338,7 +338,7 @@ class BaseObj(object):
         elif isinstance(value, dict):
             # Display dictionary
             out = []
-            for key,val in value.iteritems():
+            for key,val in value.items():
                 out.append(str(key) + ": " + self._str_value(val))
             return '{' + ', '.join(out) + '}'
         elif isinstance(value, (int, long, str)):

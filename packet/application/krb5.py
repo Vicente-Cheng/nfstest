@@ -525,7 +525,7 @@ class KRB5(BaseObj):
             slen = unpack.size()
             derunpack = DERunpack(unpack.getbytes())
             krbobj = derunpack.get_item()
-            appid, obj = krbobj.items()[0]
+            appid, obj = list(krbobj.items())[0]
             self.appid = krb5_application(appid)
             if self.appid in (const.AS_REQ, const.TGS_REQ):
                 # AS-REQ  ::= [APPLICATION 10] KDC-REQ

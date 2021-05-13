@@ -345,7 +345,7 @@ class DERunpack(Unpack):
                             ret[tag] = item
                 elif self.tclass == CONTEXT:
                     # The item (item) has a Context tag
-                    key, value = item.items()[0]
+                    key, value = list(item.items())[0]
                     ret[key] = value
                 else:
                     # Current item (ret) and item have no context tag so this
