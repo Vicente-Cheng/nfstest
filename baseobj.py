@@ -198,9 +198,9 @@ class BaseObj(object):
         """
         keys = None
         for item in kwts:
-            if type(item) == dict:
+            if isinstance(item, dict):
                 self.__dict__.update(item)
-            elif type(item) == list or type(item) == tuple:
+            elif isinstance(item, (list, tuple)):
                 if keys is None:
                     keys = item
                 else:
@@ -309,7 +309,7 @@ class BaseObj(object):
                 if val != None:
                     if isrepr:
                         value = pformat(val, indent=0)
-                        if (isinstance(val, list) or isinstance(val, dict)) and value.find("\n") > 0:
+                        if isinstance(val, (list, dict)) and value.find("\n") > 0:
                             # If list or dictionary have more than one line as
                             # returned from pformat, add an extra new line
                             # between opening and closing brackets and add
@@ -329,7 +329,7 @@ class BaseObj(object):
 
     def _str_value(self, value):
         """Format value"""
-        if isinstance(value, list) or isinstance(value, tuple):
+        if isinstance(value, (list, tuple)):
             # Display list or tuple
             out = []
             for item in value:
@@ -341,8 +341,8 @@ class BaseObj(object):
             for key,val in value.iteritems():
                 out.append(str(key) + ": " + self._str_value(val))
             return '{' + ', '.join(out) + '}'
-        elif type(value) == int or type(value) == long or type(value) == str:
-            if _strsize > 0 and type(value) == str:
+        elif isinstance(value, (int, long, str)):
+            if _strsize > 0 and isinstance(value, str):
                 return repr(value[:_strsize])
             return repr(value)
         else:
@@ -458,7 +458,7 @@ class BaseObj(object):
                x.debug_level('debug ^ 1')
         """
         global _dlevel
-        if type(level) == str:
+        if isinstance(level, str):
             # Convert named verbose levels to a number
             # -- Get a list of all named verbose levels
             for item in sorted(set(re.split('\W+', level))):
@@ -608,7 +608,7 @@ class BaseObj(object):
         ret = ''
         if level is None:
             return
-        if type(level) == str:
+        if isinstance(level, str):
             level = _debug_map[level.lower()]
         if level & _dlevel:
             # Add display prefix only if msg is not an empty string

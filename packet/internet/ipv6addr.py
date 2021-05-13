@@ -55,7 +55,7 @@ class IPv6Addr(str):
            IPv6 address.
         """
         if ip != None:
-            if type(ip) != str:
+            if not isinstance(ip, str):
                 # Convert IP address to a string
                 ip = hex(ip)
             ip = ip.rstrip('Ll').replace('0x', '')

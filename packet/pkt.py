@@ -78,7 +78,7 @@ class Pkt(BaseObj):
 
     def __eq__(self, other):
         """Comparison method used to determine if object has a given layer"""
-        if type(other) is str:
+        if isinstance(other, str):
             return getattr(self, other.lower(), None) is not None
         return False
 

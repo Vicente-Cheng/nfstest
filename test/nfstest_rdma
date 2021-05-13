@@ -1114,7 +1114,7 @@ class RdmaTest(TestUtil):
                 # Argument filesizes is only used for testing NFS reads or
                 # NFS writes -- the argument could be either a list, a tuple
                 # or an integer (if using a single file)
-                if isinstance(filesizes, list) or isinstance(filesizes, tuple):
+                if isinstance(filesizes, (list, tuple)):
                     filesize_list = filesizes
                 else:
                     # Single file size -- convert it into a list

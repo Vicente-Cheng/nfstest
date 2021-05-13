@@ -119,7 +119,7 @@ def int_units(value):
        Examples:
            out = num_units("1MB") # out = 1048576
     """
-    if type(value) == str:
+    if isinstance(value, str):
         v, m = re.search(r"([-\+\.\d]+)\s*(\w?)", value).groups()
         value = int(float(v) * (1<<(10*UNIT_SUFFIXES.index(m.upper()))))
     return value
@@ -380,7 +380,7 @@ class FormatStr(Formatter):
             # Only one format spec is given, display list with format spec
             # applied to each item in the list
             return "[" + ", ".join(vlist) + "]"
-        elif isinstance(value, int) or isinstance(value, long) or isinstance(value, float):
+        elif isinstance(value, (int, long, float)):
             if _max_map.get(fmt):
                 # Format: {0:max32|umax32|max64|umax64}
                 # Output: if value matches the largest number in format given,
