@@ -609,7 +609,7 @@ struct nfsv4_1_file_layout4 {
 };
 
 /* COMMENT: NFSv4.x flex files layout definitions (BEGIN) ================================ */
-/* INCLUDE: nfs4flex.x */
+/* INCLUDE: packet/nfs/nfs4flex.x */
 /* COMMENT: NFSv4.x flex files layout definitions (END) ================================== */
 
 /*

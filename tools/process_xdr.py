@@ -366,6 +366,9 @@ class XDRobject:
         self.xfile = xfile
         (self.bfile, ext) = os.path.splitext(self.xfile)
         self.bname = os.path.basename(self.bfile)
+        self.import_path = os.path.dirname(self.xfile).replace(os.sep, ".")
+        if len(self.import_path):
+            self.import_path += "."
         # Output file for python class objects
         self.pfile = self.bfile + ".py"
         # Output file for python constants and mapping dictionaries
@@ -1392,7 +1395,7 @@ class XDRobject:
             dname,opts = self.gettype(dname, usetypedef=False)
 
             # Ignore opts from gettype() and just use the array def "adef"
-            alist = filter(None, [adef])
+            alist = list(filter(None, [adef]))
             isarray = False
             if len(alist) > 1 or (len(alist) == 1 and dname not in string_list):
                 # This is an array
@@ -1695,7 +1698,7 @@ class XDRobject:
         if self.modversion is not None:
             self.import_list.append("import nfstest_config as c\n")
         if self.enum_data:
-            self.import_list.append("import %s_const as const\n" % self.bname)
+            self.import_list.append("import %s%s_const as const\n" % (self.import_path, self.bname))
 
         for objpath in import_dict:
             import_str = "from %s import %s\n" % (objpath, ", ".join(import_dict[objpath]))
