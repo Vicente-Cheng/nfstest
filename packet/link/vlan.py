@@ -18,7 +18,7 @@ Decode Virtual LAN IEEE 802.1Q/802.1ad layer
 """
 import nfstest_config as c
 from baseobj import BaseObj
-from ethernet_const import *
+from packet.link.ethernet_const import *
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

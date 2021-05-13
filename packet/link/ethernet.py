@@ -18,13 +18,13 @@ Decode ethernet layer (RFC 894) Ethernet II.
 """
 import nfstest_config as c
 from baseobj import BaseObj
-from macaddr import MacAddr
-from ethernet_const import *
 from packet.transport.ib import IB
 from packet.internet.ipv4 import IPv4
 from packet.internet.ipv6 import IPv6
-from packet.link.vlan import vlan_layers
 from packet.internet.arp import ARP,RARP
+from packet.link.vlan import vlan_layers
+from packet.link.macaddr import MacAddr
+from packet.link.ethernet_const import *
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

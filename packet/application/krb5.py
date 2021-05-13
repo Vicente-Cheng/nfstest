@@ -21,10 +21,10 @@ RFC 4120 The Kerberos Network Authentication Service (V5)
 RFC 6113 A Generalized Framework for Kerberos Pre-Authentication
 """
 from packet.utils import *
-import krb5_const as const
 import nfstest_config as c
 from baseobj import BaseObj
 from packet.derunpack import DERunpack
+import packet.application.krb5_const as const
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

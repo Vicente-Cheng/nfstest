@@ -52,12 +52,12 @@ import ctypes
 import struct
 import inspect
 import textwrap
-from utils import *
 from formatstr import *
-from rexec import Rexec
 import nfstest_config as c
 from baseobj import BaseObj
-from nfs_util import NFSUtil
+from nfstest.utils import *
+from nfstest.rexec import Rexec
+from nfstest.nfs_util import NFSUtil
 import packet.nfs.nfs3_const as nfs3_const
 import packet.nfs.nfs4_const as nfs4_const
 from optparse import OptionParser,OptionGroup,IndentedHelpFormatter,SUPPRESS_HELP

@@ -24,14 +24,14 @@ RFC 1964 The Kerberos Version 5 GSS-API Mechanism
 NOTE:
   Procedure RPCSEC_GSS_BIND_CHANNEL is not supported
 """
-import krb5
-import rpc_const
-import gss_const as const
 from packet.utils import *
 import nfstest_config as c
 from baseobj import BaseObj
 from packet.unpack import Unpack
 from packet.derunpack import DERunpack
+import packet.application.krb5 as krb5
+import packet.application.gss_const as const
+import packet.application.rpc_const as rpc_const
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

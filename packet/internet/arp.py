@@ -19,12 +19,12 @@ Decode ARP and RARP layers.
 RFC 826 An Ethernet Address Resolution Protocol
 RFC 903 A Reverse Address Resolution Protocol
 """
-import arp_const as const
 import nfstest_config as c
 from packet.utils import *
 from baseobj import BaseObj
-from ipv6addr import IPv6Addr
 from packet.link.macaddr import MacAddr
+from packet.internet.ipv6addr import IPv6Addr
+import packet.internet.arp_const as const
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

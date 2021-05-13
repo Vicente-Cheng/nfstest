@@ -16,12 +16,12 @@ RPC Credentials module
 
 Decode RPC Credentials.
 """
-import gss
-import gss_const
-import rpc_const
 import nfstest_config as c
 from packet.utils import *
 from baseobj import BaseObj
+import packet.application.gss as gss
+import packet.application.gss_const as gss_const
+import packet.application.rpc_const as rpc_const
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

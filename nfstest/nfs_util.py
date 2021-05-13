@@ -24,7 +24,6 @@ trace are also included.
 """
 import os
 import struct
-from host import Host
 from formatstr import *
 import nfstest_config as c
 from packet.unpack import Unpack
@@ -32,6 +31,7 @@ from packet.nfs.nfs3_const import *
 from packet.nfs.nfs4_const import *
 from packet.nfs.nfs4 import stateid4
 from nfstest.utils import split_path
+from nfstest.host import Host
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

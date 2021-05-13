@@ -22,12 +22,12 @@ RFC 4034 Resource Records for the DNS Security Extensions
 RFC 4035 Protocol Modifications for the DNS Security Extensions
 RFC 4255 Using DNS to Securely Publish Secure Shell (SSH) Key Fingerprints
 """
-import dns_const as const
 import nfstest_config as c
 from packet.utils import *
 from baseobj import BaseObj
 from packet.unpack import Unpack
 from packet.internet.ipv6addr import IPv6Addr
+import packet.application.dns_const as const
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL

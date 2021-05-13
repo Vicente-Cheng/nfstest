@@ -17,11 +17,11 @@ IPv6 module
 Decode IP version 6 layer.
 Extension headers are not supported.
 """
-from ipv4 import IPv4
 import nfstest_config as c
-from ipv6addr import IPv6Addr
 from packet.transport.tcp import TCP
 from packet.transport.udp import UDP
+from packet.internet.ipv4 import IPv4
+from packet.internet.ipv6addr import IPv6Addr
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
