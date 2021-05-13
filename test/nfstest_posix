@@ -105,13 +105,13 @@ access_names = {
 
 def access_str(mode):
     """Convert the access mode bitmap to its string representation."""
-    list = []
+    access_list = []
     for perm in access_names:
         if perm & mode != 0:
-            list.append(access_names[perm])
-    if len(list) == 0:
-        list.append(access_names[0])
-    return '|'.join(list)
+            access_list.append(access_names[perm])
+    if len(access_list) == 0:
+        access_list.append(access_names[0])
+    return '|'.join(access_list)
 
 class DirEnt(ctypes.Structure):
     """
@@ -1686,9 +1686,9 @@ class PosixTest(TestUtil):
                 dirent = ctypes.cast(c_dirent, ctypes.POINTER(DirEnt))
                 self.test(dirent[0].d_name == dirlist[0], "%s - directory entry is correct after rewind" % objtype)
             else:
-                list = list(range(N))
-                random.shuffle(list)
-                for index in list:
+                random_list = list(range(N))
+                random.shuffle(random_list)
+                for index in random_list:
                     name = self._readdir(fd, offsets[index])
                     self.test(name == dirlist[index], "%s - directory entry is correct at offset = %d" % (objtype, offsets[index]))
 
