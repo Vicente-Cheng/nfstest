@@ -994,7 +994,7 @@ class DelegTest(TestUtil):
                 if conflict_type == OP_SETATTR:
                     dmsg = "Change permissions on the file from another client"
                     self.dprint("DBG2", "%s to recall delegation [%s]" % (dmsg, r_absfile))
-                    self.rexecobj.run(os.chmod, r_absfile, 0777)
+                    self.rexecobj.run(os.chmod, r_absfile, 0o777)
                 elif conflict_type == OP_REMOVE:
                     dmsg = "Remove the file from another client"
                     self.dprint("DBG2", "%s to recall delegation [%s]" % (dmsg, r_absfile))

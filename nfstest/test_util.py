@@ -1753,7 +1753,7 @@ class TestUtil(NFSUtil):
             # Slow down traffic for tcpdump to capture all packets
             time.sleep(delay)
 
-    def create_dir(self, dir=None, mode=0755):
+    def create_dir(self, dir=None, mode=0o755):
         """Create a directory under the given directory with the given mode."""
         self.get_dirname(dir=dir)
         self.dprint('DBG3', "Creating directory [%s]" % self.absdir)

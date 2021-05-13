@@ -1052,7 +1052,7 @@ class FileIO(BaseObj):
 
         if not os.path.exists(self.datadir):
             # Create top level directory if it does not exist
-            os.mkdir(self.datadir, 0777)
+            os.mkdir(self.datadir, 0o777)
         self.datadir_st = os.stat(self.datadir)
 
         # Get mount stats for mount point

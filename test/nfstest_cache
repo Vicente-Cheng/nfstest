@@ -367,11 +367,11 @@ class CacheTest(TestUtil):
             dirname = self.get_dirname()
             self.testdir = self.absdir
             self.dprint('DBG3', "Creating directory [%s]" % self.testdir)
-            os.mkdir(self.testdir, 0777)
+            os.mkdir(self.testdir, 0o777)
 
             self.get_dirname(dir=dirname)
             self.dprint('DBG3', "Creating directory [%s]" % self.absdir)
-            os.mkdir(self.absdir, 0777)
+            os.mkdir(self.absdir, 0o777)
 
             if data_cache:
                 cache_str = "directory listing"

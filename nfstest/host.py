@@ -536,7 +536,7 @@ class Host(BaseObj):
             return
         if self._localhost:
             if not os.path.exists(self.mtdir):
-                os.mkdir(self.mtdir, 0777)
+                os.mkdir(self.mtdir, 0o777)
         else:
             try:
                 cmd = "test -e '%s'" % self.mtdir
@@ -823,7 +823,7 @@ class Host(BaseObj):
         if os.path.exists(self.messages):
             fstat = os.stat(self.messages)
             self.dbgoffset = fstat.st_size
-            self.dbgmode = fstat.st_mode & 0777
+            self.dbgmode = fstat.st_mode & 0o777
             for mod in modmsgs.keys():
                 if len(modmsgs[mod]):
                     self._nfsdebug = True
@@ -843,7 +843,7 @@ class Host(BaseObj):
             try:
                 fd = None
                 fdw = None
-                os.system(self.sudo_cmd("chmod %o %s" % (self.dbgmode|0444, self.messages)))
+                os.system(self.sudo_cmd("chmod %o %s" % (self.dbgmode|0o444, self.messages)))
                 self.dprint('DBG2', "Creating log messages file [%s]" % self.dbgfile)
                 fdw = open(self.dbgfile, "w")
                 fd = open(self.messages, "r")

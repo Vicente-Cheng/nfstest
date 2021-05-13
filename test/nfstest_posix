@@ -192,18 +192,18 @@ open_flag_map = {
 }
 
 perm_map = {
-    00001: 'XOTH',
-    00002: 'WOTH',
-    00004: 'ROTH',
-    00010: 'XGRP',
-    00020: 'WGRP',
-    00040: 'RGRP',
-    00100: 'XUSR',
-    00200: 'WUSR',
-    00400: 'RUSR',
-    01000: 'SVTX',
-    02000: 'SGID',
-    04000: 'SUID',
+    0o0001: 'XOTH',
+    0o0002: 'WOTH',
+    0o0004: 'ROTH',
+    0o0010: 'XGRP',
+    0o0020: 'WGRP',
+    0o0040: 'RGRP',
+    0o0100: 'XUSR',
+    0o0200: 'WUSR',
+    0o0400: 'RUSR',
+    0o1000: 'SVTX',
+    0o2000: 'SGID',
+    0o4000: 'SUID',
 }
 
 def oflag_str(flags):
@@ -315,8 +315,8 @@ class PosixTest(TestUtil):
     def access_test(self):
         """Verify POSIX API access() on files with different modes."""
         self.test_group("Verify POSIX API access() on %s" % self.nfsstr())
-        perms = [0777, 0666, 0555, 0333, 0444, 0222, 0111, 000]
-        cperms = [07, 06, 05, 03]
+        perms = [0o777, 0o666, 0o555, 0o333, 0o444, 0o222, 0o111, 0o000]
+        cperms = [0o7, 0o6, 0o5, 0o3]
 
         try:
             self.create_file()
@@ -371,14 +371,14 @@ class PosixTest(TestUtil):
                     self.create_dir()
                     self.absfile = self.absdir
                 chmod_count = 0
-                max_perm = 07777+1
+                max_perm = 0o7777+1
                 bad_dict = {}
                 bit_list = []
                 for perm in xrange(max_perm):
                     bit_list.append(perm)
                     posix.chmod(self.absfile, perm)
                     fstat = os.stat(self.absfile)
-                    mode = fstat.st_mode & 07777
+                    mode = fstat.st_mode & 0o7777
                     if mode == perm:
                         chmod_count += 1
                     if self.tverbose != 1:
@@ -402,7 +402,7 @@ class PosixTest(TestUtil):
                         self.test_info(">>>>: " + msg)
                 fstat_b = os.stat(self.absfile)
                 sleep(1)
-                posix.chmod(self.absfile, 0777)
+                posix.chmod(self.absfile, 0o777)
                 fstat = os.stat(self.absfile)
                 self.test(fstat.st_ctime > fstat_b.st_ctime, "chmod - %s st_ctime should be updated" % objtype)
         except Exception:
@@ -464,7 +464,7 @@ class PosixTest(TestUtil):
 
         try:
             fd = None
-            mode = 0754
+            mode = 0o754
             self.get_filename()
             self.dprint('DBG3', "Create file %s using POSIX API creat()" % self.absfile)
             fd = self.libc.creat(self.absfile, mode)
@@ -473,16 +473,16 @@ class PosixTest(TestUtil):
             posix.close(fd)
             self.test(os.path.exists(self.absfile), "creat - file should be created")
             fstat = os.stat(self.absfile)
-            self.test(fstat.st_mode & 0777 == mode, "creat - mode permissions of created file should be correct")
+            self.test(fstat.st_mode & 0o777 == mode, "creat - mode permissions of created file should be correct")
             self.test(fstat.st_size == count, "creat - file size should be correct")
 
             self.dprint('DBG3', "Open existing file %s using POSIX API creat()" % self.absfile)
-            fd = self.libc.creat(self.absfile, 0744)
+            fd = self.libc.creat(self.absfile, 0o744)
             self.test(fd > 0, "creat - existent file open should succeed")
             posix.close(fd)
             fstat = os.stat(self.absfile)
             self.test(os.path.exists(self.absfile), "creat - file should still exist")
-            self.test(fstat.st_mode & 0777 == mode, "creat - mode permissions of opened file should not be changed")
+            self.test(fstat.st_mode & 0o777 == mode, "creat - mode permissions of opened file should not be changed")
             self.test(fstat.st_size == 0, "creat - existent file should be truncated")
         except Exception:
             self.test(False, traceback.format_exc())
@@ -852,7 +852,7 @@ class PosixTest(TestUtil):
             self.dprint('DBG3', "lstat %s [%s]" % (type, self.absfile))
             fstat = self.run_func(posix.lstat, self.absfile)
             if srcfile != None:
-                mode = 0777
+                mode = 0o777
                 size = len(srcfile)
                 is_func = stat.S_ISLNK
                 nlink = 1
@@ -872,7 +872,7 @@ class PosixTest(TestUtil):
                 self.close_files(fd)
 
         if type != "symbolic link":
-            self.test(fstat.st_mode & 0777 == mode, "%s - %s permissions should be correct" % (op_str, type), failmsg=", expecting %05o and got %05o" % (mode, fstat.st_mode & 0777))
+            self.test(fstat.st_mode & 0o777 == mode, "%s - %s permissions should be correct" % (op_str, type), failmsg=", expecting %05o and got %05o" % (mode, fstat.st_mode & 0o777))
         self.test(is_func(fstat.st_mode), "%s - object type should be a %s%s" % (op_str, reg, type))
         self.test(fstat.st_nlink == nlink, "%s - %s st_nlink should be equal to %d" % (op_str, type, nlink), failmsg=", expecting %d and got %d" % (nlink, fstat.st_nlink))
         self.test(fstat.st_uid == os.getuid(), "%s - %s st_uid should be correct" % (op_str, type), failmsg=", expecting %d and got %d" % (os.getuid(), fstat.st_uid))
@@ -898,14 +898,14 @@ class PosixTest(TestUtil):
 
         try:
             self.test_info("Regular file")
-            self.create_file(mode=0754)
-            self._stat_obj(0754, stat_mode=stat_mode, type='file')
+            self.create_file(mode=0o754)
+            self._stat_obj(0o754, stat_mode=stat_mode, type='file')
             testfile = self.absfile
 
             self.test_info("Directory")
-            self.create_dir(mode=0755)
+            self.create_dir(mode=0o755)
             self.absfile = self.absdir
-            self._stat_obj(0755, stat_mode=stat_mode, type='directory')
+            self._stat_obj(0o755, stat_mode=stat_mode, type='directory')
             testdir = self.absdir
 
             self.test_info("Symbolic link to a file")
@@ -913,14 +913,14 @@ class PosixTest(TestUtil):
             self.get_filename()
             self.dprint('DBG3', "Creating symbolic link to file [%s -> %s]" % (self.absfile, srcfile))
             os.symlink(srcfile, self.absfile)
-            self._stat_obj(0754, stat_mode=stat_mode, type='symbolic link', srcfile=srcfile)
+            self._stat_obj(0o754, stat_mode=stat_mode, type='symbolic link', srcfile=srcfile)
 
             self.test_info("Symbolic link to a directory")
             srcfile = testdir
             self.get_filename()
             self.dprint('DBG3', "Creating symbolic link to directory [%s -> %s]" % (self.absfile, srcfile))
             os.symlink(srcfile, self.absfile)
-            self._stat_obj(0755, stat_mode=stat_mode, type='symbolic link', srcfile=srcfile, srctype='directory')
+            self._stat_obj(0o755, stat_mode=stat_mode, type='symbolic link', srcfile=srcfile, srctype='directory')
         except Exception:
             self.test(False, traceback.format_exc())
 
@@ -944,14 +944,14 @@ class PosixTest(TestUtil):
             dstat_b = os.stat(abstopdir)
             sleep(1)
 
-            mode = 0754
+            mode = 0o754
             self.get_dirname(dir=topdir)
             self.dprint('DBG3', "Creating directory [%s]" % self.absdir)
             amsg = "mkdir - mkdir() should succeed"
             self.run_func(posix.mkdir, self.absdir, mode, msg=amsg)
             dstat = os.stat(self.absdir)
             self.test(os.path.exists(self.absdir), "mkdir - directory should be created")
-            self.test(dstat.st_mode & 0777 == mode, "mkdir - mode permissions of created directory should be correct")
+            self.test(dstat.st_mode & 0o777 == mode, "mkdir - mode permissions of created directory should be correct")
 
             dstat = os.stat(abstopdir)
             self.test(dstat.st_ctime > dstat_b.st_ctime, "mkdir - parent directory st_ctime should be updated")
@@ -1157,7 +1157,7 @@ class PosixTest(TestUtil):
                 # Create file to use as existent file or as the source file
                 # for the symbolic link
                 self.create_file()
-                os.chmod(self.absfile, 0777)
+                os.chmod(self.absfile, 0o777)
                 if ftype == SYMLINK:
                     # Create symbolic link
                     srcfile = self.absfile
@@ -1178,11 +1178,11 @@ class PosixTest(TestUtil):
                     for flag in flags:
                         mode |= flag
 
-                    perms = 0700 | random.randint(0,077)
-                    if perms == 0777:
+                    perms = 0o700 | random.randint(0,0o77)
+                    if perms == 0o777:
                         # Change open permissions to make it different than current
                         # file permissions
-                        perms = 0755
+                        perms = 0o755
 
                     # Booleans for checking file if able to read or/and write
                     is_write_allowed = posix.O_WRONLY in flags or posix.O_RDWR in flags
@@ -1242,9 +1242,9 @@ class PosixTest(TestUtil):
                             msg = "open - opening %s should succeed" % fmap[ftype]
                             self.test(openerr is None, msg, subtest=wflag_str, failmsg=strerror)
                             if not openerr:
-                                expr = fstat.st_mode & 0777 == ofstat.st_mode & 0777
+                                expr = fstat.st_mode & 0o777 == ofstat.st_mode & 0o777
                                 msg = "open - permission mode should not be changed when opening %s" % fmap[ftype]
-                                fmsg = ": changed from %04o to %04o" % (ofstat.st_mode & 0777, fstat.st_mode & 0777)
+                                fmsg = ": changed from %04o to %04o" % (ofstat.st_mode & 0o777, fstat.st_mode & 0o777)
                                 self.test(expr, msg, subtest=wflag_str, failmsg=fmsg)
                     else:
                         if openerr and posix.O_CREAT in flags and posix.O_DIRECTORY in flags:
@@ -1258,9 +1258,9 @@ class PosixTest(TestUtil):
                             if file_exists:
                                 if fstat is None:
                                     fstat = os.stat(self.absfile)
-                                expr = fstat.st_mode & 0777 == perms
+                                expr = fstat.st_mode & 0o777 == perms
                                 msg = "open - file should be created with correct permission mode"
-                                fmsg = ": expecting %04o, got %04o" % (perms, fstat.st_mode & 0777)
+                                fmsg = ": expecting %04o, got %04o" % (perms, fstat.st_mode & 0o777)
                                 self.test(expr, msg, subtest=flag_str, failmsg=fmsg)
                         else:
                             # O_CREAT is not set

@@ -491,7 +491,7 @@ class DioTest(TestUtil):
         """
         (open_args, info) = self._get_info(direct)
         self.dprint('DBG3', "Open file %s for writing%s" % (file, info))
-        fd = posix.open(file, posix.O_WRONLY|posix.O_CREAT|open_args, 0644)
+        fd = posix.open(file, posix.O_WRONLY|posix.O_CREAT|open_args, 0o644)
         offset = 0
         while offset < self.filesize:
             count = self.filesize - offset
@@ -677,7 +677,7 @@ class DioTest(TestUtil):
 
             self.get_filename()
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
-            fd = posix.open(self.absfile, posix.O_WRONLY|posix.O_CREAT|posix.O_DIRECT, 0644)
+            fd = posix.open(self.absfile, posix.O_WRONLY|posix.O_CREAT|posix.O_DIRECT, 0o644)
 
             idx = 0
             ngood = 0
