@@ -292,8 +292,8 @@ class TestUtil(NFSUtil):
         if len(self.test_msgs) > 0:
             if getattr(self, 'logfile', None):
                 if not self._empty_msg:
-                    print ""
-                print "Logfile: %s" % self.logfile
+                    print("")
+                print("Logfile: %s" % self.logfile)
                 self._empty_msg = 0
             ntests, tmsg = self._total_counts(self._msg_count)
             if ntests > 0:
@@ -306,12 +306,12 @@ class TestUtil(NFSUtil):
                     msg = "\033[33m" + msg + "\033[m" if self.isatty else msg
                 else:
                     msg = "\033[32m" + msg + "\033[m" if self.isatty else msg
-                print msg
+                print(msg)
         if self._opts_done:
             self.total_time = time.time() - self.test_time[0]
             total_str = "\nTotal time: %s" % self._print_time(self.total_time)
             self.write_log(total_str)
-            print total_str
+            print(total_str)
         self.close_log()
 
     def _verify_testnames(self):
@@ -948,12 +948,12 @@ class TestUtil(NFSUtil):
             self.scan_options()
         else:
             if opts.list__tests:
-                print "\n".join(self.testnames + self.testgroups.keys())
+                print("\n".join(self.testnames + self.testgroups.keys()))
                 sys.exit(0)
             if opts.list__options:
                 hidden_opts = ("--list--tests", "--list--options")
                 long_opts = [x for x in self.opts._long_opt.keys() if x not in hidden_opts]
-                print "\n".join(self.opts._short_opt.keys() + long_opts)
+                print("\n".join(self.opts._short_opt.keys() + long_opts))
                 sys.exit(0)
 
             if opts.notimestamps:
@@ -1427,7 +1427,7 @@ class TestUtil(NFSUtil):
                 msg = VT_BOLD + msg + VT_NORM
         else:
             tidmsg_s = tidmsg_l
-        print tidmsg_s + msg
+        print(tidmsg_s + msg)
         sys.stdout.flush()
         if len(msg) > 0:
             self._empty_msg = 0
@@ -1617,7 +1617,7 @@ class TestUtil(NFSUtil):
         msg = "CONFIG: " + msg
         msg = msg.replace("\n", "\n        ")
         self.write_log(msg)
-        print msg
+        print(msg)
         sys.exit(2)
 
     def test_info(self, msg):

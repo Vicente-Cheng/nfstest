@@ -628,7 +628,7 @@ class BaseObj(object):
             if indent > 0:
                 sp = ' ' * indent
                 ret = ret.replace("\n", "\n"+sp)
-            print ret
+            print(ret)
             self.write_log(ret)
             global _dcount
             _dcount += 1

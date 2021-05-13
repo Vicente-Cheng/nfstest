@@ -371,8 +371,8 @@ class XDRobject:
         # Output file for python constants and mapping dictionaries
         self.cfile = self.bfile + "_const.py"
         if self.pfile == self.xfile:
-            print "    The input file has a python extension,\n" + \
-                  "    it will not be overwritten"
+            print("    The input file has a python extension,\n" + \
+                  "    it will not be overwritten")
             return
 
         # Timestamp output files are generated
@@ -393,7 +393,7 @@ class XDRobject:
             self.process_comments(line)
             incl_file = self.tags.pop("INCLUDE", None)
             if incl_file is not None:
-                print "  Including file %s" % incl_file
+                print("  Including file %s" % incl_file)
                 for incl_line in open(incl_file, "r"):
                     self.xdr_lines.append(incl_line)
                 continue
@@ -1584,7 +1584,7 @@ class XDRobject:
 
         # Save enum and constants to *_const.py file
         if self.enum_data:
-            print "  Creating file %s" % self.cfile
+            print("  Creating file %s" % self.cfile)
             fd = open(self.cfile, "w")
             self.set_copyright(fd)
             fd.write(self.genstr)
@@ -1668,7 +1668,7 @@ class XDRobject:
 
     def process_xdr(self):
         """Process XDR definitions"""
-        print "  Creating file %s" % self.pfile
+        print("  Creating file %s" % self.pfile)
         fd = open(self.pfile, "w")
         self.set_copyright(fd)
         fd.write(self.genstr)
@@ -1904,5 +1904,5 @@ if len(args) < 1:
     opts.error("XDR definition file is required")
 
 for xdrfile in args:
-    print "Process XDR file %s" % xdrfile
+    print("Process XDR file %s" % xdrfile)
     XDRobject(xdrfile)

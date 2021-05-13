@@ -86,8 +86,8 @@ if __name__ == '__main__':
         tcount += 1
 
     if tcount == ntests:
-        print "All tests passed!"
+        print("All tests passed!")
         exit(0)
     else:
-        print "%d tests failed" % (ntests-tcount)
+        print("%d tests failed" % (ntests-tcount))
         exit(1)

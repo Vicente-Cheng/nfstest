@@ -69,7 +69,7 @@ vopts, args = opts.parse_args()
 if vopts.list__options:
     hidden_opts = ("--list--options",)
     long_opts = [x for x in opts._long_opt.keys() if x not in hidden_opts]
-    print "\n".join(opts._short_opt.keys() + long_opts)
+    print("\n".join(opts._short_opt.keys() + long_opts))
     sys.exit(0)
 
 if len(args) < 1:
@@ -81,7 +81,7 @@ unpack.UNPACK_ERROR = eval(vopts.unpack_error)
 
 # Process all trace files
 for pfile in args:
-    print pfile
+    print(pfile)
     pkttobj = Pktt(pfile)
     if len(vopts.debug_level):
         pkttobj.debug_level(vopts.debug_level)
@@ -121,9 +121,9 @@ for pfile in args:
                 # Operation mismatch between reply and call
                 expr = expr or item.op != array[idx].op
                 if expr:
-                    print "    >>> Operation lists do not match for xid:0x%08x%s" % (pkt_reply.rpc.xid, strtrunc)
-                    print "       ", pkt_call
-                    print "       ", pkt_reply
+                    print("    >>> Operation lists do not match for xid:0x%08x%s" % (pkt_reply.rpc.xid, strtrunc))
+                    print("       ", pkt_call)
+                    print("       ", pkt_reply)
                     break
                 idx += 1
         except:

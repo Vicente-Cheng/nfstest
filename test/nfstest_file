@@ -158,7 +158,7 @@ vopts, args = opts.parse_args()
 if vopts.list__options:
     hidden_opts = ("--list--options",)
     long_opts = [x for x in opts._long_opt.keys() if x not in hidden_opts]
-    print "\n".join(opts._short_opt.keys() + long_opts)
+    print("\n".join(opts._short_opt.keys() + long_opts))
     sys.exit(0)
 
 if vopts.tz is not None:
@@ -195,7 +195,7 @@ def display_pkt(vlevel, pkttobj, pkt):
     if vlevel == 0x04:
         disp = repr
 
-    print disp(pkt)
+    print(disp(pkt))
 
 def print_pkt(pkttobj, pkt):
     """Display packet for all verbose levels specified in the verbose option"""
@@ -400,4 +400,4 @@ if fh_list:
 
 pkttobj.show_progress(True)
 dtime = time.time() - stime
-print "Duration: %d secs\n" % dtime
+print("Duration: %d secs\n" % dtime)

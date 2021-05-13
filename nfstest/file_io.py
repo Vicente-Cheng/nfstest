@@ -265,7 +265,7 @@ class FileIO(BaseObj):
         self.minfiles   = kwargs.pop("minfiles",   str(MIN_FILES))
 
         if self.datadir is None:
-            print "Error: datadir is required"
+            print("Error: datadir is required")
             sys.exit(2)
 
         data = [int(x) for x in self.minfiles.split(",")]
@@ -278,7 +278,7 @@ class FileIO(BaseObj):
             self.top_minfiles  = max(data)
             self.bot_minfiles  = min(data)
         else:
-            print "Error: option minfiles must be an integer or two integers separated by a ',': %s" % self.minfiles
+            print("Error: option minfiles must be an integer or two integers separated by a ',': %s" % self.minfiles)
             sys.exit(2)
         self.minfiles = self.top_minfiles
 
@@ -383,7 +383,7 @@ class FileIO(BaseObj):
         # Verify read and write options add up to 100 percent
         total = abs(self.read) + abs(self.write) + abs(self.rdwr)
         if total != 100.0:
-            print "Total for read, write and rdwr must be == 100"
+            print("Total for read, write and rdwr must be == 100")
             sys.exit(2)
 
         # Set verbose level mask
@@ -438,7 +438,7 @@ class FileIO(BaseObj):
     def __del__(self):
         """Destructor"""
         if getattr(self, 'logfile', None):
-            print "\nLogfile: %s" % self.logfile
+            print("\nLogfile: %s" % self.logfile)
 
     def _dprint(self, level, msg):
         """Local dprint function, if called from a subprocess send the
