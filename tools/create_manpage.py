@@ -13,11 +13,11 @@
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #===============================================================================
 import os
+import io
 import re
 import sys
 import time
 import tokenize
-import StringIO
 import subprocess
 import nfstest_config as c
 
@@ -37,7 +37,7 @@ def _get_modules(script):
     filedata = re.sub(r"\\\n\s+", r" ", filedata)
 
     # Have the file data be used as a file
-    fd = StringIO.StringIO(filedata)
+    fd = io.StringIO(filedata)
 
     # Remove all comments and replace strings so all matches are done
     # on the source code only
