@@ -2107,7 +2107,7 @@ class TestUtil(NFSUtil):
             lock_type = self.lock_type
         ret = []
         mode_str = 'WRITE' if lock_type == fcntl.F_WRLCK else 'READ'
-        lockdata = struct.pack('hhllhh', lock_type, 0, long(offset), long(length), 0, 0)
+        lockdata = struct.pack('hhllhh', lock_type, 0, offset, length, 0, 0)
         for fd in self.rfds + self.wfds:
             try:
                 self.dprint('DBG3', "Lock file F_SETLKW (%s)" % mode_str)

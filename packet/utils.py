@@ -72,7 +72,7 @@ class IntHex(int):
         return "0x%08x" % self
     __repr__ = __str__
 
-class LongHex(long):
+class LongHex(int):
     """Long integer object which is displayed in hex"""
     def __str__(self):
         return "0x%016x" % self

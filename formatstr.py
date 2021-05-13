@@ -380,7 +380,7 @@ class FormatStr(Formatter):
             # Only one format spec is given, display list with format spec
             # applied to each item in the list
             return "[" + ", ".join(vlist) + "]"
-        elif isinstance(value, (int, long, float)):
+        elif isinstance(value, (int, float)):
             if _max_map.get(fmt):
                 # Format: {0:max32|umax32|max64|umax64}
                 # Output: if value matches the largest number in format given,

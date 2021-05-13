@@ -33,7 +33,7 @@ ERF_type = {
     21: "InfiniBand",
 }
 
-class ERF_TS(long):
+class ERF_TS(int):
     """ERF Time Stamp"""
     def __str__(self):
         sec = (self >> 32)
