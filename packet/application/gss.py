@@ -165,7 +165,7 @@ class GSS_API(BaseObj):
                 self.krb5 = StrHex(derunpack.getbytes())
             self._valid = True
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Truth value testing for the built-in operation bool()"""
         return self._valid
 

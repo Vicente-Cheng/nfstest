@@ -546,6 +546,6 @@ class KRB5(BaseObj):
         unpack.read(slen)
         self._krb5 = True
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Truth value testing for the built-in operation bool()"""
         return self._krb5

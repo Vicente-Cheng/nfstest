@@ -1130,7 +1130,7 @@ class IB(BaseObj):
             # Display payload size
             self._size = self.psize
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Truth value testing for the built-in operation bool()"""
         return self._ib
 

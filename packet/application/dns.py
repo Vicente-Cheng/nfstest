@@ -188,7 +188,7 @@ class DNS(BaseObj):
             return
         self._dns = True
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Truth value testing for the built-in operation bool()"""
         return self._dns
 

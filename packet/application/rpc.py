@@ -296,7 +296,7 @@ class RPC(GSS):
             except Exception:
                 pass
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Truth value testing for the built-in operation bool()"""
         return self._rpc
 
