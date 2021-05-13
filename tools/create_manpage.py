@@ -101,9 +101,7 @@ def _get_see_also(src, manpage, modules, local_mods):
                 if m:
                     obj += "(%s)" % m.group(1)
                     parent_objs[obj] = 1
-    objs = parent_objs.keys()
-    objs.sort()
-    return ',\n'.join(objs)
+    return ',\n'.join(sorted(parent_objs.keys()))
 
 def _check_script(script):
     fd = open(script, 'r')
