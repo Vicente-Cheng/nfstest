@@ -281,7 +281,7 @@ class Pktt(BaseObj):
         pkt = None
         while self.index <= index:
             try:
-                pkt = self.next()
+                pkt = next(self)
             except:
                 break
 
@@ -289,7 +289,7 @@ class Pktt(BaseObj):
             raise IndexError
         return pkt
 
-    def next(self):
+    def __next__(self):
         """Get the next packet from the trace file or raise StopIteration.
 
            The packet is also stored in the object attribute pkt.
@@ -333,7 +333,7 @@ class Pktt(BaseObj):
                 if obj.pkt is None:
                     # Get first packet for this packet trace object
                     try:
-                        obj.next()
+                        next(obj)
                     except StopIteration:
                         obj.mindex = self.index
                 if obj.eof:
@@ -362,7 +362,7 @@ class Pktt(BaseObj):
                 if len(self._rdma_info):
                     pktt_obj._rdma_info = self._rdma_info
                     self._rdma_info = RDMAinfo()
-                pktt_obj.next()
+                next(pktt_obj)
 
             if pktt_obj.dframe:
                 # Increment cumulative frame number
@@ -379,7 +379,7 @@ class Pktt(BaseObj):
 
             try:
                 # Get next packet for this packet trace object
-                pktt_obj.next()
+                next(pktt_obj)
             except StopIteration:
                 # Set maximum packet index for this packet trace object to
                 # be used by rewind to select the proper packet trace object
@@ -476,7 +476,7 @@ class Pktt(BaseObj):
                     if not obj.eof or index <= obj.mindex:
                         obj.rewind()
                         try:
-                            obj.next()
+                            next(obj)
                         except StopIteration:
                             pass
                     elif obj.serial and index > obj.mindex:
@@ -501,7 +501,7 @@ class Pktt(BaseObj):
             # next packet fetched will be the one given by index
             while self.index < index:
                 try:
-                    pkt = self.next()
+                    pkt = next(self)
                 except:
                     break
 
