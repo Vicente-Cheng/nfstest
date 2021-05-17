@@ -539,7 +539,7 @@ class KRB5(BaseObj):
                 self.kdata = KRB_ERROR(obj)
             else:
                 self.kdata = obj
-        except Exception as e:
+        except Exception:
             return
         if len(derunpack) > 0:
             return

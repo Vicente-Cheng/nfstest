@@ -1379,7 +1379,7 @@ try:
             x.stripe_size = x.layout['stripe_size']
             x.find_getdeviceinfo()
             break
-        except Exception as e:
+        except Exception:
             pass
         finally:
             x.pktt.close()

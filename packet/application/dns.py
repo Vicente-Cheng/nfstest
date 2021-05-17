@@ -182,7 +182,7 @@ class DNS(BaseObj):
                 else:
                     # Display error
                     self.set_strfmt(1, "DNS reply id={0} {7}")
-        except Exception as e:
+        except Exception:
             return
         if len(unpack) > 0:
             return

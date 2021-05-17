@@ -192,17 +192,17 @@ def testlock(fd, lock_type, offset=0, length=0):
     out = fcntl(fd, F_GETLK, lockdata)
     return struct.unpack('hhllhh', out)
 
-def get_ioerror(ioerror, err):
+def get_ioerror(ioerrno, err):
     """Return fail message when expecting an error"""
     fmsg = ""
     # Test expression to return
-    expr = ioerror and ioerror.errno == err
-    if not ioerror:
+    expr = ioerrno == err
+    if not ioerrno:
         fmsg = ": no error was returned"
-    elif ioerror.errno != err:
+    elif ioerrno != err:
         # Got the wrong error
         expected = errno.errorcode[err]
-        error = errno.errorcode[ioerror.errno]
+        error = errno.errorcode[ioerrno]
         fmsg =  ": expecting %s, got %s" % (expected, error)
     return (expr, fmsg)
 
@@ -565,7 +565,7 @@ class LockTest(TestUtil):
         try:
             fmsg = ""
             pexpr = False
-            ioerr = None
+            ioerrno = 0
             if pinfo:
                 # Use the lock range given in the ProcInfo object
                 offset = pinfo.offset if offset is None else offset
@@ -600,18 +600,18 @@ class LockTest(TestUtil):
                 getlock(fd, ltype, offset, length, stype, self.lockw_timeout)
         except IOError as ioerr:
             # Set up fail message if expecting no errors
+            ioerrno = ioerr.errno
             errstr = errno.errorcode[ioerr.errno]
             self.dprint("DBG7", "Got error %s" % errstr)
             fmsg = ": got error %s" % errstr
         if error:
             # Expecting an error
-            (expr, fmsg) = get_ioerror(ioerr, error)
-            self.test(expr, msg, subtest=submsg, failmsg=fmsg)
+            (expr, fmsg) = get_ioerror(ioerrno, error)
         else:
             # Not expecting an error
-            expr = not ioerr and (not block or not pexpr)
-            self.test(expr, msg, subtest=submsg, failmsg=fmsg)
-        return ioerr is None
+            expr = not ioerrno and (not block or not pexpr)
+        self.test(expr, msg, subtest=submsg, failmsg=fmsg)
+        return ioerrno is None
 
     def wait_for_lock(self, fd, info_list, lockmsg, submsg_list):
         """Wait for blocked lock

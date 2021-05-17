@@ -594,10 +594,11 @@ class PosixTest(TestUtil):
             posix.close(fd)
 
             try:
+                werrno = 0
                 self._do_io(fd, "%s file using original file descriptor" % objtype.capitalize())
             except OSError as e:
-                pass
-            self.test(e != None and e.errno == 9, "fcntl - %s after closing original file descriptor should return an error" % objtype)
+                werrno = e.errno
+            self.test(werrno == errno.EBADF, "fcntl - %s after closing original file descriptor should return an error" % objtype)
 
             flock = Flock(lock_type, 0, 0, int(self.filesize/2), 0)
             self.libc.fcntl.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.POINTER(Flock)]
@@ -1090,17 +1091,17 @@ class PosixTest(TestUtil):
         """
         self._mmap_test('munmap')
 
-    def _oserror(self, oserror, err):
+    def _oserror(self, oserrno, err):
         """Internal method to return fail message when expecting an error"""
         fmsg = ""
         # Test expression to return
-        expr = oserror and oserror.errno == err
-        if not oserror:
+        expr = oserrno == err
+        if oserrno == 0:
             fmsg = ": no error was returned"
-        elif oserror.errno != err:
+        elif oserrno != err:
             # Got the wrong error
             expected = errno.errorcode[err]
-            error = errno.errorcode[oserror.errno]
+            error = errno.errorcode[oserrno]
             fmsg =  ": expecting %s, got %s" % (expected, error)
         return (expr, fmsg)
 
@@ -1193,15 +1194,15 @@ class PosixTest(TestUtil):
                         ofstat = os.stat(self.absfile)
 
                     try:
-                        openerr = None
+                        openerr = 0
                         tryopen = True
                         self.dprint('DBG7', "Open %s %s%s" % (fmap[ftype], filename, wflag_str))
                         fd = posix.open(self.absfile, mode, perms)
                         opened = True
-                    except OSError as openerr:
-                        self.dprint('DBG7', "Open error: %s" % openerr.strerror)
-                        pass
-                    strerror = ": %s" % openerr.strerror if openerr else ""
+                    except OSError as e:
+                        openerr = e.errno
+                        self.dprint('DBG7', "Open error: %s" % e.strerror)
+                    strerror = ": %s" % os.strerror(openerr) if openerr != 0 else ""
 
                     fstat = None
                     if opened:
@@ -1214,7 +1215,7 @@ class PosixTest(TestUtil):
                             (expr, fmsg) = self._oserror(openerr, errno.EEXIST)
                             msg = "open - opening %s should return an error when O_EXCL|O_CREAT is used" % fmap[ftype]
                             self.test(expr, msg, subtest=flag_str, failmsg=fmsg)
-                        elif openerr and posix.O_EXCL in flags and posix.O_CREAT not in flags:
+                        elif openerr != 0 and posix.O_EXCL in flags and posix.O_CREAT not in flags:
                             msg = "open - opening %s should be unspecified when O_EXCL is used and O_CREAT is not specified" % fmap[ftype]
                             self.test(True, msg, subtest=flag_str)
                         elif posix.O_DIRECTORY in flags and posix.O_CREAT in flags:
@@ -1235,19 +1236,19 @@ class PosixTest(TestUtil):
                             (expr, fmsg) = self._oserror(openerr, errno.ELOOP)
                             msg = "open - opening %s should return an error when O_NOFOLLOW is used" % fmap[ftype]
                             self.test(expr, msg, subtest=flag_str, failmsg=fmsg)
-                        elif posix.O_NOATIME in flags and openerr:
+                        elif posix.O_NOATIME in flags and openerr != 0:
                             msg = "open - opening %s should be unspecified when O_NOATIME is used" % fmap[ftype]
                             self.test(True, msg, subtest=wflag_str)
                         else:
                             msg = "open - opening %s should succeed" % fmap[ftype]
-                            self.test(openerr is None, msg, subtest=wflag_str, failmsg=strerror)
-                            if not openerr:
+                            self.test(openerr == 0, msg, subtest=wflag_str, failmsg=strerror)
+                            if openerr == 0:
                                 expr = fstat.st_mode & 0o777 == ofstat.st_mode & 0o777
                                 msg = "open - permission mode should not be changed when opening %s" % fmap[ftype]
                                 fmsg = ": changed from %04o to %04o" % (ofstat.st_mode & 0o777, fstat.st_mode & 0o777)
                                 self.test(expr, msg, subtest=wflag_str, failmsg=fmsg)
                     else:
-                        if openerr and posix.O_CREAT in flags and posix.O_DIRECTORY in flags:
+                        if openerr != 0 and posix.O_CREAT in flags and posix.O_DIRECTORY in flags:
                             msg = "open - opening %s should be unspecified when O_CREAT|O_DIRECTORY is used" % fmap[ftype]
                             self.test(True, msg, subtest=flag_str)
                         elif posix.O_CREAT in flags:
@@ -1268,7 +1269,7 @@ class PosixTest(TestUtil):
                             msg = "open - opening %s should return an error when O_CREAT is not used" % fmap[ftype]
                             self.test(expr, msg, subtest=flag_str, failmsg=fmsg)
 
-                    if openerr:
+                    if openerr != 0:
                         if not is_write_allowed and posix.O_EXCL in flags:
                             msg = "open - opening %s should be unspecified when O_RDONLY|O_EXCL" % fmap[ftype]
                             self.test(True, msg, subtest=flag_str)
@@ -1282,23 +1283,23 @@ class PosixTest(TestUtil):
 
                     wdata = self.data_pattern(0, iosize)
                     try:
-                        ioerr = None
+                        ioerr = 0
                         posix.write(fd, wdata)
-                    except OSError as ioerr:
-                        pass
-                    wstrerror = ": %s" % ioerr.strerror if ioerr else ""
+                    except OSError as e:
+                        ioerr = e.errno
+                    wstrerror = ": %s" % os.strerror(ioerr) if ioerr != 0 else ""
 
-                    if not ioerr:
+                    if ioerr == 0:
                         # Get file stats after write
                         nfstat = posix.fstat(fd)
 
                     if is_write_allowed:
-                        if ioerr and posix.O_WRONLY in flags and posix.O_RDWR in flags:
+                        if ioerr != 0 and posix.O_WRONLY in flags and posix.O_RDWR in flags:
                             msg = "open - writing should be unspecified when opening with O_WRONLY|O_RDWR"
                             self.test(True, msg, subtest=flag_str)
                         else:
                             msg = "open - writing should succeed when opening with O_WRONLY or O_RDWR"
-                            self.test(ioerr is None, msg, subtest=flag_str, failmsg=wstrerror)
+                            self.test(ioerr == 0, msg, subtest=flag_str, failmsg=wstrerror)
                             if posix.O_TRUNC in flags:
                                 expr = nfstat.st_size == iosize
                                 msg = "open - data should be written at the beginning of file when O_TRUNC is used"
@@ -1315,20 +1316,20 @@ class PosixTest(TestUtil):
                         self.test(expr, msg, subtest=flag_str, failmsg=fmsg)
 
                     try:
-                        ioerr = None
+                        ioerr = 0
                         posix.lseek(fd, 0, os.SEEK_SET)
                         rdata = posix.read(fd, iosize)
-                    except OSError as ioerr:
-                        pass
-                    rstrerror = ": %s" % ioerr.strerror if ioerr else ""
+                    except OSError as e:
+                        ioerr = e.errno
+                    rstrerror = ": %s" % os.strerror(ioerr) if ioerr != 0 else ""
 
                     if is_read_allowed:
-                        if ioerr and posix.O_WRONLY in flags and posix.O_RDWR in flags:
+                        if ioerr != 0 and posix.O_WRONLY in flags and posix.O_RDWR in flags:
                             msg = "open - reading should be unspecified when opening with O_WRONLY|O_RDWR"
                             self.test(True, msg, subtest=flag_str)
                         else:
                             msg = "open - reading should succeed when opening with O_RDONLY or O_RDWR"
-                            self.test(ioerr is None, msg, subtest=flag_str, failmsg=rstrerror)
+                            self.test(ioerr == 0, msg, subtest=flag_str, failmsg=rstrerror)
                     else:
                         (expr, fmsg) = self._oserror(ioerr, errno.EBADF)
                         msg = "open - reading should return an error when opening with O_WRONLY"

@@ -456,7 +456,7 @@ class CacheTest(TestUtil):
                 dirlist.append(dirname3)
                 test_expr = self.dir_test(data_cache, dirlist, nlink+1, atime=(time()-stime), inwire=True)
                 self.test(test_expr, "%s should have changed just after acdirmin" % cache_str.capitalize())
-        except Exception as e:
+        except Exception:
             self.test(False, traceback.format_exc())
 
     def acregmin_attr_test(self):

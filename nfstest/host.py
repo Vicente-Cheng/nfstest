@@ -459,7 +459,7 @@ class Host(BaseObj):
                                     try:
                                         cmd = "%s -%s %d" % (self.kill, killsig, pid)
                                         self.run_cmd(cmd, sudo=True, dlevel=dlevel, msg=msg)
-                                    except Exception as e:
+                                    except Exception:
                                         pass
                                 count += 1
                                 time.sleep(0.1)
@@ -853,8 +853,6 @@ class Host(BaseObj):
                     if len(data) == 0:
                         break
                     fdw.write(data)
-            except Exception as e:
-                raise
             finally:
                 if fd:
                     fd.close()

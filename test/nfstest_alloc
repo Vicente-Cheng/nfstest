@@ -747,11 +747,12 @@ class AllocTest(TestUtil):
 
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
-                werror = None
+                werrno = 0
                 self.create_file(size=filesize)
             except OSError as werror:
-                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
-            expr = werror and werror.errno == errno.ENOSPC
+                werrno = werror.errno
+                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werrno, werrno)
+            expr = werrno == errno.ENOSPC
             self.test(expr, "Write to a different file should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
             otherfile = self.filename
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
@@ -762,15 +763,16 @@ class AllocTest(TestUtil):
 
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
-                werror = None
+                werrno = 0
                 os.lseek(fd, offset+size, 0)
                 data = self.data_pattern(offset+size, filesize)
                 self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset+size))
                 count = os.write(fd, data)
                 os.fsync(fd)
             except OSError as werror:
-                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
-            expr = werror and werror.errno == errno.ENOSPC
+                werrno = werror.errno
+                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werrno, werrno)
+            expr = werrno == errno.ENOSPC
             self.test(expr, "Write outside the allocated region should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
@@ -1023,11 +1025,12 @@ class AllocTest(TestUtil):
             # Try creating a file to make sure there is no more disk space
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
-                werror = None
+                werrno = 0
                 self.create_file(size=filesize)
             except OSError as werror:
-                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
-            expr = werror and werror.errno == errno.ENOSPC
+                werrno = werror.errno
+                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werrno, werrno)
+            expr = werrno == errno.ENOSPC
             self.test(expr, "Write to a different file should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
@@ -1047,39 +1050,40 @@ class AllocTest(TestUtil):
 
             try:
                 fmsg = ""
-                werror = None
+                werrno = 0
                 os.lseek(fd, offset, 0)
                 data = self.data_pattern(offset, self.filesize)
                 self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset))
                 count = os.write(fd, data)
                 os.fsync(fd)
             except OSError as werror:
-                err = werror.errno
-                fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
-            self.test(werror is None, "Write within the deallocated region should succeed", failmsg=fmsg)
+                werrno = werror.errno
+                fmsg = ", got error [%s] %s" % (errno.errorcode.get(werrno, werrno), os.strerror(werrno))
+            self.test(werrno == 0, "Write within the deallocated region should succeed", failmsg=fmsg)
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             try:
                 fmsg = ""
-                werror = None
+                werrno = 0
                 self.create_file()
             except OSError as werror:
-                err = werror.errno
-                fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
-            self.test(werror is None, "Write to another file should succeed when no space is left on the device after a successful DEALLOCATE"+msg, failmsg=fmsg)
+                werrno = werror.errno
+                fmsg = ", got error [%s] %s" % (errno.errorcode.get(werrno, werrno), os.strerror(werrno))
+            self.test(werrno == 0, "Write to another file should succeed when no space is left on the device after a successful DEALLOCATE"+msg, failmsg=fmsg)
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             try:
                 fmsg = ", expecting ENOSPC but it succeeded"
-                werror = None
+                werrno = 0
                 os.lseek(fd, offset+self.filesize, 0)
                 data = self.data_pattern(offset+self.filesize, size)
                 self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset+self.filesize))
                 count = os.write(fd, data)
                 os.fsync(fd)
             except OSError as werror:
-                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werror.errno,werror.errno)
-            expr = werror and werror.errno == errno.ENOSPC
+                werrno = werror.errno
+                fmsg = ", expecting ENOSPC but got %s" % errno.errorcode.get(werrno, werrno)
+            expr = werrno == errno.ENOSPC
             self.test(expr, "Write within the deallocated region should fail with ENOSPC when no space is left on the device", failmsg=fmsg)
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
         except Exception:

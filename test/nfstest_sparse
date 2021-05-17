@@ -172,7 +172,7 @@ class SparseTest(TestUtil):
                 self.testidx += 1
                 self.trace_start()
                 fmsg = ""
-                werror = None
+                werrno = 0
                 seek_offset = offset
                 self.dprint('DBG3', "SEEK using %s on file %s starting at offset %d" % (SEEKmap[whence], self.absfile, offset))
                 offset = os.lseek(fd, offset, whence)
@@ -181,23 +181,23 @@ class SparseTest(TestUtil):
                     # Hole was not found
                     eof = 1
             except OSError as werror:
-                err = werror.errno
-                fmsg = ", got error [%s] %s" % (errno.errorcode.get(err,err), os.strerror(err))
+                werrno = werror.errno
+                fmsg = ", got error [%s] %s" % (errno.errorcode.get(werrno, werrno), os.strerror(werrno))
             finally:
                 self.trace_stop()
 
             if whence == SEEK_DATA and self.sfile.endhole and doffset == offset_list[-1]:
                 # Looking for data starting on a hole which is the end of the file
                 fmsg = ", expecting ENXIO but it succeeded"
-                expr = werror and werror.errno == errno.ENXIO
+                expr = werrno == errno.ENXIO
                 tmsg = "SEEK should fail with ENXIO searching for the next %s when file ends in a hole" % segstr
                 self.test(expr, tmsg+msg, failmsg=fmsg)
                 self.set_nfserr_list(nfs4list=[NFS4ERR_NOENT, NFS4ERR_NXIO])
             else:
                 tmsg = "SEEK should succeed searching for the next %s" % segstr
-                self.test(werror is None, tmsg+msg, failmsg=fmsg)
+                self.test(werrno == 0, tmsg+msg, failmsg=fmsg)
 
-            if not werror:
+            if werrno == 0:
                 fmsg = ", expecting offset %d but got %d" % (doffset, offset)
                 if whence == SEEK_HOLE and offset == file_size:
                     # Found the implicit hole at the end of the file
@@ -360,13 +360,14 @@ class SparseTest(TestUtil):
 
             self.dprint('DBG3', "Search for the next %s on file %s starting at offset %d" % (segstr, absfile, offset))
             try:
-                werror = None
+                werrno = 0
                 fmsg = ", expecting ENXIO but it succeeded"
                 o_offset = os.lseek(fd, offset, whence)
                 self.dprint('DBG5', "SEEK returned offset %d" % o_offset)
             except OSError as werror:
-                fmsg = ", expecting ENXIO but got %s" % errno.errorcode.get(werror.errno,werror.errno)
-            expr = werror and werror.errno == errno.ENXIO
+                werrno = werror.errno
+                fmsg = ", expecting ENXIO but got %s" % errno.errorcode.get(werrno, werrno)
+            expr = werrno == errno.ENXIO
             tmsg = "SEEK system call should fail with ENXIO %s" % smsg
             self.test(expr, tmsg+msg, failmsg=fmsg)
         except Exception:
