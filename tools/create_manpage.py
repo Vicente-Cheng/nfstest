@@ -219,13 +219,13 @@ def create_manpage(src, dst):
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         pstdout, pstderr = proc.communicate()
         proc.wait()
-        version = pstdout.split()[1]
+        version = pstdout.decode().split()[1]
 
         cmd = "%s --help" % src
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         pstdout, pstderr = proc.communicate()
         proc.wait()
-        lines = re.sub('Total time:.*', '', pstdout)
+        lines = re.sub('Total time:.*', '', pstdout.decode())
         lines = re.sub('TIME:\s+[0-9.]+s.*', '', lines)
         lines = re.sub('0 tests \(0 passed, 0 failed\)', '', lines)
         lines = lines.split('\n')
@@ -237,7 +237,7 @@ def create_manpage(src, dst):
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         pstdout, pstderr = proc.communicate()
         proc.wait()
-        lines = pstdout.split('\n')
+        lines = pstdout.decode().split('\n')
 
     for line in lines:
         if is_script and len(usage) == 0:

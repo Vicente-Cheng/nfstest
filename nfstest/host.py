@@ -397,6 +397,8 @@ class Host(BaseObj):
                 self.process_smap[self.process.pid] = 1
             return
         self.pstdout, self.pstderr = self.process.communicate()
+        self.pstdout = self.pstdout.decode()
+        self.pstderr = self.pstderr.decode()
         self.process.wait()
         self.returncode = self.process.returncode
         if self._localhost:
@@ -754,9 +756,9 @@ class Host(BaseObj):
 
             # Make sure tcpdump has started
             if self._localhost:
-                out = self.traceproc.stderr.readline()
+                out = self.traceproc.stderr.readline().decode()
             else:
-                out = self.traceproc.stdout.readline()
+                out = self.traceproc.stdout.readline().decode()
 
             if not re.search('listening on', out):
                 time.sleep(1)

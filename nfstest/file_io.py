@@ -1059,7 +1059,7 @@ class FileIO(BaseObj):
         cmd = "mountstats %s" % mtpoint
         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
         pstdout, pstderr = process.communicate()
-        for line in pstdout.split("\n"):
+        for line in pstdout.decode().split("\n"):
             regex = re.search("Stats for\s+(.*):", line)
             if regex:
                 self.dprint("INFO", regex.group(1))
