@@ -976,7 +976,7 @@ class SSCTest(TestUtil):
                 except Exception:
                     self.test(False, traceback.format_exc())
 
-            if write or dst_off > 0:
+            if write or (dst_off is not None and dst_off > 0):
                 # Verify destination file was not modified outside the
                 # file ranges from the copies
                 for dstobj in self.dst_file_list():
