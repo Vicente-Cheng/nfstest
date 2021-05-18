@@ -103,7 +103,7 @@ class ARP(BaseObj):
         """Get hardware address"""
         ret = None
         if self.htype == const.HTYPE_ETHERNET:
-            ret = MacAddr(unpack.read(6).encode('hex'))
+            ret = MacAddr(unpack.read(6).hex())
         else:
             ret = unpack.read(self.hlen)
         return ret
@@ -114,7 +114,7 @@ class ARP(BaseObj):
         if self.ptype == const.PTYPE_IPV4:
             ret = "%d.%d.%d.%d" % unpack.unpack(4, "!4B")
         elif self.ptype == const.PTYPE_IPV6:
-            ret = IPv6Addr(unpack.read(16).encode('hex'))
+            ret = IPv6Addr(unpack.read(16).hex())
         else:
             ret = unpack.read(self.plen)
         return ret

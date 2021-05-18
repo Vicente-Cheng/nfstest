@@ -178,8 +178,8 @@ class GRH(BaseObj):
         self.paylen = ulist[1]
         self.nxthdr = ulist[2]
         self.hoplmt = ulist[3]
-        self.sgid   = IPv6Addr(ulist[4].encode('hex'))
-        self.dgid   = IPv6Addr(ulist[5].encode('hex'))
+        self.sgid   = IPv6Addr(ulist[4].hex())
+        self.dgid   = IPv6Addr(ulist[5].hex())
 
         # Calculate where the Invariant CRC starts
         self._icrc_offset = unpack.tell() + self.paylen - 4

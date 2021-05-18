@@ -184,7 +184,7 @@ def crc16(value):
 
 def hexstr(value):
     """Convert string to its hex representation"""
-    return "0x" + value.encode("hex")
+    return "0x" + value.hex()
 
 class FormatStr(Formatter):
     """String Formatter object
@@ -345,7 +345,7 @@ class FormatStr(Formatter):
                 xprefix = ""
                 if xmod == "#":
                     xprefix = "0x"
-                return xprefix + value.encode("hex")
+                return xprefix + value.hex()
             elif fmt == "crc32":
                 if CRC32:
                     return "{0:#010x}".format(crc32(value))

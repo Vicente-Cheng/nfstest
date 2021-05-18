@@ -87,7 +87,7 @@ class DateStr(float):
 class StrHex(str):
     """String object which is displayed in hex"""
     def __str__(self):
-        return "0x" + self.encode("hex")
+        return "0x" + self.hex()
 
 class EnumInval(Exception):
     """Exception for an invalid enum value"""

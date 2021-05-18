@@ -133,7 +133,7 @@ class Pkt(BaseObj):
                         out += "    %s:%s %s\n" % (name, sps, str(value))
                         if index == lastkey and getattr(value, "data", "") and key != "nfs":
                             sps = " " * (_maxlen - 4)
-                            out += "    DATA:%s 0x%s\n" % (sps, value.data.encode("hex"))
+                            out += "    DATA:%s 0x%s\n" % (sps, value.data.hex())
                 index += 1
             out += ")\n" if rdebug == 2 else ""
         else:

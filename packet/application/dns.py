@@ -240,7 +240,7 @@ class DNS(BaseObj):
         if size == 4:
             return ".".join([str(x) for x in unpack.unpack(4, "!4B")])
         elif size == 16:
-            return IPv6Addr(unpack.unpack(16, "!16s")[0].encode('hex'))
+            return IPv6Addr(unpack.unpack(16, "!16s")[0].hex())
         else:
             return unpack.read(size)
 

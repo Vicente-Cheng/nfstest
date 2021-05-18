@@ -64,8 +64,8 @@ class ETHERNET(BaseObj):
         """
         unpack = pktt.unpack
         ulist = unpack.unpack(14, "!6s6sH")
-        self.dst  = MacAddr(ulist[0].encode('hex'))
-        self.src  = MacAddr(ulist[1].encode('hex'))
+        self.dst  = MacAddr(ulist[0].hex())
+        self.src  = MacAddr(ulist[1].hex())
         self.type = ulist[2]
         self.psize = unpack.size()
         pktt.pkt.add_layer("ethernet", self)

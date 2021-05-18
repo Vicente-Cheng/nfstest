@@ -74,8 +74,8 @@ class IPv6(IPv4):
         self.total_size    = ulist[1]
         self.protocol      = ulist[2]
         self.hop_limit     = ulist[3]
-        self.src           = IPv6Addr(ulist[4].encode('hex'))
-        self.dst           = IPv6Addr(ulist[5].encode('hex'))
+        self.src           = IPv6Addr(ulist[4].hex())
+        self.dst           = IPv6Addr(ulist[5].hex())
 
         pktt.pkt.add_layer("ip", self)
 
