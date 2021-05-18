@@ -32,6 +32,7 @@ remote host without the need for a password.
 import os
 import time
 import types
+import signal
 import inspect
 import nfstest_config as c
 from baseobj import BaseObj
@@ -294,8 +295,25 @@ class Rexec(BaseObj):
             self.process.stdin.write(server_code)
 
         # Connect to remote server
-        address = (servername, PORT)
-        self.conn = Client(address)
+        etime = time.time() + 5.0
+        try:
+            while True:
+                try:
+                    self.conn = Client((servername, PORT))
+                except ConnectionRefusedError as error:
+                    if time.time() < etime:
+                        time.sleep(0.1)
+                        continue
+                    raise
+                else:
+                    break
+        finally:
+            if self.conn is None:
+                # Unable to connect, terminate server process
+                if self.pid is not None:
+                    os.kill(self.pid, signal.SIGTERM)
+                elif self.process is not None:
+                    self.process.terminate()
         PORT += 1
 
     def __del__(self):
