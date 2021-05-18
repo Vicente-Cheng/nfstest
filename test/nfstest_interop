@@ -197,7 +197,8 @@ class InteropTest(TestUtil):
                 os.close(ofd)
             # Umount and destroy Host objects
             while self.clients:
-                self.clients.pop()
+                clientobj = self.clients.pop()
+                clientobj.cleanup()
             self.umount()
             self.trace_stop()
             self.trace_open()
@@ -395,4 +396,5 @@ try:
 except Exception:
     x.test(False, traceback.format_exc())
 finally:
+    x.cleanup()
     x.exit()

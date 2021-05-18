@@ -108,6 +108,7 @@ class NFSUtil(Host):
         self.layoutget_on_open = False
 
         # Initialize object variables
+        self._ncleanup_done = False
         self.clients = []
         self.clientobj = None
         self.nii_name = ''    # nii_name for the client
@@ -153,16 +154,21 @@ class NFSUtil(Host):
         self.stateid_invalid   = self._stateid(NFS4_UINT32_MAX, 0)
 
     def __del__(self):
-        """Destructor
+        """Destructor"""
+        NFSUtil.cleanup(self)
 
-           Gracefully stop the packet trace and un-reference all client
+    def cleanup(self):
+        """Gracefully stop the packet trace and un-reference all client
            objects
         """
+        if self._ncleanup_done:
+            return
+        self._ncleanup_done = True
         self.clientobj = None
         while self.clients:
             self.clients.pop()
         # Call base class destructor
-        super(NFSUtil, self).__del__()
+        Host.cleanup(self)
 
     def _stateid(self, seqid, other):
         """Return the special stateid given by seqid and other"""

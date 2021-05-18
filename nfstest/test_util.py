@@ -240,6 +240,7 @@ class TestUtil(NFSUtil):
         self.xunit_report_file = None
         self.xunit_report_doc = None
         self.test_results = []
+        self._tcleanup_done = False
 
         # Trace marker info
         self.trace_marker_name = "F__NFSTEST_MARKER__F__"
@@ -277,15 +278,9 @@ class TestUtil(NFSUtil):
            Gracefully stop the packet trace, cleanup files, unmount volume,
            and reset network.
         """
-        self.debug_repr(0)
-        self._tverbose()
-        self._print_msg("", single=1)
-        count = self.dprint_count()
-        self.dprint('DBG7', "Calling %s() destructor" % self.__class__.__name__)
-        self.trace_stop()
-        self.cleanup(newline=False)
-        # Call base destructor
-        NFSUtil.__del__(self)
+        self.cleanup()
+
+    def _close(self, count):
         if self.dprint_count() > count:
             self._empty_msg = 0
 
@@ -1162,40 +1157,8 @@ class TestUtil(NFSUtil):
             self.umount()
         self.dprint('DBG7', "SETUP done")
 
-    def cleanup(self, newline=True):
-        """Clean up test environment.
-
-           Remove any files created: test files, trace files.
-        """
-        cleanup_msg = False
-        if not self.nocleanup or len(self.rexecobj_list):
-            if newline:
-                self._tverbose()
-                self._print_msg("", single=1)
-            self.dprint('DBG7', "CLEANUP starts")
-            cleanup_msg = True
-
-        for rexecobj in self.rexecobj_list:
-            try:
-                if rexecobj.remote:
-                    srvname = "at %s" % rexecobj.servername
-                else:
-                    srvname = "locally"
-                self.dprint('DBG3', "    Stop remote procedure server %s" % srvname)
-                rexecobj.close()
-            except:
-                pass
-        self.rexecobj = None
-        self.rexecobj_list = []
-
-        if self.nocleanup:
-            # Nothing else to clean up
-            if cleanup_msg:
-                self.dprint('DBG7', "CLEANUP done")
-            return
-        # Cleanup just once
-        self.nocleanup = True
-
+    def _cleanup_files(self):
+        """Cleanup files created"""
         if not self.mounted and self.remove_list:
             self.mount()
 
@@ -1240,12 +1203,52 @@ class TestUtil(NFSUtil):
             except:
                 pass
 
+        self.umount()
+
+    def cleanup(self):
+        """Clean up test environment.
+
+           Remove any files created: test files, trace files.
+        """
+        if self._tcleanup_done:
+            return
+        self._tcleanup_done = True
+        self.debug_repr(0)
+        self._tverbose()
+        count = self.dprint_count()
+        self.trace_stop()
+
+        cleanup_msg = False
+        if not self.nocleanup or len(self.rexecobj_list):
+            self._print_msg("", single=1)
+            self.dprint('DBG7', "CLEANUP starts")
+            cleanup_msg = True
+
+        for rexecobj in self.rexecobj_list:
+            try:
+                if rexecobj.remote:
+                    srvname = "at %s" % rexecobj.servername
+                else:
+                    srvname = "locally"
+                self.dprint('DBG3', "    Stop remote procedure server %s" % srvname)
+                rexecobj.close()
+            except:
+                pass
+        self.rexecobj = None
+        self.rexecobj_list = []
+
+        if not self.nocleanup:
+            self._cleanup_files()
+
+        if cleanup_msg:
+            self.dprint('DBG7', "CLEANUP done")
+
         if self.xunit_report:
             with open(self.xunit_report_file, "w") as f:
                 f.write(self.xunit_report_doc.toprettyxml(indent="  "))
 
-        self.umount()
-        self.dprint('DBG7', "CLEANUP done")
+        NFSUtil.cleanup(self)
+        self._close(count)
 
     def set_nfserr_list(self, nfs3list=[], nfs4list=[], nlm4list=[], mnt3list=[]):
         """Temporaly set the NFS list of expected NFS errors in the next call

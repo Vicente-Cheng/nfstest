@@ -197,6 +197,7 @@ class Host(BaseObj):
         self.sudo         = kwargs.pop("sudo",         c.NFSTEST_SUDO)
 
         # Initialize object variables
+        self._hcleanup_done = False
         self.nfs_version = float(self.nfsversion)
         self.mtdir = self.mtpoint
         self.mounted = False
@@ -258,10 +259,14 @@ class Host(BaseObj):
             self.libc = ctypes.CDLL('libc.dylib', use_errno=True)
 
     def __del__(self):
-        """Destructor
+        """Destructor"""
+        Host.cleanup(self)
 
-           Gracefully unmount volume and reset network.
-        """
+    def cleanup(self):
+        """Gracefully unmount volume and reset network"""
+        if self._hcleanup_done:
+            return
+        self._hcleanup_done = True
         self.trace_stop()
         if self.need_network_reset:
             self.network_reset()

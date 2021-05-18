@@ -1304,4 +1304,5 @@ except Exception:
 finally:
     x.proto = "tcp"
     x.port = 2049
+    x.cleanup()
     x.exit()
