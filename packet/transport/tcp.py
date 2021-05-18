@@ -140,7 +140,7 @@ class Option(BaseObj):
                     elif self.kind == 5:
                         # Sack Option Format
                         self.blocks = []
-                        for i in range((length-2)/8):
+                        for i in range(int((length-2)/8)):
                             left_edge  = unpack.unpack_uint()
                             right_edge = unpack.unpack_uint()
                             self.blocks.append([left_edge, right_edge])

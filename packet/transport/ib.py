@@ -631,7 +631,7 @@ class RDMAsegment(object):
                 return seg
             else:
                 dmalen = seg.dmalen
-                seg.epsn = psn + dmalen/iosize - 1 + (1 if dmalen%iosize else 0)
+                seg.epsn = psn + int(dmalen/iosize) - 1 + (1 if dmalen%iosize else 0)
         else:
             # Sub-segment does not exist, add it to the list
             if only:
@@ -648,7 +648,7 @@ class RDMAsegment(object):
                     # least this PSN is valid for the sub-segment
                     epsn = psn
                 else:
-                    epsn = psn + dmalen/iosize - 1 + (1 if dmalen%iosize else 0)
+                    epsn = psn + int(dmalen/iosize) - 1 + (1 if dmalen%iosize else 0)
             seg = RDMAseg(psn, epsn, dmalen)
             self.seglist.append(seg)
         return seg

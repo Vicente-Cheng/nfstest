@@ -1437,9 +1437,9 @@ class TestUtil(NFSUtil):
 
     def _print_time(self, sec):
         """Return the given time in the format [[%dh]%dm]%fs."""
-        hh = int(sec)/3600
+        hh = int(sec/3600)
         sec -= 3600.0*hh
-        mm = int(sec)/60
+        mm = int(sec/60)
         sec -= 60.0*mm
         ret = "%fs" % sec
         if mm > 0:

@@ -285,7 +285,7 @@ class DioTest(TestUtil):
                     raise Exception("Could not find layout")
                 self.stripe_size = self.layout['stripe_size']
                 if self.stripe_size > 0 and self.stripe_size < 3*self.rsize:
-                    raise Exception("CONFIG error: option rsize must be less or equal to %d (stripe size / 3)" % self.stripe_size/3)
+                    raise Exception("CONFIG error: option rsize must be less or equal to %d (stripe size / 3)" % int(self.stripe_size/3))
             self.pktt.close()
 
             # Check if delegations are granted
@@ -737,7 +737,7 @@ class DioTest(TestUtil):
             bio_mode = os.O_WRONLY|os.O_CREAT if buffered_write else os.O_RDONLY
 
             if not bsize:
-                bsize = self.rsize/2
+                bsize = int(self.rsize/2)
             self.alloc_buffers(size=bsize)
 
             self.umount()
@@ -754,7 +754,7 @@ class DioTest(TestUtil):
                     nio = 1
                 b_size = mtbsize if nio > 1 else bsize
             else:
-                b_size = bsize / nio
+                b_size = int(bsize / nio)
 
             if write:
                 while len(self.files) < 4:
@@ -1331,6 +1331,7 @@ class DioTest(TestUtil):
 
     def _vectored_io_test(self):
         """Verify vectored I/O functionality."""
+        hsize = int(self.PAGESIZE/2)
         for write in self.io_list:
             #=======================================================================
             # Non-contiguous vectors on aligned offset
@@ -1402,51 +1403,51 @@ class DioTest(TestUtil):
             #=======================================================================
             # Non-aligned contiguous vectors on aligned offset with various sizes
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
@@ -1462,51 +1463,51 @@ class DioTest(TestUtil):
             #=======================================================================
             # Aligned contiguous vectors on aligned offset with various sizes
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
-                {'size':self.rsize,                 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
-                {'size':self.rsize,                 'aligned':True},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':True, 'server':DS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
+                {'size':self.rsize,       'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':DS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':DS},
+                {'size':self.rsize-hsize, 'aligned':True},
             ]
             self.vectored_io(tinfo, write=write, contiguous=True)
 
@@ -1517,86 +1518,86 @@ class DioTest(TestUtil):
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
                 {'size':self.rsize, 'aligned':True},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':True,  'server':MDS},
                 {'size':self.rsize, 'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
                 {'size':self.rsize, 'aligned':True, 'server':MDS},
                 {'size':self.rsize, 'aligned':True},
                 {'size':self.rsize, 'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             #=======================================================================
             # Non-contiguous vectors on non-aligned offset with various sizes
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True,  'server':MDS},
-                {'size':self.rsize,                 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':True,  'server':MDS},
+                {'size':self.rsize,       'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True,  'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':True,  'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2)
+            self.vectored_io(tinfo, write=write, offset=hsize)
 
             #=======================================================================
             # Non-aligned contiguous vectors on non-aligned offset
@@ -1605,58 +1606,58 @@ class DioTest(TestUtil):
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
                 {'size':self.rsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             #=======================================================================
             # Non-aligned contiguous vectors on non-aligned offset with various sizes
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize,       'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':False, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             #=======================================================================
             # Aligned contiguous vectors on non-aligned offset
@@ -1665,58 +1666,58 @@ class DioTest(TestUtil):
                 {'size':self.rsize, 'aligned':True},
                 {'size':self.rsize, 'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             #=======================================================================
             # Aligned contiguous vectors on non-aligned offset with various sizes
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize,                 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
+                {'size':self.rsize,       'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
             tinfo = [
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True, 'server':MDS},
-                {'size':self.rsize-self.PAGESIZE/2, 'aligned':True},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True, 'server':MDS},
+                {'size':self.rsize-hsize, 'aligned':True},
             ]
-            self.vectored_io(tinfo, write=write, offset=self.PAGESIZE/2, contiguous=True)
+            self.vectored_io(tinfo, write=write, offset=hsize, contiguous=True)
 
     def vectored_io_test(self):
         """Verify vectored I/O functionality."""

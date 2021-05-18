@@ -286,7 +286,7 @@ class DERunpack(Unpack):
         out = 0
         clist = struct.unpack("!%dB"%size, self.read(size))
         # First byte has the first two nodes
-        ret = [str(clist[0]/40), str(clist[0]%40)]
+        ret = [str(int(clist[0]/40)), str(clist[0]%40)]
         for item in clist[1:]:
             if item & 0x80:
                 # Current node has more bytes

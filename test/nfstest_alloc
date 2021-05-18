@@ -487,46 +487,48 @@ class AllocTest(TestUtil):
         """Verify ALLOCATE succeeds on files opened as write only"""
         self.test_group("Verify ALLOCATE succeeds on files opened as write only")
         blocksize = self.statvfs.f_bsize
+        bsize = int(blocksize/2)
         self.testidx = 1
 
         self.alloc01(os.O_WRONLY)
         msg1 = " for a range not starting at the beginning of the file"
         self.alloc01(os.O_WRONLY, offset=blocksize, size=self.filesize, msg=msg1)
         msg2 = " for a range starting at a non-aligned block size boundary"
-        self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2)
+        self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize+bsize, msg=msg2)
         msg3 = " for a range ending at a non-aligned block size boundary"
-        self.alloc01(os.O_WRONLY, offset=0, size=blocksize+blocksize/2, msg=msg3)
+        self.alloc01(os.O_WRONLY, offset=0, size=blocksize+bsize, msg=msg3)
         msg4 = " for a range starting and ending at a non-aligned block size boundary"
-        self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize, msg=msg4)
+        self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize, msg=msg4)
 
         if hasattr(self, "deleg_stateid") and self.deleg_stateid is None:
             # Run tests with byte range locking
             msg = " (locking file)"
             self.alloc01(os.O_WRONLY, msg=msg, lock=True)
             self.alloc01(os.O_WRONLY, offset=blocksize, size=self.filesize, msg=msg1+msg, lock=True)
-            self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2+msg, lock=True)
-            self.alloc01(os.O_WRONLY, offset=0, size=blocksize+blocksize/2, msg=msg3+msg, lock=True)
-            self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize, msg=msg4+msg, lock=True)
+            self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize+bsize, msg=msg2+msg, lock=True)
+            self.alloc01(os.O_WRONLY, offset=0, size=blocksize+bsize, msg=msg3+msg, lock=True)
+            self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize, msg=msg4+msg, lock=True)
 
     def alloc02_test(self):
         """Verify ALLOCATE succeeds on files opened as read and write"""
         self.test_group("Verify ALLOCATE succeeds on files opened as read and write")
         blocksize = self.statvfs.f_bsize
+        bsize = int(blocksize/2)
         self.testidx = 1
 
         self.alloc01(os.O_RDWR)
         msg1 = " for a range not starting at the beginning of the file"
         self.alloc01(os.O_RDWR, offset=blocksize, size=self.filesize, msg=msg1)
         msg2 = " for a range starting at a non-aligned block size boundary"
-        self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2)
+        self.alloc01(os.O_RDWR, offset=bsize, size=blocksize+bsize, msg=msg2)
         msg3 = " for a range ending at a non-aligned block size boundary"
-        self.alloc01(os.O_RDWR, offset=0, size=blocksize+blocksize/2, msg=msg3)
+        self.alloc01(os.O_RDWR, offset=0, size=blocksize+bsize, msg=msg3)
         msg4 = " for a range starting and ending at a non-aligned block size boundary"
-        self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize, msg=msg4)
+        self.alloc01(os.O_RDWR, offset=bsize, size=blocksize, msg=msg4)
         msg5 = " when range is fully inside the current file size"
-        self.alloc01(os.O_RDWR, offset=self.filesize/4, size=self.filesize/2, msg=msg5)
+        self.alloc01(os.O_RDWR, offset=int(self.filesize/4), size=int(self.filesize/2), msg=msg5)
         msg6 = " when range is partially outside the current file size"
-        self.alloc01(os.O_RDWR, offset=self.filesize/2, size=self.filesize, msg=msg6)
+        self.alloc01(os.O_RDWR, offset=int(self.filesize/2), size=self.filesize, msg=msg6)
         msg7 = " when range is fully outside the current file size"
         self.alloc01(os.O_RDWR, offset=self.filesize, size=self.filesize, msg=msg7)
 
@@ -535,11 +537,11 @@ class AllocTest(TestUtil):
             msg = " (locking file)"
             self.alloc01(os.O_RDWR, msg=msg, lock=True)
             self.alloc01(os.O_RDWR, offset=blocksize, size=self.filesize, msg=msg1+msg, lock=True)
-            self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2+msg, lock=True)
-            self.alloc01(os.O_RDWR, offset=0, size=blocksize+blocksize/2, msg=msg3+msg, lock=True)
-            self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize, msg=msg4+msg, lock=True)
-            self.alloc01(os.O_RDWR, offset=self.filesize/4, size=self.filesize/2, msg=msg5+msg, lock=True)
-            self.alloc01(os.O_RDWR, offset=self.filesize/2, size=self.filesize, msg=msg6+msg, lock=True)
+            self.alloc01(os.O_RDWR, offset=bsize, size=blocksize+bsize, msg=msg2+msg, lock=True)
+            self.alloc01(os.O_RDWR, offset=0, size=blocksize+bsize, msg=msg3+msg, lock=True)
+            self.alloc01(os.O_RDWR, offset=bsize, size=blocksize, msg=msg4+msg, lock=True)
+            self.alloc01(os.O_RDWR, offset=int(self.filesize/4), size=int(self.filesize/2), msg=msg5+msg, lock=True)
+            self.alloc01(os.O_RDWR, offset=int(self.filesize/2), size=self.filesize, msg=msg6+msg, lock=True)
             self.alloc01(os.O_RDWR, offset=self.filesize, size=self.filesize, msg=msg7+msg, lock=True)
 
     def alloc03(self, dealloc=False):
@@ -898,21 +900,22 @@ class AllocTest(TestUtil):
         """Verify DEALLOCATE succeeds on files opened as write only"""
         self.test_group("Verify DEALLOCATE succeeds on files opened as write only")
         blocksize = self.statvfs.f_bsize
+        bsize = int(blocksize/2)
         self.testidx = 1
 
         self.alloc01(os.O_WRONLY, dealloc=True)
         msg1 = " for a range not starting at the beginning of the file"
         self.alloc01(os.O_WRONLY, offset=blocksize, size=self.filesize, msg=msg1, dealloc=True)
         msg2 = " for a range starting at a non-aligned block size boundary"
-        self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2, dealloc=True)
+        self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize+bsize, msg=msg2, dealloc=True)
         msg3 = " for a range ending at a non-aligned block size boundary"
-        self.alloc01(os.O_WRONLY, offset=0, size=blocksize+blocksize/2, msg=msg3, dealloc=True)
+        self.alloc01(os.O_WRONLY, offset=0, size=blocksize+bsize, msg=msg3, dealloc=True)
         msg4 = " for a range starting and ending at a non-aligned block size boundary"
-        self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize, msg=msg4, dealloc=True)
+        self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize, msg=msg4, dealloc=True)
         msg5 = " when range is fully inside the current file size"
-        self.alloc01(os.O_WRONLY, offset=self.filesize/4, size=self.filesize/2, msg=msg5, dealloc=True)
+        self.alloc01(os.O_WRONLY, offset=int(self.filesize/4), size=int(self.filesize/2), msg=msg5, dealloc=True)
         msg6 = " when range is partially outside the current file size"
-        self.alloc01(os.O_WRONLY, offset=self.filesize/2, size=self.filesize, msg=msg6, dealloc=True)
+        self.alloc01(os.O_WRONLY, offset=int(self.filesize/2), size=self.filesize, msg=msg6, dealloc=True)
         msg7 = " when range is fully outside the current file size"
         self.alloc01(os.O_WRONLY, offset=self.filesize, size=self.filesize, msg=msg7, dealloc=True)
 
@@ -921,32 +924,33 @@ class AllocTest(TestUtil):
             msg = " (locking file)"
             self.alloc01(os.O_WRONLY, msg=msg, lock=True, dealloc=True)
             self.alloc01(os.O_WRONLY, offset=blocksize, size=self.filesize, msg=msg1+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_WRONLY, offset=0, size=blocksize+blocksize/2, msg=msg3+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_WRONLY, offset=blocksize/2, size=blocksize, msg=msg4+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_WRONLY, offset=self.filesize/4, size=self.filesize/2, msg=msg5+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_WRONLY, offset=self.filesize/2, size=self.filesize, msg=msg6+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize+bsize, msg=msg2+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_WRONLY, offset=0, size=blocksize+bsize, msg=msg3+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_WRONLY, offset=bsize, size=blocksize, msg=msg4+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_WRONLY, offset=int(self.filesize/4), size=int(self.filesize/2), msg=msg5+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_WRONLY, offset=int(self.filesize/2), size=self.filesize, msg=msg6+msg, lock=True, dealloc=True)
             self.alloc01(os.O_WRONLY, offset=self.filesize, size=self.filesize, msg=msg7+msg, lock=True, dealloc=True)
 
     def dealloc02_test(self):
         """Verify DEALLOCATE succeeds on files opened as read and write"""
         self.test_group("Verify DEALLOCATE succeeds on files opened as read and write")
         blocksize = self.statvfs.f_bsize
+        bsize = int(blocksize/2)
         self.testidx = 1
 
         self.alloc01(os.O_RDWR, dealloc=True)
         msg1 = " for a range not starting at the beginning of the file"
         self.alloc01(os.O_RDWR, offset=blocksize, size=self.filesize, msg=msg1, dealloc=True)
         msg2 = " for a range starting at a non-aligned block size boundary"
-        self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2, dealloc=True)
+        self.alloc01(os.O_RDWR, offset=bsize, size=blocksize+bsize, msg=msg2, dealloc=True)
         msg3 = " for a range ending at a non-aligned block size boundary"
-        self.alloc01(os.O_RDWR, offset=0, size=blocksize+blocksize/2, msg=msg3, dealloc=True)
+        self.alloc01(os.O_RDWR, offset=0, size=blocksize+bsize, msg=msg3, dealloc=True)
         msg4 = " for a range starting and ending at a non-aligned block size boundary"
-        self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize, msg=msg4, dealloc=True)
+        self.alloc01(os.O_RDWR, offset=bsize, size=blocksize, msg=msg4, dealloc=True)
         msg5 = " when range is fully inside the current file size"
-        self.alloc01(os.O_RDWR, offset=self.filesize/4, size=self.filesize/2, msg=msg5, dealloc=True)
+        self.alloc01(os.O_RDWR, offset=int(self.filesize/4), size=int(self.filesize/2), msg=msg5, dealloc=True)
         msg6 = " when range is partially outside the current file size"
-        self.alloc01(os.O_RDWR, offset=self.filesize/2, size=self.filesize, msg=msg6, dealloc=True)
+        self.alloc01(os.O_RDWR, offset=int(self.filesize/2), size=self.filesize, msg=msg6, dealloc=True)
         msg7 = " when range is fully outside the current file size"
         self.alloc01(os.O_RDWR, offset=self.filesize, size=self.filesize, msg=msg7, dealloc=True)
 
@@ -955,11 +959,11 @@ class AllocTest(TestUtil):
             msg = " (locking file)"
             self.alloc01(os.O_RDWR, msg=msg, lock=True, dealloc=True)
             self.alloc01(os.O_RDWR, offset=blocksize, size=self.filesize, msg=msg1+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize+blocksize/2, msg=msg2+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_RDWR, offset=0, size=blocksize+blocksize/2, msg=msg3+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_RDWR, offset=blocksize/2, size=blocksize, msg=msg4+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_RDWR, offset=self.filesize/4, size=self.filesize/2, msg=msg5+msg, lock=True, dealloc=True)
-            self.alloc01(os.O_RDWR, offset=self.filesize/2, size=self.filesize, msg=msg6+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_RDWR, offset=bsize, size=blocksize+bsize, msg=msg2+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_RDWR, offset=0, size=blocksize+bsize, msg=msg3+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_RDWR, offset=bsize, size=blocksize, msg=msg4+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_RDWR, offset=int(self.filesize/4), size=int(self.filesize/2), msg=msg5+msg, lock=True, dealloc=True)
+            self.alloc01(os.O_RDWR, offset=int(self.filesize/2), size=self.filesize, msg=msg6+msg, lock=True, dealloc=True)
             self.alloc01(os.O_RDWR, offset=self.filesize, size=self.filesize, msg=msg7+msg, lock=True, dealloc=True)
 
     def dealloc03_test(self):

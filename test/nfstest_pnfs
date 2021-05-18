@@ -118,7 +118,7 @@ class pNFSTest(TestUtil):
         first_index = self.layout['first_stripe_index']
 
         # Get first DS index where I/O is sent
-        N = (first_index + (offset / stripe_size)) % nds
+        N = (first_index + int(offset / stripe_size)) % nds
         # Get last DS index + 1
         M = int(math.ceil((1.0*offset+size) / stripe_size))
         M = (first_index + M) % nds
@@ -247,7 +247,7 @@ class pNFSTest(TestUtil):
         self.dprint('DBG2', "Commit thru MDS is %s" % self.layout['commit_mds'])
         self.dprint('DBG2', "Device ID: 0x%s" % self.layout['deviceid'].encode('hex'))
         if filesize < (nds-1) * self.layout['stripe_size'] + 1:
-            N = (filesize / (self.layout['stripe_size'] + 1)) + 1
+            N = int(filesize / (self.layout['stripe_size'] + 1)) + 1
             if len(nocreate_list) == 0:
                 nocreate_list  = [False for i in range(N)]
                 nocreate_list += [True  for i in range(N, nds)]
@@ -1075,7 +1075,7 @@ class pNFSTest(TestUtil):
 
     def setattr_test(self):
         """Verify setattr traffic for file using pNFS."""
-        self.do_setattr(size=self.filesize/2, lock=False)
+        self.do_setattr(size=int(self.filesize/2), lock=False)
 
     def setattr_lock_test(self):
         """Verify setattr traffic for locked file using pNFS."""

@@ -136,8 +136,8 @@ def str_time(value):
     """
     ret = ""
     value = int(value)
-    hh = value/3600
-    mm = (value-3600*hh)/60
+    hh = int(value/3600)
+    mm = int((value-3600*hh)/60)
     ss = value%60
     if hh > 0:
         ret += "%d:" % hh
