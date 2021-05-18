@@ -608,7 +608,6 @@ class FileIO(BaseObj):
             if self.random and not lockfull:
                 # Lock file segment
                 lockout = self._getlock(fileobj.name, fd, lock_type=fcntl.F_WRLCK, offset=offset, length=size)
-            data = 'x' * size
             self._dprint("DBG5", "WRITE   %s %d @ %d" % (fileobj.name, size, offset))
 
             if self.direct:
@@ -616,7 +615,7 @@ class FileIO(BaseObj):
                 count = self.libc.write(fd, self.wbuffer, size)
             else:
                 # Buffered I/O
-                count = os.write(fd, data)
+                count = os.write(fd, b'x'*size)
                 if self._percent(self.fsync):
                     self._dprint("DBG4", "FSYNC   %s" % fileobj.name)
                     self.nfsync += 1
@@ -984,7 +983,7 @@ class FileIO(BaseObj):
             self.rbuffer = self._mem_alloc(rsize, aligned=True)
             self._dprint("DBG7", "Allocating aligned write buffer of size %d" % wsize)
             self.wbuffer = self._mem_alloc(wsize, aligned=True)
-            pdata = ctypes.create_string_buffer('x' * wsize)
+            pdata = ctypes.create_string_buffer(b'x' * wsize)
             self.libc.memcpy(self.wbuffer, pdata, wsize);
 
         count = 0

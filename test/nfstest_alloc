@@ -455,7 +455,7 @@ class AllocTest(TestUtil):
                 self.dprint('DBG4', "Read file %s %d @ %d" % (self.absfile, zrange[1], zrange[0]))
                 os.lseek(fd, zrange[0], 0)
                 rdata = os.read(fd, zrange[1])
-                wdata = "\x00" * zrange[1]
+                wdata = bytes(zrange[1])
                 if dealloc:
                     tmsg = "Read from deallocated range inside the previous file size should return zeros"
                 else:
@@ -779,7 +779,7 @@ class AllocTest(TestUtil):
             self.dprint('DBG5', "Available disk space %s" % formatstr.str_units(self.get_freebytes()))
 
             os.lseek(fd, offset, 0)
-            data = self.data_pattern(offset, size, pattern="\x55\xaa")
+            data = self.data_pattern(offset, size, pattern=b"\x55\xaa")
             self.dprint('DBG3', "Write file %s %d@%d" % (testfile, len(data), offset))
             count = os.write(fd, data)
             os.fsync(fd)
@@ -1205,7 +1205,7 @@ class AllocTest(TestUtil):
             fd = os.open(self.absfile, os.O_WRONLY|os.O_CREAT)
             self.dprint('DBG3', "Initialize file %s with zeros" % self.absfile)
             size = filesize
-            data = "\x00" * block_size
+            data = bytes(block_size)
             tstart = time.time()
             while size > 0:
                 if block_size > size:

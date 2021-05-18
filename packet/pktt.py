@@ -151,7 +151,7 @@ class Pktt(BaseObj):
         self.pkt_call  = None # The current packet call if self.pkt is a reply
         self.pktt_list = []   # List of Pktt objects created
         self.tfiles    = []   # List of packet trace files
-        self.rdbuffer  = ""   # Read buffer
+        self.rdbuffer  = b""  # Read buffer
         self.rdoffset  = 0    # Read buffer offset
         self.filesize  = 0    # Size of packet trace file
         self.prevprog  = -1.0 # Previous progress percentage
@@ -517,7 +517,7 @@ class Pktt(BaseObj):
         soffset = self.fh.tell() - len(self.rdbuffer)
         if hard or offset < soffset or whence != os.SEEK_SET:
             # Seek is before the read buffer, do the actual seek
-            self.rdbuffer = ""
+            self.rdbuffer = b""
             self.rdoffset = 0
             self.fh.seek(offset, whence)
             self.offset = self.fh.tell()
@@ -550,11 +550,11 @@ class Pktt(BaseObj):
                 except:
                     self.ident = ""
 
-                if self.ident == '\324\303\262\241':
+                if self.ident == b'\324\303\262\241':
                     # Little endian
                     self.header_fmt = '<HHIIII'
                     self.header_rec = '<IIII'
-                elif self.ident == '\241\262\303\324':
+                elif self.ident == b'\241\262\303\324':
                     # Big endian
                     self.header_fmt = '>HHIIII'
                     self.header_rec = '>IIII'

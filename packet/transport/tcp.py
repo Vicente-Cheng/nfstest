@@ -54,7 +54,7 @@ class Stream(BaseObj):
     _attrlist = ("last_seq", "next_seq", "seq_wrap", "seq_base", "frag_off")
 
     def __init__(self, seqno):
-        self.buffer   = "" # Keep track of RPC packets spanning multiple TCP packets
+        self.buffer  = b"" # Keep track of RPC packets spanning multiple TCP packets
         self.frag_off = 0  # Keep track of multiple RPC packets within a single TCP packet
         self.last_seq = 0  # Last sequence number processed
         self.next_seq = 0  # Next sequence number expected
@@ -74,7 +74,7 @@ class Stream(BaseObj):
             # Previous fragment is missing so fill previous fragment with zeros
             size = seq - self.next_seq
             self.segments.append([self.next_seq, seq])
-            self.buffer += "\x00" * size
+            self.buffer += bytes(size)
             self.buffer += data
         else:
             # Fragment is out of order -- found previous missing fragment
@@ -346,7 +346,7 @@ class TCP(BaseObj):
             # There has been some data lost in the capture,
             # to continue decoding next packets, reset stream
             # except if this packet is just a TCP ACK (flags = 0x10)
-            stream.buffer = ""
+            stream.buffer = b""
             stream.frag_off = 0
 
         if not rpc:
@@ -373,7 +373,7 @@ class TCP(BaseObj):
         else:
             if len(stream.buffer) > 0 or ldata == rpcsize:
                 stream.frag_off = 0
-            stream.buffer = ""
+            stream.buffer = b""
             # Save RPC layer on packet object
             pkt.add_layer("rpc", rpc)
             if rpc.type:

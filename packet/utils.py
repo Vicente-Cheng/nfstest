@@ -84,7 +84,7 @@ class DateStr(float):
     def __str__(self):
         return repr(fstrobj.format(self._strfmt, self))
 
-class StrHex(str):
+class StrHex(bytes):
     """String object which is displayed in hex"""
     def __str__(self):
         return "0x" + self.hex()
@@ -363,7 +363,7 @@ class RDMAbase(BaseObj):
         if self.rdma_write_chunks:
             # There are RDMA write chunks, use the next chunk data
             # instead of calling the original decoding function
-            data = ""
+            data = b""
             for rsegment in self.rdma_write_chunks.pop(0):
                 # Just get the bytes for the segment, dropping the
                 # padding bytes if any

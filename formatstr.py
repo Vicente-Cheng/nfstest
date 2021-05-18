@@ -333,7 +333,7 @@ class FormatStr(Formatter):
         if isinstance(value, int) and type(value) != int:
             # This is an object derived from int, convert it to string
             value = str(value)
-        if isinstance(value, str):
+        if isinstance(value, (str, bytes)):
             fmtlist = (xmod+fmt).split(":")
             if len(fmtlist) > 1:
                 # Nested format, process in reversed order

@@ -341,8 +341,8 @@ class BaseObj(object):
             for key,val in value.items():
                 out.append(str(key) + ": " + self._str_value(val))
             return '{' + ', '.join(out) + '}'
-        elif isinstance(value, (int, str)):
-            if _strsize > 0 and isinstance(value, str):
+        elif isinstance(value, (int, str, bytes)):
+            if _strsize > 0 and isinstance(value, (str, bytes)):
                 return repr(value[:_strsize])
             return repr(value)
         else:

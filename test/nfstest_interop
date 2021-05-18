@@ -102,8 +102,9 @@ class InteropTest(TestUtil):
     def do_read(self, absfile, version):
         """Read contents of given file"""
         self.dprint('DBG1', "Read contents of %s using NFS%s" % (absfile, version))
-        file = open(absfile, "r")
-        return file.read()
+        with open(absfile, "rb") as fd:
+            data = fd.read()
+        return data
 
     def do_write(self, absfile, data, version):
         """Append data to given file"""
@@ -120,14 +121,14 @@ class InteropTest(TestUtil):
         # Write data for each version of NFS
         data_map = {
             "v3"   : {"args":{"nfsversion":3, "mtpoint":self.mtpoint+"_v30"},
-                      "data":self.data_pattern(0, self.datasize, "A")},
+                      "data":self.data_pattern(0, self.datasize, b"A")},
             "v4"   : {"args":{"nfsversion":self.nfsvers4, "mtpoint":self.mtpoint+"_v40"},
-                      "data":self.data_pattern(0, self.datasize, "B")},
+                      "data":self.data_pattern(0, self.datasize, b"B")},
             "v4.1" : {"args":{"nfsversion":4.1, "mtpoint":self.mtpoint+"_v41"},
-                      "data":self.data_pattern(0, self.datasize, "C")},
+                      "data":self.data_pattern(0, self.datasize, b"C")},
         }
         # Initialize expected data to be read
-        self.write_data = ""
+        self.write_data = b""
 
         try:
             # Ignore option --nfsversion and use the version given for the

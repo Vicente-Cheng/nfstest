@@ -168,9 +168,9 @@ class NFSUtil(Host):
         """Return the special stateid given by seqid and other"""
         data = struct.pack("!I", seqid)
         if other == 0:
-            data += "\x00" * NFS4_OTHER_SIZE
+            data += bytes(NFS4_OTHER_SIZE)
         elif other == 1:
-            data += "\xFF" * NFS4_OTHER_SIZE
+            data += b"\xFF" * NFS4_OTHER_SIZE
         return stateid4(Unpack(data))
 
     def create_host(self, host, **kwargs):
@@ -276,9 +276,9 @@ class NFSUtil(Host):
                         # of the other operations in the array
                         if op == OP_READ and rpc.type == 1:
                             if item.status == NFS4_OK:
-                                item.opread.resok.data = ""
+                                item.opread.resok.data = b""
                         elif op == OP_WRITE and rpc.type == 0:
-                            item.opwrite.data = ""
+                            item.opwrite.data = b""
                         if not defexpr:
                             # If any of the lists is given, make sure to
                             # include only operations in the given lists
@@ -302,9 +302,9 @@ class NFSUtil(Host):
                     # so memory is not an issue
                     if procedure == NFSPROC3_READ and rpc.type == 1:
                         if pkt.nfs.status == NFS3_OK:
-                            pkt.nfs.opread.resok.data = ""
+                            pkt.nfs.opread.resok.data = b""
                     elif procedure == NFSPROC3_WRITE and rpc.type == 0:
-                        pkt.nfs.opwrite.data = ""
+                        pkt.nfs.opwrite.data = b""
             pktlist.append(pkt)
             if pktdisp:
                 self.test_info(str(pkt))
@@ -513,18 +513,18 @@ class NFSUtil(Host):
             file_str = "NFS.claim.name == '%s'" % filename
             str_list.append(file_str)
         if claimfh is not None:
-            claimfh_str = "(NFS.fh == '%s' and NFS.claim.claim == %d)" % (self.pktt.escape(claimfh), CLAIM_FH)
+            claimfh_str = "(NFS.fh == b'%s' and NFS.claim.claim == %d)" % (self.pktt.escape(claimfh), CLAIM_FH)
             str_list.append(claimfh_str)
         if deleg_stateid is not None:
             deleg_str  = "(NFS.claim.claim == %d" % CLAIM_DELEGATE_CUR
             deleg_str += " and NFS.claim.deleg_info.name == '%s'" % filename
-            deleg_str += " and NFS.claim.deleg_info.stateid == '%s')" % self.pktt.escape(deleg_stateid)
+            deleg_str += " and NFS.claim.deleg_info.stateid == b'%s')" % self.pktt.escape(deleg_stateid)
             if fh is not None:
                 deleg_str += " or (NFS.claim.claim == %d" % CLAIM_DELEG_CUR_FH
-                deleg_str += " and NFS.fh == '%s' and NFS.claim.stateid == '%s')" % (self.pktt.escape(fh), self.pktt.escape(deleg_stateid))
+                deleg_str += " and NFS.fh == b'%s' and NFS.claim.stateid == b'%s')" % (self.pktt.escape(fh), self.pktt.escape(deleg_stateid))
             str_list.append("(" + deleg_str + ")")
         if claimfh is None and deleg_stateid is None and fh is not None:
-            dirfh_str = "NFS.fh == '%s'" % self.pktt.escape(fh)
+            dirfh_str = "NFS.fh == b'%s'" % self.pktt.escape(fh)
             file_str = dirfh_str + " and " + file_str
             str_list.append(dirfh_str)
 
@@ -610,7 +610,7 @@ class NFSUtil(Host):
             # Find LAYOUTGET request
             port = self.port if self.proto in ("tcp", "udp") else None
             dst = self.pktt.ip_tcp_dst_expr(self.server_ipaddr, port)
-            pkt = self.pktt.match(dst + " and NFS.fh == '%s' and NFS.argop == %d" % (self.pktt.escape(filehandle), OP_LAYOUTGET))
+            pkt = self.pktt.match(dst + " and NFS.fh == b'%s' and NFS.argop == %d" % (self.pktt.escape(filehandle), OP_LAYOUTGET))
             if pkt is not None:
                 xid = pkt.rpc.xid
                 layoutget = pkt.NFSop
@@ -699,7 +699,7 @@ class NFSUtil(Host):
             deviceid = self.layout.get('deviceid')
 
         # Find GETDEVICEINFO request and reply
-        match = "NFS.deviceid == '%s'" % self.pktt.escape(deviceid) if deviceid is not None else ''
+        match = "NFS.deviceid == b'%s'" % self.pktt.escape(deviceid) if deviceid is not None else ''
         (pktcall, pktreply) = self.find_nfs_op(OP_GETDEVICEINFO, match=match, status=None)
         if pktreply is None and usecache:
             devinfo = self.device_info.get(deviceid)
@@ -875,7 +875,7 @@ class NFSUtil(Host):
             pmsg = ""
         fhstr = self.pktt.escape(filehandle)
         # Find packet having a GETATTR asking for FATTR4_SUPPORTED_ATTRS(bit 0)
-        attrmatch = "NFS.fh == '%s' and NFS.request & %s != 0" % (fhstr, hex(1 << FATTR4_SUPPORTED_ATTRS))
+        attrmatch = "NFS.fh == b'%s' and NFS.request & %s != 0" % (fhstr, hex(1 << FATTR4_SUPPORTED_ATTRS))
         pktcall, pktreply = self.find_nfs_op(OP_GETATTR, match=attrmatch)
         self.test(pktcall, "GETATTR should be sent to %s asking for FATTR4_SUPPORTED_ATTRS%s" % (server_type, pmsg))
         if pktreply:
@@ -886,7 +886,7 @@ class NFSUtil(Host):
             self.test(False, "GETATTR reply was not found")
 
         # Find packet having a GETATTR asking for FATTR4_FS_LAYOUT_TYPES(bit 62)
-        attrmatch = "NFS.fh == '%s' and NFS.request & %s != 0" % (fhstr, hex(1 << FATTR4_FS_LAYOUT_TYPES))
+        attrmatch = "NFS.fh == b'%s' and NFS.request & %s != 0" % (fhstr, hex(1 << FATTR4_FS_LAYOUT_TYPES))
         pktcall, pktreply = self.find_nfs_op(OP_GETATTR, match=attrmatch)
         self.test(pktcall, "GETATTR should be sent to %s asking for FATTR4_FS_LAYOUT_TYPES%s" % (server_type, pmsg))
         if pktreply:
@@ -1275,7 +1275,7 @@ class NFSUtil(Host):
                     proto = self.proto
                 if proto in ("tcp", "udp"):
                     dst += "%s.dst_port == %d and " % (proto.upper(), port)
-        fh = "NFS.fh == '%s'" % self.pktt.escape(filehandle)
+        fh = "NFS.fh == b'%s'" % self.pktt.escape(filehandle)
         save_index = self.pktt.get_index()
         xids = []
         offsets = {}
@@ -1445,7 +1445,7 @@ class NFSUtil(Host):
            Return the number of commits sent to the server.
         """
         dst = self.pktt.ip_tcp_dst_expr(ipaddr, port)
-        fh = " and NFS.fh == '%s'" % self.pktt.escape(filehandle)
+        fh = " and NFS.fh == b'%s'" % self.pktt.escape(filehandle)
         save_index = self.pktt.get_index()
         xids = []
         if init:
@@ -1502,7 +1502,7 @@ class NFSUtil(Host):
             return
 
         dst = self.pktt.ip_tcp_dst_expr(self.server_ipaddr, self.port)
-        fh = "NFS.fh == '%s'" % self.pktt.escape(filehandle)
+        fh = "NFS.fh == b'%s'" % self.pktt.escape(filehandle)
 
         # Find LAYOUTCOMMIT request
         pkt = self.pktt.match(dst + " and " + fh + " and NFS.argop == %d" % OP_LAYOUTCOMMIT)
@@ -1652,7 +1652,7 @@ class NFSUtil(Host):
             self.pktt.rewind(pindex)
 
         # Find CLOSE request and reply
-        match_str = "NFS.fh == '%s'" % self.pktt.escape(filehandle)
+        match_str = "NFS.fh == b'%s'" % self.pktt.escape(filehandle)
         (closecall, closereply) = self.find_nfs_op(OP_CLOSE, src_ipaddr=self.client_ipaddr, match=match_str, first_call=True)
         self.test(closecall, "CLOSE should be sent to the server")
 
@@ -1709,7 +1709,7 @@ class NFSUtil(Host):
             save_index = self.pktt.get_index()
             argl = ("ipaddr", "port")
             args = dict((k, kwargs[k]) for k in kwargs if k in argl)
-            args["match"] = "NFS.fh == '%s'" % self.pktt.escape(self.filehandle)
+            args["match"] = "NFS.fh == b'%s'" % self.pktt.escape(self.filehandle)
             (pktcall, pktreply) = self.find_nfs_op(OP_LOCK, **args)
             if pktreply and (write is None or pktcall.NFSop.locktype in lock_type):
                 self.lock_stateid = pktreply.NFSop.stateid.other

@@ -549,12 +549,12 @@ class PosixTest(TestUtil):
             pos = posix.lseek(fd, 0, os.SEEK_CUR)
             self.test(pos == test_pos, "fcntl - repositioning file pointer using DUP'ed file descriptor should reposition it in the original file descriptor as well")
             self.posix_offset = pos
-            out = self._do_io(fd, "%s file using original file descriptor" % objtype.capitalize(), pattern="-")
+            out = self._do_io(fd, "%s file using original file descriptor" % objtype.capitalize(), pattern=b"-")
             if self.posix_read:
                 data = self.data_pattern(test_pos, self.posix_iosize)
             else:
-                data = self.data_pattern(test_pos, self.posix_iosize, pattern="-")
-                with open(self.absfile, "r") as fdr:
+                data = self.data_pattern(test_pos, self.posix_iosize, pattern=b"-")
+                with open(self.absfile, "rb") as fdr:
                     fdr.seek(test_pos)
                     out = fdr.read(self.posix_iosize)
             self.test(out == data, "fcntl - %s data is correct when repositioning file pointer using DUP'ed file descriptor" % str_ed)
@@ -583,10 +583,10 @@ class PosixTest(TestUtil):
                 pos = posix.lseek(fd, 0, os.SEEK_CUR)
                 self.test(pos == test_pos, "fcntl - repositioning file pointer using DUP'ed file descriptor should reposition it in the original file descriptor as well")
                 self.posix_offset = pos
-                out = self._do_io(fd2, "%s file using DUP'ed file descriptor" % objtype.capitalize(), pattern="+")
+                out = self._do_io(fd2, "%s file using DUP'ed file descriptor" % objtype.capitalize(), pattern=b"+")
 
-                data = self.data_pattern(test_pos, self.posix_iosize, pattern="+")
-                with open(self.absfile, "r") as fdr:
+                data = self.data_pattern(test_pos, self.posix_iosize, pattern=b"+")
+                with open(self.absfile, "rb") as fdr:
                     fdr.seek(-self.posix_iosize, os.SEEK_END)
                     out = fdr.read(self.posix_iosize)
                 self.test(out == data, "fcntl - data is %s correctly at the end of the file when O_APPEND is set regardless where the file pointer is set" % str_ed)
@@ -760,7 +760,10 @@ class PosixTest(TestUtil):
 
         try:
             fd = None
-            data = "AAAAAAAAAAAAAAAAAAAA"
+            data  = b"AAAAAAAAAAAAAAAAAAAA"
+            dataB = b'BBBB'
+            dataC = b'CCCCCC'
+            dataD = b'DDDDDDDD'
             self.get_filename()
             self.dprint('DBG3', "Open file %s for writing" % self.absfile)
             fd = posix.open(self.absfile, posix.O_WRONLY|posix.O_CREAT)
@@ -770,18 +773,18 @@ class PosixTest(TestUtil):
             self.dprint('DBG3', "Set file pointer lseek(4, SEEK_SET)")
             offset = self.run_func(posix.lseek, fd, 4, os.SEEK_SET)
             self.test(offset == 4, "lseek - offset: 4, whence: SEEK_SET succeeds")
-            self.dprint('DBG3', "Write file [%s]" % 'BBBB')
-            count = posix.write(fd, 'BBBB')
+            self.dprint('DBG3', "Write file [%s]" % dataB)
+            count = posix.write(fd, dataB)
             self.dprint('DBG3', "Set file pointer lseek(8, SEEK_CUR)")
             offset = self.run_func(posix.lseek, fd, 8, os.SEEK_CUR)
             self.test(offset == 16, "lseek - offset: 8, whence: SEEK_CUR succeeds")
-            self.dprint('DBG3', "Write file [%s]" % 'CCCCCC')
-            count = posix.write(fd, 'CCCCCC')
+            self.dprint('DBG3', "Write file [%s]" % dataC)
+            count = posix.write(fd, dataC)
             self.dprint('DBG3', "Set file pointer lseek(1000, SEEK_END)")
             offset = self.run_func(posix.lseek, fd, 1000, os.SEEK_END)
             self.test(offset == 1022, "lseek - offset: 1000, whence: SEEK_END succeeds")
-            self.dprint('DBG3', "Write file [%s]" % 'DDDDDDDD')
-            count = posix.write(fd, 'DDDDDDDD')
+            self.dprint('DBG3', "Write file [%s]" % dataD)
+            count = posix.write(fd, dataD)
             if self.nfs_version > 2:
                 N = 2*1024*1024*1024
                 self.dprint('DBG3', "Set file pointer lseek(2GB, SEEK_SET)")
@@ -801,17 +804,17 @@ class PosixTest(TestUtil):
             offset = self.run_func(posix.lseek, fd, 4, os.SEEK_SET)
             self.dprint('DBG3', "Read 4 bytes")
             data = posix.read(fd, 4)
-            self.test(data == 'BBBB', "lseek - read data at offset = 4 should be correct")
+            self.test(data == dataB, "lseek - read data at offset = 4 should be correct")
             self.dprint('DBG3', "Set file pointer lseek(16, SEEK_SET)")
             offset = self.run_func(posix.lseek, fd, 16, os.SEEK_SET)
             self.dprint('DBG3', "Read 6 bytes")
             data = posix.read(fd, 6)
-            self.test(data == 'CCCCCC', "lseek - read data at offset = 16 should be correct")
+            self.test(data == dataC, "lseek - read data at offset = 16 should be correct")
             self.dprint('DBG3', "Set file pointer lseek(1022, SEEK_SET)")
             offset = self.run_func(posix.lseek, fd, 1022, os.SEEK_SET)
             self.dprint('DBG3', "Read 8 bytes")
             data = posix.read(fd, 8)
-            self.test(data == 'DDDDDDDD', "lseek - read data at offset = 1022 should be correct")
+            self.test(data == dataD, "lseek - read data at offset = 1022 should be correct")
             posix.close(fd)
         except Exception:
             self.test(False, traceback.format_exc())
@@ -1032,7 +1035,7 @@ class PosixTest(TestUtil):
             fd = posix.open(self.absfile, posix.O_RDWR|posix.O_CREAT)
             # Write a dummy byte at end of file to reserve space on the file
             posix.lseek(fd, N-1, os.SEEK_SET)
-            posix.write(fd, '\000')
+            posix.write(fd, b'\000')
 
             if objtype == 'mmap':
                 self.dprint('DBG3', "mmap file using length of 0")
@@ -1058,7 +1061,7 @@ class PosixTest(TestUtil):
             posix.close(fd)
 
             self.dprint('DBG3', "Read data from file to verify data written using mmap region")
-            with open(self.absfile, "r") as fdr:
+            with open(self.absfile, "rb") as fdr:
                 data = fdr.read()
             self.test(data == self.data_pattern(0,N), "%s - written data should be correct" % objtype)
 
@@ -1796,7 +1799,7 @@ class PosixTest(TestUtil):
 
             self.dprint('DBG3', "Write 0 bytes to file %s using POSIX API write()" % self.absfile)
             amsg = "write - write() should succeed"
-            count = self.run_func(posix.write, fd, '', msg=amsg)
+            count = self.run_func(posix.write, fd, b'', msg=amsg)
             self.test(count == 0, "write - writing 0 bytes should return 0")
 
             self.dprint('DBG3', "Write data to file %s at offset = 0 using POSIX API write()" % self.absfile)
@@ -1827,7 +1830,7 @@ class PosixTest(TestUtil):
             hsize = int(self.filesize/2)
             off = posix.lseek(fd, offset-hsize, os.SEEK_SET)
             data = posix.read(fd, hsize)
-            self.test(data == '\000'*len(data), "write - hole in middle of file should be read correctly")
+            self.test(data == bytes(len(data)), "write - hole in middle of file should be read correctly")
 
             posix.close(fd)
         except Exception:

@@ -567,7 +567,7 @@ class RDMAseg(object):
 
     def get_data(self, padding=True):
         """Return sub-segment data"""
-        data = ""
+        data = b""
         # Get data from all fragments
         for fragdata in self.fraglist:
             data += fragdata
@@ -664,7 +664,7 @@ class RDMAsegment(object):
 
     def get_data(self, padding=True):
         """Return segment data"""
-        data = ""
+        data = b""
         # Get data from all sub-segments
         for seg in self.seglist:
             data += seg.get_data(padding)
@@ -802,7 +802,7 @@ class RDMAinfo(RDMAbase):
                 slist = read_chunks.setdefault(rsegment.xdrpos, [])
                 slist.append(rsegment)
 
-            data = ""
+            data = b""
             offset = 0  # Current offset of reduced message
             # Reassemble the whole message
             for xdrpos in sorted(read_chunks.keys()):
@@ -953,7 +953,7 @@ class RDMAinfo(RDMAbase):
         #   +--------------------------+------------------+--------------------------+
         #   Each RDMA write could be a single RDMA_WRITE_Only or a series of
         #   RDMA_WRITE_First, RDMA_WRITE_Middle, ..., RDMA_WRITE_Last
-        replydata = ""
+        replydata = b""
         if rpcrdma.reply:
             # Process all segments in the RDMA reply chunk
             for rdma_seg in rpcrdma.reply.target:
@@ -1202,7 +1202,7 @@ class IB(BaseObj):
             # and remove saved segments
             sdata = self._senddata.pop(self.bth.destqp, {})
             sdata[self.bth.psn] = unpack.read(len(unpack))
-            data = ""
+            data = b""
             # Reassemble data according to the PSN numbers
             for psn in sorted(sdata.keys()):
                 data += sdata[psn]

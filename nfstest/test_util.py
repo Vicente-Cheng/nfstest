@@ -1722,9 +1722,9 @@ class TestUtil(NFSUtil):
                Data pattern to return, default is of the form:
                hex_offset(0x%08X) abcdefghijklmnopqrst\\n
         """
-        data = ''
+        data = b''
         if pattern is None:
-            pattern = 'abcdefghijklmnopqrst'
+            pattern = b'abcdefghijklmnopqrst'
             line_len = 32
             default = True
         else:
@@ -1737,9 +1737,9 @@ class TestUtil(NFSUtil):
 
         for i in range(0,N):
             if default:
-                str_offset = "0x%08X " % offset
+                str_offset = b"0x%08X " % offset
                 plen = 31 - len(str_offset)
-                data += str_offset + pattern[:plen] + '\n'
+                data += str_offset + pattern[:plen] + b'\n'
                 offset += line_len
             else:
                 data += pattern

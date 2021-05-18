@@ -108,7 +108,7 @@ Notes:
 # Test script ID
 SCRIPT_ID = "SSC"
 
-DATA_PATTERN = "ABCDE"
+DATA_PATTERN = b"ABCDE"
 
 INTRA_TESTS = [
     "intra01",
@@ -998,7 +998,7 @@ class SSCTest(TestUtil):
                             elif samefile:
                                 sdata = self.data_pattern(doff, cnt)
                             else:
-                                sdata = self.data_pattern(doff, cnt, "\x00")
+                                sdata = self.data_pattern(doff, cnt, b"\x00")
                             if sdata != ddata:
                                 expr = False
                                 break

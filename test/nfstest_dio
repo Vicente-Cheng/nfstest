@@ -605,9 +605,9 @@ class DioTest(TestUtil):
                 filehandle = self.layout['filehandles'][0]
 
             if nfs_version < 4:
-                match_str = "NFS.argop == %d and NFS.fh == '%s'" % (NFSPROC3_READ, self.pktt.escape(filehandle))
+                match_str = "NFS.argop == %d and NFS.fh == b'%s'" % (NFSPROC3_READ, self.pktt.escape(filehandle))
             else:
-                match_str = "NFS.argop == %d and NFS.stateid.other == '%s'" % (OP_READ, self.pktt.escape(stateid))
+                match_str = "NFS.argop == %d and NFS.stateid.other == b'%s'" % (OP_READ, self.pktt.escape(stateid))
 
             pkt = self.pktt.match(match_str)
             self.test(pkt, "READ should be sent to the server")
@@ -853,9 +853,9 @@ class DioTest(TestUtil):
 
             match_str = "NFS.argop == %d" % io_op
             if nfs_version < 4:
-                match_str += " and NFS.fh == '%s'" % self.pktt.escape(filehandle)
+                match_str += " and NFS.fh == b'%s'" % self.pktt.escape(filehandle)
             else:
-                match_str += " and NFS.stateid.other == '%s'" % self.pktt.escape(stateid)
+                match_str += " and NFS.stateid.other == b'%s'" % self.pktt.escape(stateid)
 
             idx = 0
             xids = {}
@@ -976,9 +976,9 @@ class DioTest(TestUtil):
                     bio_op = OP_WRITE if buffered_write else OP_READ
 
                 if nfs_version < 4:
-                    match_str = "NFS.argop == %d and NFS.fh == '%s'" % (bio_op, self.pktt.escape(filehandle))
+                    match_str = "NFS.argop == %d and NFS.fh == b'%s'" % (bio_op, self.pktt.escape(filehandle))
                 else:
-                    match_str = "NFS.argop == %d and NFS.stateid.other == '%s'" % (bio_op, self.pktt.escape(stateid))
+                    match_str = "NFS.argop == %d and NFS.stateid.other == b'%s'" % (bio_op, self.pktt.escape(stateid))
 
                 while self.pktt.match(match_str):
                     pkt = self.pktt.pkt
@@ -1249,10 +1249,10 @@ class DioTest(TestUtil):
 
             if nfs_version < 4:
                 io_op  = NFSPROC3_WRITE if write else NFSPROC3_READ
-                match_str = "NFS.argop == %d and NFS.fh == '%s'" % (io_op, self.pktt.escape(filehandle))
+                match_str = "NFS.argop == %d and NFS.fh == b'%s'" % (io_op, self.pktt.escape(filehandle))
             else:
                 io_op  = OP_WRITE if write else OP_READ
-                match_str = "NFS.argop == %d and NFS.stateid.other == '%s'" % (io_op, self.pktt.escape(self.stateid))
+                match_str = "NFS.argop == %d and NFS.stateid.other == b'%s'" % (io_op, self.pktt.escape(self.stateid))
 
             xids = {}
             ret = []
@@ -1313,7 +1313,7 @@ class DioTest(TestUtil):
                 data = ctypes.string_at(buffers[idx], size)
                 if write:
                     if fd is None:
-                       fd = open(absfile, 'r')
+                       fd = open(absfile, 'rb')
                        fd.seek(offset)
                     rdata = fd.read(size)
                     self.test(data == rdata, "WRITE vector(%d) data should be correct" % size)

@@ -635,7 +635,7 @@ class pNFSTest(TestUtil):
             filehandle    = openfh['filehandle']
             open_stateid  = openfh['open_stateid']
             deleg_stateid = openfh['deleg_stateid']
-            fhandlestr = "NFS.fh == '%s'" % self.pktt.escape(filehandle)
+            fhandlestr = "NFS.fh == b'%s'" % self.pktt.escape(filehandle)
 
             if delegreturn:
                 # Find DELEGRETURN request
@@ -733,7 +733,7 @@ class pNFSTest(TestUtil):
                 fstat = os.stat(testfile)
                 self.test(fstat.st_size == self.filesize, "Size of file on %s should be correct" % ver, failmsg=", expecting %d and got %d" % (self.filesize, fstat.st_size))
                 self.dprint('DBG3', "Read file %s @0" % testfile)
-                fd = open(testfile, "r")
+                fd = open(testfile, "rb")
                 try:
                     data = fd.read()
                 finally:
@@ -760,7 +760,7 @@ class pNFSTest(TestUtil):
                 fstat = os.stat(testfile)
                 self.test(fstat.st_size == self.filesize, "Size of file on pNFS should be correct", failmsg=", expecting %d and got %d" % (self.filesize, fstat.st_size))
                 self.dprint('DBG3', "Read file %s @0" % testfile)
-                fd = open(testfile, "r")
+                fd = open(testfile, "rb")
                 try:
                     data = fd.read()
                 finally:
@@ -1020,7 +1020,7 @@ class pNFSTest(TestUtil):
         self.pktt.rewind()
         (multipath_ds_list, openfh) = self.verify_file(filename, iomode=LAYOUTIOMODE4_RW, nolayoutget=True, lock=haslock, verify_close=False)
 
-        fhandle_str = "NFS.fh == '%s'" % self.pktt.escape(openfh['filehandle'])
+        fhandle_str = "NFS.fh == b'%s'" % self.pktt.escape(openfh['filehandle'])
         (pktcall, pktreply) = self.find_nfs_op(OP_SETATTR, status=None, match=fhandle_str)
         self.test(pktcall, "SETATTR should be sent to MDS")
         if pktcall:
@@ -1240,7 +1240,7 @@ class pNFSTest(TestUtil):
             self.trace_open()
             self.set_pktlist()
 
-            self.test(data == '\000' * self.rsize, "Client should read a hole at the beginning of the file after writing")
+            self.test(data == bytes(self.rsize), "Client should read a hole at the beginning of the file after writing")
 
             (filehandle, open_stateid, deleg_stateid) = self.find_open(filename=filename)
             openfh = {"open_stateid": open_stateid, "deleg_stateid": deleg_stateid}

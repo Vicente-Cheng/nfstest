@@ -229,7 +229,7 @@ TESTGROUPS = {
 # Dictionary having the number of clients required by each test
 TEST_CLIENT_DICT = {x:1 for x in TESTNAMES_RECALL}
 
-PATTERN = 'FF00'
+PATTERN = b'FF00'
 
 OPEN_STID  = 0
 LOCK_STID  = 1
@@ -566,7 +566,7 @@ class DelegTest(TestUtil):
         # Matched all packets sent to the server given by ipaddr and port
         src = "IP.src == '%s' and " % self.client_ipaddr
         dst = self.pktt.ip_tcp_dst_expr(ipaddr, port)
-        fh  = " and NFS.fh == '%s' and " % self.pktt.escape(filehandle)
+        fh  = " and NFS.fh == b'%s' and " % self.pktt.escape(filehandle)
         nfsver = self.match_nfs_version(self.nfs_version, False)
         matchstr = src + dst + nfsver + fh + "NFS.argop == %d" % op_type
 
@@ -843,7 +843,7 @@ class DelegTest(TestUtil):
             if self.pktcall:
                 # Find DELEGRETURN request and reply
                 self.pktt.rewind(self.pktcall.record.index)
-                match_str = "NFS.fh == '%s'" % self.pktt.escape(fh)
+                match_str = "NFS.fh == b'%s'" % self.pktt.escape(fh)
                 (delegreturncall, delegreturnreply) = self.find_nfs_op(OP_DELEGRETURN, src_ipaddr=self.client_ipaddr, match=match_str)
                 self.test(delegreturncall, "DELEGRETURN should be sent after the close")
                 if delegreturncall:
@@ -1026,13 +1026,13 @@ class DelegTest(TestUtil):
                     dmsg = "Write same file (truncate before writing) from another client"
                     self.dprint("DBG2", "%s to recall delegation [%s]" % (dmsg, r_absfile))
                     fdwr  = self.rexecobj.run(os.open, r_absfile, os.O_WRONLY|os.O_TRUNC)
-                    count = self.rexecobj.run(os.write, fdwr, self.data_pattern(0, 1024, "x"))
+                    count = self.rexecobj.run(os.write, fdwr, self.data_pattern(0, 1024, b"x"))
                     self.rexecobj.run(os.close, fdwr)
                 else:
                     dmsg = "Write same file from another client"
                     self.dprint("DBG2", "%s to recall delegation [%s]" % (dmsg, r_absfile))
                     fdwr  = self.rexecobj.run(os.open, r_absfile, os.O_WRONLY|os.O_APPEND)
-                    count = self.rexecobj.run(os.write, fdwr, self.data_pattern(0, 1024, "X"))
+                    count = self.rexecobj.run(os.write, fdwr, self.data_pattern(0, 1024, b"X"))
                     self.rexecobj.run(os.close, fdwr)
             except OSError as exerr:
                 fmsg = ", failed with %s" % exerr
@@ -1143,7 +1143,7 @@ class DelegTest(TestUtil):
             conflict_match_str = src_other_client_str + nfsver + "NFS.argop == %d" % conflict_op
             if conflict_op == OP_OPEN:
                 conflict_match_str += " and (NFS.claim.name == '%s' or" % self.filename
-                conflict_match_str += " (NFS.fh == '%s' and NFS.claim.claim == %d))" % (self.pktt.escape(open_fh), CLAIM_FH)
+                conflict_match_str += " (NFS.fh == b'%s' and NFS.claim.claim == %d))" % (self.pktt.escape(open_fh), CLAIM_FH)
             elif target and conflict_type == OP_RENAME:
                 conflict_match_str += " and NFS.newname == '%s'" % self.filename
             elif conflict_type in [OP_REMOVE, OP_RENAME]:
@@ -1155,7 +1155,7 @@ class DelegTest(TestUtil):
                 expr = fh1 is not None
                 self.test(expr, "LOOKUP should be sent from second client")
                 if expr:
-                   conflict_match_str += " and NFS.fh == '%s'" % self.pktt.escape(fh1)
+                   conflict_match_str += " and NFS.fh == b'%s'" % self.pktt.escape(fh1)
 
             opencall = None
             open_call = None
