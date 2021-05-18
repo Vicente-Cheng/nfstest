@@ -1118,9 +1118,13 @@ class Pktt(BaseObj):
                # Call as a class
                escaped_data = Pktt.escape(data)
         """
+        isbytes = isinstance(data, bytes)
         # repr() can escape or not a single quote depending if a double
         # quote is present, just make sure both quotes are escaped correctly
         rdata = repr(data)
+        if isbytes:
+            # Strip the bytes marker
+            rdata = rdata[1:]
         if rdata[0] == '"':
             # Double quotes are escaped
             dquote = r'x22'
@@ -1130,12 +1134,11 @@ class Pktt(BaseObj):
             dquote = r'\x22'
             squote = r'x27'
         # Replace all double quotes to its corresponding hex value
-        data = re.sub(r'"', dquote, rdata[1:-1])
+        rdata = rdata[1:-1].replace('"', dquote)
         # Replace all single quotes to its corresponding hex value
-        data = re.sub(r"'", squote, data)
+        rdata = rdata.replace("'", squote)
         # Escape all backslashes
-        data = re.sub(r'\\', r'\\\\', data)
-        return data
+        return rdata.replace('\\', '\\\\')
 
     @staticmethod
     def ip_tcp_src_expr(ipaddr, port=None):
