@@ -289,6 +289,14 @@ class Unpack(object):
         """Get a fixed length opaque"""
         return self.read(size, pad=4)
 
+    def unpack_utf8(self, maxcount=0):
+        """Get a variable length utf8 string up to a maximum length of maxcount"""
+        return self.unpack_opaque(maxcount).decode()
+
+    def unpack_futf8(self, size):
+        """Get a fixed length utf8 string"""
+        return self.unpack_fopaque(size).decode()
+
     def unpack_string(self, ltype=unpack_uint, pad=0, maxcount=0):
         """Get a variable length string
 
