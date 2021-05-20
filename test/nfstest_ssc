@@ -1004,10 +1004,10 @@ class SSCTest(TestUtil):
                                 break
                             doff += cnt
                     self.test(expr, "Destination file data not written by COPY should not be modified")
-            self.close_files()
         except Exception:
             self.test(False, traceback.format_exc())
         finally:
+            self.close_files()
             self.umount()
             if inter and self.dst:
                 self.dst.umount()
