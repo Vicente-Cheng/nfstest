@@ -33,8 +33,8 @@ __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
 __version__   = "1.2"
 
-if sys.version_info[0] != 2:
-    raise Exception("Script requires Python 2")
+if sys.version_info[0] != 3:
+    raise Exception("Script requires Python 3")
 
 # Module variables
 _dindent = ""

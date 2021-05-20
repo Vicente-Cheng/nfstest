@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #===============================================================================
 # Copyright 2012 NetApp, Inc. All Rights Reserved,
 # contribution by Jorge Mora <mora@netapp.com>
@@ -233,7 +233,7 @@ def create_manpage(src, dst):
             lines.pop()
     else:
         absmodule = os.path.splitext(src)[0].replace('/', '.')
-        cmd = "pydoc %s" % absmodule
+        cmd = "pydoc3 %s" % absmodule
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         pstdout, pstderr = proc.communicate()
         proc.wait()
