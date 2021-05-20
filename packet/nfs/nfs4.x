@@ -254,7 +254,7 @@ typedef uint32_t                nfs_lease4;
 typedef uint32_t                qop4;
 typedef opaque                  sec_oid4<>; /* STRHEX:1 */
 typedef uint32_t                seqid4;
-typedef opaque                  utf8string<>;
+typedef string                  utf8string<>;
 typedef utf8string              utf8str_cis;
 typedef utf8string              utf8str_cs;
 typedef utf8string              utf8str_mixed;
