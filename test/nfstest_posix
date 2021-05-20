@@ -444,7 +444,7 @@ class PosixTest(TestUtil):
             fd = None
             self.create_dir()
 
-            fd = self.libc.opendir(self.absdir)
+            fd = self.libc.opendir(self.absdir.encode())
             out = self.libc.closedir(fd)
             fd = None
             self.test(out == 0, "closedir - closedir() should succeed")
@@ -467,7 +467,7 @@ class PosixTest(TestUtil):
             mode = 0o754
             self.get_filename()
             self.dprint('DBG3', "Create file %s using POSIX API creat()" % self.absfile)
-            fd = self.libc.creat(self.absfile, mode)
+            fd = self.libc.creat(self.absfile.encode(), mode)
             self.test(fd > 0, "creat - creat() should succeed")
             count = posix.write(fd, self.data_pattern(0, self.filesize))
             posix.close(fd)
@@ -477,7 +477,7 @@ class PosixTest(TestUtil):
             self.test(fstat.st_size == count, "creat - file size should be correct")
 
             self.dprint('DBG3', "Open existing file %s using POSIX API creat()" % self.absfile)
-            fd = self.libc.creat(self.absfile, 0o744)
+            fd = self.libc.creat(self.absfile.encode(), 0o744)
             self.test(fd > 0, "creat - existent file open should succeed")
             posix.close(fd)
             fstat = os.stat(self.absfile)
@@ -1357,11 +1357,11 @@ class PosixTest(TestUtil):
         try:
             fd = None
             self.create_dir()
-            fd = self.libc.opendir(self.absdir)
+            fd = self.libc.opendir(self.absdir.encode())
             self.test(fd != None, "opendir - opendir() on an existent directory should succeed")
             self.libc.closedir(fd)
             fd = None
-            fd = self.libc.opendir(self.absdir+'bogus')
+            fd = self.libc.opendir(self.absdir.encode() + b'bogus')
             self.test(fd == None, "opendir - opendir() on a non-existent directory should fail")
         except Exception:
             self.test(False, traceback.format_exc())
@@ -1406,9 +1406,9 @@ class PosixTest(TestUtil):
             fd = None
             self.create_dir()
             self.create_file(dir=self.dirname)
-            filename = os.path.basename(self.filename)
+            filename = os.path.basename(self.filename).encode()
 
-            fd = self.libc.opendir(self.absdir)
+            fd = self.libc.opendir(self.absdir.encode())
             dirlist = []
             while True:
                 dirent = self.libc.readdir(fd)
@@ -1665,7 +1665,7 @@ class PosixTest(TestUtil):
             for i in range(N):
                 self.create_file(dir=self.dirname)
 
-            fd = self.libc.opendir(self.absdir)
+            fd = self.libc.opendir(self.absdir.encode())
 
             dirlist = []
             offsets = []

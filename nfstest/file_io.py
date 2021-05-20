@@ -666,7 +666,7 @@ class FileIO(BaseObj):
             # Choose new size at random
             nsize = self.random.randint(0, fileobj.size + self.wsizedev)
             self._dprint("DBG2", "TRUNC   %s %d -> %d" % (fileobj.name, fileobj.size, nsize))
-            out = self.libc.truncate(self.absfile, nsize)
+            out = self.libc.truncate(self.absfile.encode(), nsize)
             if out == -1:
                 err = ctypes.get_errno()
                 if hasattr(fileobj, 'srcname') and err == errno.ENOENT:
@@ -749,7 +749,7 @@ class FileIO(BaseObj):
             count = self.random.randint(1,99)
             self._dprint("DBG2", "READDIR %s maxentries: %d" % (self.datadir, count))
             self.absfile = self.datadir
-            fd = self.libc.opendir(self.datadir)
+            fd = self.libc.opendir(self.datadir.encode())
             index = 0
             while True:
                 dirent = self.libc.readdir(fd)
