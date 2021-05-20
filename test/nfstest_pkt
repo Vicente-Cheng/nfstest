@@ -266,9 +266,6 @@ if vopts.reply and vopts.no_rpc_replies:
 if vopts.call and vopts.no_rpc_replies:
     opts.error("Options --call and --no-rpc-replies are mutually exclusive")
 
-# Re-open stdout to set file descriptor to unbuffered
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-
 if vopts.call:
     vopts.display = "pkt_call,pkt"
 

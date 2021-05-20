@@ -83,7 +83,7 @@ class RemoteServer:
 
     def start(self):
         if self.logfile is not None:
-            self.fd = open(self.logfile, "w", 0)
+            self.fd = open(self.logfile, "w")
         self.listener = Listener(("", self.port))
         self.conn = self.listener.accept()
         self.log("Connection accepted\n")

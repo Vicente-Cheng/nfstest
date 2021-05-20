@@ -169,9 +169,6 @@ if vopts.path is None:
 if len(args) < 1:
     opts.error("No packet trace file!")
 
-# Re-open stdout to set file descriptor to unbuffered
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-
 def atoi(text):
     """Convert string to integer or just return the string if it
        does not represent an integer
