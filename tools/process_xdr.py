@@ -230,8 +230,10 @@ uint32_list = ["unsigned int"]
 int64_list = ["hyper"]
 # Types to decode using unpack_uint64()
 uint64_list = ["unsigned hyper"]
-# Types to decode using unpack_opaque()
-string_list = ["opaque", "string"]
+# Types to decode using unpack_utf8()
+utf8_list = ["string"]
+# Types to decode string
+string_list = ["opaque"] + utf8_list
 
 valid_tags = {
     "COPYRIGHT" : 1,
@@ -505,6 +507,10 @@ class XDRobject:
                 fstr = ""
                 if alist[0][0] == "[":
                     fstr = "f"
+                if dname in utf8_list:
+                    fstr += "utf8"
+                else:
+                    fstr += "opaque"
                 size = self.getsize(alist[0])
                 if typedef and len(size):
                     ustr = "lambda unpack: unpack"
@@ -514,7 +520,7 @@ class XDRobject:
                     if asize is not None:
                         # Size for each member of an array
                         ltstr = ", %s" % asize
-                ret = ("%s.unpack_%sopaque" % (ustr, fstr), "(%s)" % size, '%s, args={"size":%s}' % (ltstr, size))
+                ret = ("%s.unpack_%s" % (ustr, fstr), "(%s)" % size, '%s, args={"size":%s}' % (ltstr, size))
             else:
                 ret = ("%s.unpack_opaque" % ustr, "()", "")
         elif typedef:
