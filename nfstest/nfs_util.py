@@ -1665,7 +1665,9 @@ class NFSUtil(Host):
         if closecall:
             self.test(stateid == closecall.NFSop.stateid.other, "CLOSE should be sent with correct OPEN stateid")
 
-            # Verify there is only one CLOSE
+            # Verify there is only one CLOSE which is not a TCP retransmission
+            if closecall == "tcp":
+                match_str += " and tcp.seq_number != %d" % closecall.tcp.seq_number
             self.pktt.rewind(closecall.record.index+1)
             self.find_nfs_op(OP_CLOSE, src_ipaddr=self.client_ipaddr, match=match_str, first_call=True)
             if self.pktcall:
