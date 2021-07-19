@@ -1213,8 +1213,8 @@ class TestUtil(NFSUtil):
         if self._tcleanup_done:
             return
         self._tcleanup_done = True
-        self.debug_repr(0)
         self._tverbose()
+        self.debug_repr(0)
         count = self.dprint_count()
         self.trace_stop()
 
