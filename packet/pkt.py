@@ -39,14 +39,14 @@ from baseobj import BaseObj
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.3"
+__version__   = "1.4"
 
 # The order in which to display all layers in the packet
 PKT_layers = [
     'record',
     'ethernet', 'erf', 'vlan',
     'ip', 'arp', 'rarp',
-    'tcp', 'udp', 'ib',
+    'tcp', 'udp', 'ib', 'mpa',
     'rpcordma', 'rpc', 'ntp', 'dns', 'krb',
     'gssd', 'nfs', 'mount', 'portmap', 'nlm', 'gssc',
 ]

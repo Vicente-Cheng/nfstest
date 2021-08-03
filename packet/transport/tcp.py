@@ -23,6 +23,7 @@ RFC 7323 TCP Extensions for High Performance
 import nfstest_config as c
 from baseobj import BaseObj
 from packet.unpack import Unpack
+from packet.transport.mpa import MPA
 from packet.application.dns import DNS
 from packet.application.rpc import RPC
 from packet.application.krb5 import KRB5
@@ -323,6 +324,9 @@ class TCP(BaseObj):
             krb = KRB5(pktt, proto=6)
             if krb:
                 pkt.add_layer("krb", krb)
+            return
+        elif 20049 in [self.src_port, self.dst_port]:
+            MPA(pktt)
             return
 
         if stream.frag_off > 0 and len(stream.buffer) == 0:
