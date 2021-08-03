@@ -56,8 +56,8 @@ from packet.link.erf import ERF
 from packet.unpack import Unpack
 from packet.record import Record
 from packet.pkt import Pkt, PKT_layers
-from packet.transport.ib import RDMAinfo
 from packet.link.ethernet import ETHERNET
+from packet.transport.rdmainfo import RDMAinfo
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
