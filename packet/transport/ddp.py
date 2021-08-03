@@ -21,6 +21,7 @@ RFC 5041 Direct Data Placement over Reliable Transports
 import nfstest_config as c
 from baseobj import BaseObj
 from packet.utils import IntHex, LongHex
+from packet.transport.rdmap import RDMAP
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
@@ -90,7 +91,6 @@ class DDP(BaseObj):
             # DDP tagged messaged
             self.stag   = IntHex(ulist[2])
             self.offset = LongHex(unpack.unpack_uint64())
-            self._strfmt1 = "DDP   v{2:<3} stag: {3}, offset: {6}, last: {1}, len: {7}"
             self._strfmt2 = "version: {2}, stag: {3}, offset: {6}, last: {1}, len: {7}"
         else:
             # DDP untagged messaged
@@ -98,13 +98,25 @@ class DDP(BaseObj):
             self.queue  = ulist[0]
             self.msn    = ulist[1]
             self.offset = ulist[2]
-            self._strfmt1 = "DDP   v{2:<3} queue: {4}, msn: {5}, offset: {6}, last: {1}, len: {7}"
             self._strfmt2 = "version: {2}, queue: {4}, msn: {5}, offset: {6}, last: {1}, len: {7}"
 
         # Get the payload size
         self.psize = unpack.size()
 
+        # Dissect the payload
+        RDMAP(pktt, rsvdulp)
+
+        if pktt.pkt.rdmap:
+            if self.tagged:
+                self._strfmt1 = "stag: {3}, offset: {6}, last: {1}"
+            else:
+                self._strfmt1 = "queue: {4}, msn: {5}, offset: {6}, last: {1}"
+        elif self.tagged:
+            self._strfmt1 = "DDP   v{2:<3} stag: {3}, offset: {6}, last: {1}, len: {7}"
+        else:
+            self._strfmt1 = "DDP   v{2:<3} queue: {4}, msn: {5}, offset: {6}, last: {1}, len: {7}"
+
         # Get the un-dissected bytes
-        size = self.psize
+        size = unpack.size()
         if size > 0:
             self.data = unpack.read(size)

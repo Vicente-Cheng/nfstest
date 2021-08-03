@@ -1,0 +1,144 @@
+#===============================================================================
+# Copyright 2021 NetApp, Inc. All Rights Reserved,
+# contribution by Jorge Mora <mora@netapp.com>
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#===============================================================================
+"""
+RDMAP module
+
+Decode RDMAP layer.
+
+RFC 5040 Remote Direct Memory Access Protocol Specification
+"""
+import nfstest_config as c
+from baseobj import BaseObj
+from packet.utils import IntHex, LongHex, Enum
+
+# Module constants
+__author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
+__copyright__ = "Copyright (C) 2021 NetApp, Inc."
+__license__   = "GPL v2"
+__version__   = "1.0"
+
+rdmap_op_codes = {
+    0b0000 : "RDMA_Write",
+    0b0001 : "RDMA_Read_Request",
+    0b0010 : "RDMA_Read_Response",
+    0b0011 : "Send",
+    0b0100 : "Send_Invalidate",
+    0b0101 : "Send_SE",
+    0b0110 : "Send_SE_Invalidate",
+    0b0111 : "Terminate",
+}
+
+# Create Operation Code constants
+for (key, value) in rdmap_op_codes.items():
+    exec("%s = %d" % (value, key))
+
+class OpCode(Enum):
+    """enum OpCode"""
+    _enumdict = rdmap_op_codes
+
+class RDMAP(BaseObj):
+    """RDMAP object
+
+       Usage:
+           from packet.transport.rdmap import RDMAP
+
+           x = RDMAP(pktt, pinfo)
+
+       Object definition:
+
+       RDMAP(
+           version = int,  # RDMA Protocol version
+           opcode  = int,  # RDMA OpCode
+           psize   = int,  # Payload Size
+           [ # Only valid for Send with Invalidate and Send with Solicited Event
+             # and Invalidate Messages
+               istag = int,  # Invalidate STag
+           ]
+           [ # RDMA Read Request Header
+               sinkstag = int,  # Data Sink STag
+               sinksto  = int,  # Data Sink Tagged Offset
+               dma_len  = int,  # RDMA Read Message Size
+               srcstag  = int,  # Data Source STag
+               srcsto   = int,  # Data Source Tagged Offset
+           ]
+       )
+    """
+    # Class attributes
+    _attrlist = ("version", "opcode", "istag", "sinkstag", "sinksto",
+                 "dma_len", "srcstag", "srcsto", "psize")
+    _strfmt1  = "RDMAP v{0:<3} {1} {_ddp}, len: {8}"
+    _strfmt2  = "{1}, version: {0},{2:? istag\: {2},:} len: {8}"
+
+    def __init__(self, pktt, pinfo):
+        """Constructor
+
+           Initialize object's private data.
+
+           pktt:
+               Packet trace object (packet.pktt.Pktt) so this layer has
+               access to the parent layers.
+           pinfo:
+               List of two integers: [RDMAP control, Invalidate STag].
+        """
+        unpack = pktt.unpack
+        offset = unpack.tell()
+        self._ddp = pktt.pkt.ddp
+
+        self.version = (pinfo[0] >> 6) & 0x03  # RDMAP version
+        reserved     = (pinfo[0] >> 4) & 0x03
+        self.opcode  = OpCode(pinfo[0] & 0x0f) # RDMAP opcode
+
+        if self.version not in (0, 1) or reserved != 0:
+            unpack.seek(offset)
+            return
+
+        if not self._ddp.tagged:
+            # Invalidate STag
+            self.istag = IntHex(pinfo[1])
+
+        if self.opcode == RDMA_Read_Request:
+            ulist = unpack.unpack(28, "!IQIIQ")
+            self.sinkstag = IntHex(ulist[0])
+            self.sinksto  = LongHex(ulist[1])
+            self.dma_len  = ulist[2]
+            self.srcstag  = IntHex(ulist[3])
+            self.srcsto   = LongHex(ulist[4])
+            self._strfmt1 = "RDMAP v{0:<3} {1}  src: ({6}, {7}), sink: ({3}, {4}), dma_len: {5}"
+            self._strfmt2 = "{1}, version: {0}, src: ({6}, {7}), sink: ({3}, {4}), dma_len: {5}"
+        elif self.opcode == Terminate:
+            # Terminate OpCode not supported yet
+            pass
+
+        # This is an RDMAP packet
+        pktt.pkt.add_layer("rdmap", self)
+
+        # Get payload size
+        self.psize = unpack.size()
+
+        # Get the un-dissected bytes
+        size = self.psize
+        if size > 0:
+            self.data = unpack.read(size)
+
+    @property
+    def stag(self):
+        return self._ddp.stag
+
+    @property
+    def offset(self):
+        return self._ddp.offset
+
+    @property
+    def lastfl(self):
+        return self._ddp.lastfl

@@ -173,6 +173,7 @@ NFSTEST_ALLMODS = [
     'packet/transport/ib.py',
     'packet/transport/mpa.py',
     'packet/transport/rdmainfo.py',
+    'packet/transport/rdmap.py',
     'packet/transport/tcp.py',
     'packet/transport/udp.py',
 ]
