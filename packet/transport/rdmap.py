@@ -20,7 +20,10 @@ RFC 5040 Remote Direct Memory Access Protocol Specification
 """
 import nfstest_config as c
 from baseobj import BaseObj
+from packet.application.rpc import RPC
 from packet.utils import IntHex, LongHex, Enum
+from packet.application.rpcordma import RPCoRDMA
+import packet.application.rpcordma_const as rdma
 
 # Module constants
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
@@ -126,8 +129,11 @@ class RDMAP(BaseObj):
         # Get payload size
         self.psize = unpack.size()
 
+        # Decode payload
+        self._decode_payload(pktt)
+
         # Get the un-dissected bytes
-        size = self.psize
+        size = unpack.size()
         if size > 0:
             self.data = unpack.read(size)
 
@@ -142,3 +148,21 @@ class RDMAP(BaseObj):
     @property
     def lastfl(self):
         return self._ddp.lastfl
+
+    def _decode_payload(self, pktt):
+        """Decode RDMAP payload."""
+        unpack = pktt.unpack
+        offset = unpack.tell()
+
+        if self.opcode in (Send, Send_Invalidate, Send_SE, Send_SE_Invalidate):
+            rpcordma = RPCoRDMA(unpack)
+            if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
+                pktt.pkt.add_layer("rpcordma", rpcordma)
+                if rpcordma.proc == rdma.RDMA_ERROR:
+                    return
+                if rpcordma.proc == rdma.RDMA_MSG:
+                    # Decode RPC layer
+                    RPC(pktt, proto=17)
+            else:
+                # RPCoRDMA is not valid
+                unpack.seek(offset)
