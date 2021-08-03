@@ -20,6 +20,8 @@ RFC 5044 Marker PDU Aligned Framing for TCP Specification
 """
 import nfstest_config as c
 from baseobj import BaseObj
+from packet.unpack import Unpack
+from packet.transport.ddp import DDP
 from packet.utils import IntHex, Enum
 
 # Module constants
@@ -123,7 +125,17 @@ class MPA(BaseObj):
             self.crc = IntHex(unpack.unpack_uint())
 
         if len(data) > 0:
-            self.data = data
+            # Replace Unpack object with just the payload data
+            # -- no padding and no CRC
+            unpack = Unpack(data)
+            pktt.unpack = unpack
+
+            # Decode payload
+            DDP(pktt)
+
+            # Get the un-dissected bytes
+            if unpack.size() > 0:
+                self.data = unpack.read(unpack.size())
 
     def _mpa_frame(self, pktt):
         """Dissect MPA Req/Rep Frame"""

@@ -46,7 +46,7 @@ PKT_layers = [
     'record',
     'ethernet', 'erf', 'vlan',
     'ip', 'arp', 'rarp',
-    'tcp', 'udp', 'ib', 'mpa',
+    'tcp', 'udp', 'ib', 'mpa', 'ddp',
     'rpcordma', 'rpc', 'ntp', 'dns', 'krb',
     'gssd', 'nfs', 'mount', 'portmap', 'nlm', 'gssc',
 ]

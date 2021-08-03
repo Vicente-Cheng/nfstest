@@ -169,6 +169,7 @@ NFSTEST_ALLMODS = [
     'packet/nfs/nlm4_const.py',
     'packet/nfs/portmap2.py',
     'packet/nfs/portmap2_const.py',
+    'packet/transport/ddp.py',
     'packet/transport/ib.py',
     'packet/transport/mpa.py',
     'packet/transport/rdmainfo.py',
