@@ -58,7 +58,7 @@ typedef unsigned hyper uint64;
 struct xdr_rdma_segment {
     uint32 handle;          /* Registered memory handle */ /* STRHEX:1 */
     uint32 length;          /* Length of the chunk in bytes */
-    uint64 offset;          /* Chunk virtual address or offset */
+    uint64 offset;          /* Chunk virtual address or offset */ /* STRHEX:1 */
 };
 
 /*
@@ -178,7 +178,7 @@ union rdma_body switch (rdma_proc proc) {
 /*
  * Fixed header fields
  */
-/* STRFMT1: RPCoRDMA {3.proc} xid: {0} */
+/* STRFMT1: RPCoRDMA   {3.proc} xid: {0} */
 /* STRFMT2: {3.proc}, xid: {0}, credits: {2}, {3} */
 /* CLASSATTR: _strname="RPCoRDMA" */
 /* OBJATTR: psize;disp=unpack.size() */
