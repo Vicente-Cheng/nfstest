@@ -194,6 +194,10 @@ class Pktt(BaseObj):
                 for tfile in self.tfiles:
                     self.pktt_list.append(Pktt(tfile, rpc_replies=self.rpc_replies))
 
+    @property
+    def rdma_info(self):
+        return self._rdma_info
+
     def close(self):
         """Gracefully close the tcpdump trace file and cleanup attributes."""
         if self._cleanup_done:

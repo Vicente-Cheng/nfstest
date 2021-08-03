@@ -582,10 +582,6 @@ class IB(BaseObj):
         pkt = pktt.pkt
         unpack = pktt.unpack
 
-        # All IB packets must have access to the RDMAinfo object for
-        # reassembly. Dereference the Pktt attribute for ease of use.
-        self._rdma_info = pktt._rdma_info
-
         self._strname  = "IB" # Layer name (IB, RoCE or RRoCE) to display
         if pkt.ethernet:
             if pkt.ip:
@@ -701,6 +697,7 @@ class IB(BaseObj):
         pkt    = pktt.pkt
         unpack = pktt.unpack
         offset = unpack.tell()
+        rdma_info = pktt.rdma_info
 
         if self.opcode in (RC + SEND_Only, RC + SEND_Only_Invalidate):
             rpcordma = RPCoRDMA(unpack)
@@ -712,7 +709,7 @@ class IB(BaseObj):
                     # Save RDMA read first fragment
                     rpcordma.data = unpack.read(len(unpack))
                 # RPCoRDMA is valid so process the RDMA chunk lists
-                replydata = self._rdma_info.process_rdma_segments(rpcordma)
+                replydata = rdma_info.process_rdma_segments(rpcordma)
                 if rpcordma.proc == rdma.RDMA_MSG and not rpcordma.reads:
                     # Decode RPC layer except for an RPC call with
                     # RDMA read chunks in which the data has been reduced
@@ -729,21 +726,21 @@ class IB(BaseObj):
                 # RPCoRDMA is not valid so rewind Unpack object
                 unpack.seek(offset)
         elif self.opcode in (RC+RDMA_WRITE_Only, RC+RDMA_WRITE_Only_Immediate):
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, True)
+            rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, True)
         elif self.opcode == RC+RDMA_WRITE_First:
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, False)
+            rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, False)
         elif self.opcode in (RC+RDMA_WRITE_Middle, RC+RDMA_WRITE_Last):
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack)
+            rdma_info.add_rdma_data(self.bth.psn, unpack)
         elif self.opcode == RC+RDMA_READ_Request:
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, False)
+            rdma_info.add_rdma_data(self.bth.psn, unpack, self.reth, False)
         elif self.opcode == RC+RDMA_READ_Response_First:
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack, only=False, read=True)
+            rdma_info.add_rdma_data(self.bth.psn, unpack, only=False, read=True)
         elif self.opcode == RC+RDMA_READ_Response_Middle:
-            self._rdma_info.add_rdma_data(self.bth.psn, unpack)
+            rdma_info.add_rdma_data(self.bth.psn, unpack)
         elif self.opcode in (RC+RDMA_READ_Response_Last, RC+RDMA_READ_Response_Only):
             only = (self.opcode == RC+RDMA_READ_Response_Only)
             # The RDMA read chunks are reassembled in the last read operation
-            data = self._rdma_info.reassemble_rdma_reads(self.bth.psn, unpack, only=only)
+            data = rdma_info.reassemble_rdma_reads(self.bth.psn, unpack, only=only)
             if data is not None:
                 # Decode RPC layer
                 pktt.unpack = Unpack(data)
