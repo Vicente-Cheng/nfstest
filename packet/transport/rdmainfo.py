@@ -95,6 +95,7 @@ class RDMAsegment(object):
         self.length  = rdma_seg.length
         self.xdrpos  = getattr(rdma_seg, "position", 0)  # RDMA read chunk XDR position
         self.rpcrdma = rpcrdma # RPC-over-RDMA object used for RDMA reads
+        self.fragments = {}    # List of iWarp data fragments
 
         # List of sub-segments (RDMAseg)
         # When the RDMA segment's length (DMA length) is large it could be
@@ -165,9 +166,16 @@ class RDMAsegment(object):
     def get_data(self, padding=True):
         """Return segment data"""
         data = b""
-        # Get data from all sub-segments
-        for seg in self.seglist:
-            data += seg.get_data(padding)
+        if len(self.seglist):
+            # Get data from all sub-segments
+            for seg in self.seglist:
+                data += seg.get_data(padding)
+        elif len(self.fragments):
+            # Get data from all iWarp fragments
+            for offset in sorted(self.fragments.keys()):
+                data += self.fragments[offset]
+            if not padding and len(data) > self.length:
+                return data[:self.length-len(data)]
         return data
 
     def get_size(self):
@@ -177,6 +185,10 @@ class RDMAsegment(object):
         for seg in self.seglist:
             size += seg.get_size()
         return size
+
+    def add_fragment(self, rdmap, unpack):
+        """Add iWarp fragment to segment"""
+        self.fragments[rdmap.offset] = unpack.read(rdmap.psize)
 
 class RDMAinfo(RDMAbase):
     """RDMA info object used for reassembly
@@ -256,6 +268,13 @@ class RDMAinfo(RDMAbase):
                     else:
                         rsegment.add_data(psn, unpack.read(size))
                     return rsegment
+
+    def add_iwarp_data(self, rdmap, unpack):
+        """Add iWarp fragment data"""
+        rsegment = self.get_rdma_segment(rdmap.stag)
+        if rsegment is not None:
+            rsegment.add_fragment(rdmap, unpack)
+        return rsegment
 
     def reassemble_rdma_reads(self, psn, unpack, only=False):
         """Reassemble RDMA read chunks
