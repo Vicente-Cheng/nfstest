@@ -153,6 +153,7 @@ class RDMAP(BaseObj):
         """Decode RDMAP payload."""
         unpack = pktt.unpack
         offset = unpack.tell()
+        rdma_info = pktt._rdma_info
 
         if self.opcode in (Send, Send_Invalidate, Send_SE, Send_SE_Invalidate):
             rpcordma = RPCoRDMA(unpack)
@@ -160,9 +161,20 @@ class RDMAP(BaseObj):
                 pktt.pkt.add_layer("rpcordma", rpcordma)
                 if rpcordma.proc == rdma.RDMA_ERROR:
                     return
+                # RPCoRDMA is valid so process the RDMA chunk lists
+                replydata = rdma_info.process_rdma_segments(rpcordma)
                 if rpcordma.proc == rdma.RDMA_MSG:
+                    # Decode RPC layer
+                    RPC(pktt, proto=17)
+                elif rpcordma.proc == rdma.RDMA_NOMSG and replydata:
+                    # This is a no-msg packet but the reply has already been
+                    # sent using RDMA writes so just add the RDMA reply chunk
+                    # data to the working buffer and decode the RPC layer
+                    unpack.insert(replydata)
                     # Decode RPC layer
                     RPC(pktt, proto=17)
             else:
                 # RPCoRDMA is not valid
                 unpack.seek(offset)
+        elif self.opcode == RDMA_Write:
+            rdma_info.add_iwarp_data(self, unpack)
