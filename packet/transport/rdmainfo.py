@@ -90,10 +90,10 @@ class RDMAsegment(object):
        comes from the RPC-over-RDMA protocol layer so the length attribute
        gives the total DMA length of the segment.
     """
-    def __init__(self, handle, length, xdrpos, rpcrdma):
-        self.handle  = handle
-        self.length  = length
-        self.xdrpos  = xdrpos  # RDMA read chunk XDR position
+    def __init__(self, rdma_seg, rpcrdma):
+        self.handle  = rdma_seg.handle
+        self.length  = rdma_seg.length
+        self.xdrpos  = getattr(rdma_seg, "position", 0)  # RDMA read chunk XDR position
         self.rpcrdma = rpcrdma # RPC-over-RDMA object used for RDMA reads
 
         # List of sub-segments (RDMAseg)
@@ -214,17 +214,17 @@ class RDMAinfo(RDMAbase):
         """Return RDMA segment identified by the given handle"""
         return self._rdma_segments.get(handle)
 
-    def add_rdma_segment(self, handle, length, xdrpos=0, rpcrdma=None):
+    def add_rdma_segment(self, rdma_seg, rpcrdma=None):
         """Add RDMA segment information and if the information already
            exists just update the length and return the segment
         """
-        rsegment = self._rdma_segments.get(handle)
+        rsegment = self._rdma_segments.get(rdma_seg.handle)
         if rsegment:
             # Update segment's length and return the segment
-            rsegment.length = length
+            rsegment.length = rdma_seg.length
         else:
             # Add segment information
-            self._rdma_segments[handle] = RDMAsegment(handle, length, xdrpos, rpcrdma)
+            self._rdma_segments[rdma_seg.handle] = RDMAsegment(rdma_seg, rpcrdma)
         return rsegment
 
     def add_rdma_data(self, psn, unpack, reth=None, only=False, read=False):
@@ -381,7 +381,7 @@ class RDMAinfo(RDMAbase):
         if rpcrdma.reads:
             # Add all segments in the RDMA read chunk list
             for rdma_seg in rpcrdma.reads:
-                self.add_rdma_segment(rdma_seg.handle, rdma_seg.length, rdma_seg.position, rpcrdma)
+                self.add_rdma_segment(rdma_seg, rpcrdma)
 
         # Reassembly is done on the reply message (RDMA_MSG)
         # Process the rdma list on the call message to set up the write
@@ -425,7 +425,7 @@ class RDMAinfo(RDMAbase):
                 self.rdma_write_chunks.append([])
                 # Process all segments in RDMA write chunk
                 for seg in chunk.target:
-                    rsegment = self.add_rdma_segment(seg.handle, seg.length)
+                    rsegment = self.add_rdma_segment(seg)
                     if rsegment:
                         # Add segment to write chunk list, this list is
                         # available to upper layer objects which inherit
@@ -457,7 +457,7 @@ class RDMAinfo(RDMAbase):
         if rpcrdma.reply:
             # Process all segments in the RDMA reply chunk
             for rdma_seg in rpcrdma.reply.target:
-                rsegment = self.add_rdma_segment(rdma_seg.handle, rdma_seg.length)
+                rsegment = self.add_rdma_segment(rdma_seg)
                 if rsegment:
                     # Get the bytes for the segment including the padding
                     # bytes because this is part of the message that will
