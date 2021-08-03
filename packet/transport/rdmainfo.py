@@ -95,6 +95,9 @@ class RDMAsegment(object):
         self.length  = rdma_seg.length
         self.xdrpos  = getattr(rdma_seg, "position", 0)  # RDMA read chunk XDR position
         self.rpcrdma = rpcrdma # RPC-over-RDMA object used for RDMA reads
+        self.rhandle = None    # Read Response handle belonging to this segment
+        self.roffset = None    # Read Response offset belonging to this segment
+        self.rlength = None    # Read Request length
         self.fragments = {}    # List of iWarp data fragments
 
         # List of sub-segments (RDMAseg)
@@ -181,10 +184,22 @@ class RDMAsegment(object):
     def get_size(self):
         """Return segment data"""
         size = 0
-        # Get the size from all sub-segments
-        for seg in self.seglist:
-            size += seg.get_size()
+        if len(self.seglist):
+            # Get the size from all sub-segments
+            for seg in self.seglist:
+                size += seg.get_size()
+        else:
+            # Get size from all iWarp fragments
+            for offset in sorted(self.fragments.keys()):
+                count = len(self.fragments[offset])
+                size += count
         return size
+
+    def add_request(self, rdmap):
+        """Add iWarp read request"""
+        self.rhandle = rdmap.sinkstag
+        self.roffset = rdmap.sinksto
+        self.rlength = rdmap.dma_len
 
     def add_fragment(self, rdmap, unpack):
         """Add iWarp fragment to segment"""
@@ -276,7 +291,19 @@ class RDMAinfo(RDMAbase):
             rsegment.add_fragment(rdmap, unpack)
         return rsegment
 
-    def reassemble_rdma_reads(self, psn, unpack, only=False):
+    def add_iwarp_request(self, rdmap):
+        """Add iWarp read request information"""
+        # The data source STag is the handle given in the read chunk segment
+        rsegment = self.get_rdma_segment(rdmap.srcstag)
+        if rsegment is not None:
+            rsegment.add_request(rdmap)
+            # Create another segment entry using the data sink STag since
+            # this is the handle to be used in the RDMA read responses.
+            # This creates a mapping between the read responses and the
+            # read chunk segment.
+            self._rdma_segments[rdmap.sinkstag] = rsegment
+
+    def reassemble_rdma_reads(self, unpack, psn=None, only=False, rdmap=None):
         """Reassemble RDMA read chunks
            The RDMA read chunks are reassembled in the read last operation
         """
@@ -297,8 +324,13 @@ class RDMAinfo(RDMAbase):
         # xdrpos1 ---^              xdrpos2 --^
 
         # Add RDMA read fragment
-        rsegment = self.add_rdma_data(psn, unpack, only=only, read=only)
-        if rsegment is None:
+        if rdmap is None:
+            rsegment = self.add_rdma_data(psn, unpack, only=only, read=only)
+        else:
+            rsegment = self.add_iwarp_data(rdmap, unpack)
+        if rsegment is None or (rdmap is not None and rdmap.lastfl == 0):
+            # Do not try to reassemble the RDMA reads if this is not
+            # a read response last
             return
 
         # Get saved RPCoRDMA object to know how to reassemble the RDMA

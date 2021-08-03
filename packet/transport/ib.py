@@ -740,7 +740,7 @@ class IB(BaseObj):
         elif self.opcode in (RC+RDMA_READ_Response_Last, RC+RDMA_READ_Response_Only):
             only = (self.opcode == RC+RDMA_READ_Response_Only)
             # The RDMA read chunks are reassembled in the last read operation
-            data = rdma_info.reassemble_rdma_reads(self.bth.psn, unpack, only=only)
+            data = rdma_info.reassemble_rdma_reads(unpack, psn=self.bth.psn, only=only)
             if data is not None:
                 # Decode RPC layer
                 pktt.unpack = Unpack(data)
