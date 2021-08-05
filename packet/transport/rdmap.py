@@ -83,6 +83,7 @@ class RDMAP(BaseObj):
                  "dma_len", "srcstag", "srcsto", "psize")
     _strfmt1  = "RDMAP v{0:<3} {1} {_ddp}, len: {8}"
     _strfmt2  = "{1}, version: {0},{2:? istag\: {2},:} len: {8}"
+    _senddata = {}
 
     def __init__(self, pktt, pinfo):
         """Constructor
@@ -157,6 +158,34 @@ class RDMAP(BaseObj):
         rdma_info = pktt._rdma_info
 
         if self.opcode in (Send, Send_Invalidate, Send_SE, Send_SE_Invalidate):
+            if self.lastfl:
+                # Last send fragment
+                # Find out if there is a reassembly table for the queue number
+                squeue = self._senddata.get(self._ddp.queue)
+                if squeue is not None:
+                    # Find out if there are any fragments for this send message
+                    # and remove the reassembly info from the table
+                    sdata = squeue.pop(self._ddp.msn, None)
+                    if sdata is not None:
+                        # Add last send fragment
+                        sdata[self.offset] = unpack.read(self.psize)
+                        data = bytes(0)
+                        # Reassemble the send message using the offset
+                        # to order the fragments
+                        for off in sorted(sdata.keys()):
+                            data += sdata.pop(off)
+                        # Replace the Unpack object with the reassembled data
+                        pktt.unpack = Unpack(data)
+                        unpack = pktt.unpack
+            else:
+                # Add send fragment to the reassembly table given by the queue
+                # number and the message sequence number
+                squeue = self._senddata.setdefault(self._ddp.queue, {})
+                sdata  = squeue.setdefault(self._ddp.msn, {})
+                # Order is based on the DDP offset
+                sdata[self.offset] = unpack.read(self.psize)
+                return
+
             rpcordma = RPCoRDMA(unpack)
             if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
                 pktt.pkt.add_layer("rpcordma", rpcordma)
