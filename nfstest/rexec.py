@@ -276,7 +276,7 @@ class Rexec(BaseObj):
             # Execute minimal python script to execute the source code
             # given in standard input
             pysrc = "import sys; exec(sys.stdin.read(%d))" % len(server_code)
-            cmdlist = ["python", "-c", repr(pysrc)]
+            cmdlist = ["python3", "-c", repr(pysrc)]
 
             if sudo:
                 cmdlist.insert(0, "sudo")
