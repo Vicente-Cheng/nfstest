@@ -292,7 +292,8 @@ class Rexec(BaseObj):
                 self.process = Popen(" ".join(cmdlist), shell=True, stdin=PIPE)
 
             # Send the server code to be executed via standard input
-            self.process.stdin.write(server_code)
+            self.process.stdin.write(server_code.encode())
+            self.process.stdin.flush()
 
         # Connect to remote server
         etime = time.time() + 5.0
