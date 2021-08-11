@@ -129,13 +129,13 @@ class IPv4(BaseObj):
             # Reassemble the fragments
             fragment = pktt._ipv4_fragments.pop(self.id, None)
             if fragment is not None:
-                data = ""
+                data = b""
                 for off in sorted(fragment.keys()):
                     offset = 8*off # Offset is given in multiples of 8
                     count = len(data)
                     if offset > count:
                         # Fill missing fragments with zeros
-                        data += "\x00" * (offset - count)
+                        data += bytes(offset - count)
                     data += fragment[off]
                 # Insert all previous fragments right before the current
                 # (and last) fragment

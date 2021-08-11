@@ -1861,7 +1861,7 @@ class TestUtil(NFSUtil):
                     elif ftype == FTYPE_SP_ZERO:
                         # Write zeros to create the hole
                         self.dprint(dlevels[1], "    Writing hole segment starting at offset %d with length %d" % (doffset, dsize))
-                        self.write_data(fd, doffset, dsize, "\x00", verbose, dlevels[2])
+                        self.write_data(fd, doffset, dsize, b"\x00", verbose, dlevels[2])
                 if sfile.endhole and ftype == FTYPE_SP_OFFSET:
                     # Extend the file to create the last hole
                     os.ftruncate(fd, size)
