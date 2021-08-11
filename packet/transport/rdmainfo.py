@@ -92,6 +92,7 @@ class RDMAsegment(object):
     """
     def __init__(self, rdma_seg, rpcrdma):
         self.handle  = rdma_seg.handle
+        self.offset  = rdma_seg.offset
         self.length  = rdma_seg.length
         self.xdrpos  = getattr(rdma_seg, "position", 0)  # RDMA read chunk XDR position
         self.rpcrdma = rpcrdma # RPC-over-RDMA object used for RDMA reads
@@ -175,8 +176,15 @@ class RDMAsegment(object):
                 data += seg.get_data(padding)
         elif len(self.fragments):
             # Get data from all iWarp fragments
+            nextoff = self.get_offset()
             for offset in sorted(self.fragments.keys()):
+                # Check for missing fragments
+                count = offset - nextoff
+                if count > 0:
+                   # There are missing fragments
+                   data += bytes(count)
                 data += self.fragments[offset]
+                nextoff = offset + len(self.fragments[offset])
             if not padding and len(data) > self.length:
                 return data[:self.length-len(data)]
         return data
@@ -190,10 +198,20 @@ class RDMAsegment(object):
                 size += seg.get_size()
         else:
             # Get size from all iWarp fragments
+            nextoff = self.get_offset()
             for offset in sorted(self.fragments.keys()):
-                count = len(self.fragments[offset])
-                size += count
+                # Check for missing fragments
+                count = offset - nextoff
+                if count > 0:
+                   # There are missing fragments
+                   size += count
+                size += len(self.fragments[offset])
+                nextoff = offset + len(self.fragments[offset])
         return size
+
+    def get_offset(self):
+        """Return the segment offset used for writes or read responses"""
+        return self.offset if self.roffset is None else self.roffset
 
     def add_request(self, rdmap):
         """Add iWarp read request"""
