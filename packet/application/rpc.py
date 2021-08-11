@@ -154,7 +154,7 @@ class RPC(GSS):
                  "accepted_status", "prog_mismatch", "rejected_status",
                  "rpc_mismatch", "auth_status", "psize")
 
-    def __init__(self, pktt, proto, state=True):
+    def __init__(self, pktt, proto=17, state=True):
         """Constructor
 
            Initialize object's private data.

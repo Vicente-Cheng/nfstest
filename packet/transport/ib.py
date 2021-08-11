@@ -713,14 +713,14 @@ class IB(BaseObj):
                 if rpcordma.proc == rdma.RDMA_MSG and not rpcordma.reads:
                     # Decode RPC layer except for an RPC call with
                     # RDMA read chunks in which the data has been reduced
-                    RPC(pktt, proto=17)
+                    RPC(pktt)
                 elif rpcordma.proc == rdma.RDMA_NOMSG and replydata:
                     # This is a no-msg packet but the reply has already been
                     # sent using RDMA writes so just add the RDMA reply chunk
                     # data to the working buffer and decode the RPC layer
                     unpack.insert(replydata)
                     # Decode RPC layer
-                    RPC(pktt, proto=17)
+                    RPC(pktt)
                 return True
             else:
                 # RPCoRDMA is not valid so rewind Unpack object
@@ -744,7 +744,7 @@ class IB(BaseObj):
             if data is not None:
                 # Decode RPC layer
                 pktt.unpack = Unpack(data)
-                RPC(pktt, proto=17)
+                RPC(pktt)
                 return True
         elif self.opcode == RC + SEND_First:
             # Create a dictionary for each destination QP where the
@@ -768,6 +768,6 @@ class IB(BaseObj):
             if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
                 pkt.add_layer("rpcordma", rpcordma)
                 # Decode RPC layer
-                RPC(pktt, proto=17)
+                RPC(pktt)
                 return True
         return False
