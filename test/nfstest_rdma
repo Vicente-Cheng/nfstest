@@ -423,9 +423,15 @@ class RdmaTest(TestUtil):
                 os.close(fd)
         return data
 
-    def get_nfragments(self, dmalen):
+    def get_nfragments(self, dmalen, iosize=None):
         """Get the number of fragments for the given DMA length"""
-        return int(dmalen/self.iosize) + (1 if dmalen%self.iosize else 0)
+        # In iWarp the iosize is calculated for each request
+        # thus the value needs to be passed as an argument
+        if dmalen == 0:
+            return 0
+        if iosize is None:
+            iosize = self.iosize
+        return int(dmalen/iosize) + (1 if dmalen%iosize else 0)
 
     def get_iosize(self):
         """Get the I/O size by inspecting any of the First or Middle fragments"""
