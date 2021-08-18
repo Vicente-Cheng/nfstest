@@ -807,6 +807,13 @@ class RdmaTest(TestUtil):
         """Verify I/O call/reply operation"""
         if pkt is None:
             # Not a valid packet
+            if optype is not None:
+                iostr = "%s %s" % (self.nfs_op_name(optype), rpc_const.msg_type[rpctype].lower())
+                if rpctype is None:
+                    srv_clnt = ""
+                else:
+                    srv_clnt = " to server" if rpctype == rpc_const.CALL else " to client"
+                self.test(False, "NFS %s should be sent%s" % (iostr, srv_clnt))
             return
 
         if self.nfs_version < 4:
