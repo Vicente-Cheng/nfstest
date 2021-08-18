@@ -285,6 +285,7 @@ class RdmaTest(TestUtil):
         self.read_file_dict  = {}   # Map size to file name to use for reading
         self.symlink_list    = []   # List of symbolic link names
         self.testdir_list    = []   # List of directory names
+        self.isiwarp         = False
 
         # Calculate file size to use for tests
         self.small_filesize = int_units(self.small_filesize)
@@ -1086,7 +1087,8 @@ class RdmaTest(TestUtil):
     def verify_nfs_over_rdma(self):
         """Verify all NFS packets are sent over RDMA"""
         count   = 0  # The number of NFS packets in packet trace
-        ibcount = 0  # The number of NFS-over-RDMA packets in packet trace
+        ibcount = 0  # The number of NFS-over-RDMA packets in trace (IB)
+        iwcount = 0  # The number of NFS-over-RDMA packets in trace (iWarp)
         save_index = self.pktt.get_index()
         self.pktt.rewind(0)
         # Get all NFS packets
@@ -1094,13 +1096,21 @@ class RdmaTest(TestUtil):
             count += 1
             if self.pktt.pkt == "ib":
                 ibcount += 1
+            elif self.pktt.pkt == "rdmap":
+                iwcount += 1
+        if iwcount > ibcount:
+            self.isiwarp = True
         self.dprint('DBG2', "NFS packets: %d" % count)
-        self.dprint('DBG2', "NFS-over-RDMA packets: %d" % ibcount)
+        if ibcount > 0 or iwcount == 0:
+            self.dprint('DBG2', "NFS-over-RDMA packets: %4d (IB)" % ibcount)
+        if iwcount > 0 or ibcount == 0:
+            self.dprint('DBG2', "NFS-over-RDMA packets: %4d (iWarp)" % iwcount)
+        rcount = ibcount + iwcount
         if count > 0:
             # Verify all NFS packets are sent over RDMA
-            fmsg = ", NFS-over-RDMA packets(%d) != NFS packets(%d)" % (ibcount, count)
+            fmsg = ", NFS-over-RDMA packets(%d) != NFS packets(%d)" % (rcount, count)
             amsg = "All NFS packets should be sent over RDMA"
-            self.test(ibcount == count, amsg, failmsg=fmsg)
+            self.test(rcount == count, amsg, failmsg=fmsg)
         self.pktt.rewind(save_index)
 
     def test_rdma_io(self, nfs_iotype, filesizes=None):
@@ -1199,7 +1209,7 @@ class RdmaTest(TestUtil):
         try:
             self.trace_open()
             # Use buffered matching -- get all NFS and RDMA packets
-            self.set_pktlist(layer="ib,nfs")
+            self.set_pktlist(layer="ib,rdmap,nfs")
             self.get_iosize() # Get the RDMA I/O size if possible
             self.get_maxresponsesize() # Get the session maximum response size
 
