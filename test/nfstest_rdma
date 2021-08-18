@@ -20,6 +20,7 @@ import nfstest_config as c
 from packet.transport.ib import *
 from packet.nfs.nfs3_const import *
 from packet.nfs.nfs4_const import *
+from packet.transport.rdmap import *
 from nfstest.test_util import TestUtil
 from packet.application.rpcordma_const import *
 import packet.application.rpc_const as rpc_const
@@ -718,8 +719,8 @@ class RdmaTest(TestUtil):
         else:
             self.dprint('DBG2', "Found NFS %s" % iostr)
         self.test(pkt, "NFS %s should be sent to %s" % (iostr, srv_clnt))
-        self.test(pkt == "ib", "NFS %s should be sent over RDMA" % iostr)
-        if pkt == "ib":
+        self.test(pkt in RDMA_layers, "NFS %s should be sent over RDMA" % iostr)
+        if pkt in RDMA_layers:
             if isrpcordma:
                 expr = pkt == "rpcordma"
                 self.test(expr, "NFS %s should be sent with RPCoRDMA layer" % iostr)
@@ -737,7 +738,10 @@ class RdmaTest(TestUtil):
                 expr = pkt != "rpcordma"
                 self.test(expr, "NFS %s should be sent with no RPCoRDMA layer" % iostr)
                 if optype in self.nfs_op(**NFSwrite) and rpctype == rpc_const.CALL:
-                    expr = pkt.ib.opcode in (RDMA_READ_Response_Last, RDMA_READ_Response_Only)
+                    if self.isiwarp:
+                        expr = pkt.rdmap.opcode == RDMA_Read_Response and pkt.rdmap.lastfl == 1
+                    else:
+                        expr = pkt.ib.opcode in (RDMA_READ_Response_Last, RDMA_READ_Response_Only)
                     self.test(expr, "NFS %s should be reassembled in the last read response fragment " % iostr)
 
     def verify_chunk_lists(self, rpcordma, optype, rpctype, nreads=0, nwrites=0, nreply=0):
