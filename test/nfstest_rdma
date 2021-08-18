@@ -620,8 +620,8 @@ class RdmaTest(TestUtil):
                     fmsg = ": expecting %d, got %d" % (iosize, size)
                     self.test(expr, amsg, failmsg=fmsg)
 
-    def verify_segment(self, iotype, handle, offset, length):
-        """Verify segment and all its fragments for the given handle"""
+    def verify_ib_segment(self, iotype, handle, offset, length):
+        """Verify IB segment and all its fragments for the given handle"""
         # Get correct info according to RDMA I/O type (either READ or WRITE)
         if iotype == RDMA_READ:
             opreq = (RDMA_READ_Request,)
@@ -695,6 +695,112 @@ class RdmaTest(TestUtil):
             # segment could be shorter than dma_length and it should be the
             # remaining bytes for the whole segment
             dma_length = length
+
+    def verify_iwarp_segment(self, iotype, handle, offset, length):
+        """Verify iWarp segment and all its fragments for the given handle"""
+        # Get correct info according to RDMA I/O type (either READ or WRITE)
+        requests = []
+        reqlen = 0
+        if iotype == RDMA_READ:
+            opres = RDMA_Read_Response
+            # Search for all read requests in the segment
+            match_str  = "rdmap.opcode == %d and rdmap.srcstag == %s and " % (RDMA_Read_Request, handle)
+            match_str += "rdmap.srcsto >= %d and rdmap.srcsto < %d" % (offset, offset + length)
+            while self.pktt.match(match_str):
+                rdmapobj = self.pktt.pkt.rdmap
+                reqlen += rdmapobj.dma_len
+                # Include the packet index in the request
+                requests.append((rdmapobj.opcode, rdmapobj.psize, rdmapobj.sinkstag, rdmapobj.sinksto, rdmapobj.dma_len))
+            self.dprint('DBG2', "RDMA read requests for handle %s: %d" % (handle, len(requests)))
+        else:
+            opres = RDMA_Write
+            requests = [(opres, length, handle, offset, length)]
+
+        opstr = rdmap_op_codes.get(opres)
+        # Direction of RDMA I/O fragments
+        srv_clnt = "server" if iotype == RDMA_READ else "client"
+
+        for reqinfo in requests:
+            # Verify all fragments
+            opreq, psize, rhandle, roffset, dma_len = reqinfo
+            if iotype == RDMA_READ:
+                self.dprint('DBG2', "%s: src:(%s, %s), sink:(%s, %s), dma_len: %s" % (opreq, handle, offset, rhandle, roffset, dma_len))
+                self.test(True, "%s should be sent to client" % opreq)
+                amsg = "%s should have correct " % opreq
+                self.test(True, amsg + "virtual address")
+                self.test(dma_len <= length, amsg + "DMA length")
+                fmsg = ": expecting no payload, got %s bytes" % psize
+                self.test(psize == 0, "%s should not have any payload data" % opreq, failmsg=fmsg)
+
+            # Search for all fragments belonging to this request
+            mstr  = "rdmap.opcode == %d and rdmap.stag == %s and " % (opres, rhandle)
+            mstr += "rdmap.offset >= %d and rdmap.offset < %d" % (roffset, roffset + dma_len)
+            iosize = 0
+            fragment_list = []
+            while self.pktt.match(mstr):
+                rdmapobj = self.pktt.pkt.rdmap
+                fragment_list.append((rdmapobj.offset, rdmapobj.lastfl, rdmapobj.psize))
+                iosize = max(iosize, rdmapobj.psize)
+
+            io_count = len(fragment_list)
+            iostr = "reads" if iotype == RDMA_READ else "writes"
+            stagstr = " (stag: %s)" % rhandle if iotype == RDMA_READ else ""
+            self.dprint('DBG2', "RDMA %s for handle %s%s: %d" % (iostr, handle, stagstr, io_count))
+
+            # Sort fragment list by offset and split them up by lastfl==1
+            nextoff = roffset    # Expected offset of next fragment
+            request_list = [[]]  # List of sub-requests
+            for off, lastfl, size in sorted(fragment_list, key=lambda x: x[0]):
+                msize = 0
+                if off != nextoff:
+                    # Missing fragment found
+                    msize = off - nextoff
+                # Append fragment to sub-request
+                request_list[-1].append((opstr, rhandle, off, lastfl, size, msize))
+                if lastfl == 1:
+                    # Start a new sub-request
+                    request_list.append([])
+                nextoff = off + size
+            if len(request_list[-1]) == 0:
+                # Remove the last empty sub-request
+                request_list.pop()
+
+            for reqitem in request_list:
+                # DMA length of sub-request
+                dmalen = sum([x[4]+x[5] for x in reqitem])
+                # Number of sub-requests found
+                nreqs = len(reqitem)
+                if len(request_list) > 1:
+                    # Display only if there are more than one sub-request
+                    self.dprint('DBG2', "RDMA %s for handle %s%s (request): %d" % (iostr, handle, stagstr, nreqs))
+                psizes = set() # List of unique payload sizes for sub-request
+                for item in reqitem:
+                    opstr, rhandle, off, lastfl, size, msize = item
+                    self.dprint('DBG3', "%s: stag=%s, offset=%s, last=%d, size=%d" % item[:5])
+                    psizes.add(size)
+
+                # Calculate the number of expected fragments per sub-request
+                ecount = self.get_nfragments(dmalen, iosize)
+                notstr = "not " if ecount == 0 else ""
+                bmsg = " for segment with DMA length of zero" if ecount == 0 else ""
+                amsg = "%s should %sbe sent to %s%s" % (opstr, notstr, srv_clnt, bmsg)
+                fmsg =  ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), nreqs)
+                self.test(nreqs == ecount, amsg, failmsg=fmsg)
+
+                if nreqs > 0:
+                    amsg = "%s should have correct " % opstr
+                    # Fragments were matched using the offset
+                    self.test(True, amsg + "virtual address")
+                    # All fragments should have the same size except for the last
+                    # but not necessarily
+                    self.test(len(psizes) <= 2, amsg + "payload size")
+
+    def verify_segment(self, iotype, handle, offset, length):
+        """Verify segment and all its fragments for the given handle"""
+        if self.isiwarp:
+            self.verify_iwarp_segment(iotype, handle, offset, length)
+        else:
+            self.verify_ib_segment(iotype, handle, offset, length)
 
     def verify_io_op(self, pkt, optype=None, rpctype=None, isrpcordma=True, rdmaproc=RDMA_MSG):
         """Verify I/O call/reply operation"""
