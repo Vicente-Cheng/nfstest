@@ -161,6 +161,7 @@ SendOnlyList = (SEND_Only, SEND_Only_Immediate, SEND_Only_Invalidate)
 SendLastList = (SEND_Last, SEND_Last_Immediate, SEND_Last_Invalidate)
 SendFMList   = (SEND_First, SEND_Middle)
 SendList     = SendFMList + SendLastList
+iWarpSendList = (Send, Send_Invalidate, Send_SE, Send_SE_Invalidate)
 
 # RDMA Read Response opcode lists
 ReadRespFMList   = (RDMA_READ_Response_First, RDMA_READ_Response_Middle)
@@ -941,9 +942,9 @@ class RdmaTest(TestUtil):
             amsg = afmt % msg_h.get(nwrites, ("", "RDMA_WRITE"))
             self.test(len(writes) == nwrites, tmsg + amsg)
 
-    def verify_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
-        """Verify I/O is sent using RDMA SENDs instead of a chunk list"""
-        if pkt and pkt == "ib":
+    def verify_ib_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
+        """Verify I/O is sent using (IB) RDMA SENDs instead of a chunk list"""
+        if pkt and pkt in RDMA_layers:
             send_list = []
             # Index of NFS write call or read reply
             io_index = pkt.record.index
@@ -983,6 +984,65 @@ class RdmaTest(TestUtil):
                     self.verify_chunk_lists(rpcordma, optype, rpctype)
                 # Verify the list of SEND fragments
                 self.verify_fragments(RDMA_SEND, send_list, count)
+
+    def verify_iwarp_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
+        """Verify I/O is sent using (iWarp) RDMA SENDs instead of a chunk list"""
+        if pkt and pkt in RDMA_layers:
+            send_list = []
+            # Index of NFS write call or read reply
+            io_index = pkt.record.index
+            opcode   = pkt.rdmap.opcode if self.isiwarp else pkt.ib.opcode
+            if opcode in iWarpSendList:
+                # Find all Send fragments
+                msn = pkt.ddp.msn
+                match_str = "ddp.queue == %d and " % pkt.ddp.queue + \
+                            "ddp.msn == %d and " % pkt.ddp.msn + \
+                            "rdmap.opcode in %s" % (iWarpSendList,)
+                while self.pktt.match(match_str, maxindex=io_index+1):
+                    rdmap = self.pktt.pkt.rdmap
+                    send_list.append((rdmap.opcode, rdmap.offset, rdmap.psize, rdmap.lastfl))
+
+            if len(send_list):
+                if chunkverify:
+                    # Verify the RDMA chunk lists
+                    if rpcordma is None and pkt == "rpcordma":
+                        rpcordma = pkt.rpcordma
+                    self.verify_chunk_lists(rpcordma, optype, rpctype)
+
+                # Verify the list of Send fragments
+                srv_clnt = "server" if rpctype == rpc_const.CALL else "client"
+                iostr = "%s %s" % (self.nfs_op_name(optype), rpc_const.msg_type[rpctype].lower())
+                self.dprint('DBG2', "RDMA Sends found for %s (MSN=%d): %d" % (iostr, pkt.ddp.msn, len(send_list)))
+                maxlen = max([len(str(x[1])) for x in send_list])
+                countlast = 0     # Number of fragments with the last flag set
+                missfrags = 0     # Number of missing fragments
+                nextoff   = 0     # Next fragment offset
+                psizes    = set() # List of unique payload sizes
+                for op, offset, size, lastfl in sorted(send_list, key=lambda x: x[1]):
+                    self.dprint('DBG3', "%s: offset=%*s, last=%d, size=%d" % (op, maxlen, offset, lastfl, size))
+                    if lastfl == 1:
+                        countlast += 1
+                    if offset != nextoff:
+                        missfrags += 1
+                    psizes.add(size)
+                    nextoff = offset + size
+                self.test(len(send_list) > 0, "Send should be sent to %s" % srv_clnt)
+                amsg = "Send should have correct "
+                self.test(missfrags == 0, amsg + "offset")
+                # All fragments should have the same size except for the last
+                # but not necessarily
+                self.test(len(psizes) <= 2, amsg + "payload size")
+                # Fragments were matched using the MSN
+                self.test(True, amsg + "MSN")
+                # Only one fragment should have the last flag set
+                self.test(countlast == 1, amsg + "last flag")
+
+    def verify_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
+        """Verify I/O is sent using RDMA SENDs instead of a chunk list"""
+        if self.isiwarp:
+            self.verify_iwarp_sends(pkt, optype, rpctype, rpcordma, chunkverify)
+        else:
+            self.verify_ib_sends(pkt, optype, rpctype, rpcordma, chunkverify)
 
     def verify_chunk_in_reply(self, pktcall, pktreply, optype, nreads=0, nwrites=0, nreply=0):
         """Verify RDMA write chunk list or RDMA reply chunk in the NFS reply"""
