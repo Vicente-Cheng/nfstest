@@ -126,6 +126,8 @@ TESTGROUPS = {
 # Line separator
 LINE_SEP = "="*80
 
+RDMA_layers = ("ib", "rdmap")
+
 # I/O operations for both NFSv3 and NFSv4
 NFSread  = { "nfs4":(OP_READ,),          "nfs3":(NFSPROC3_READ,) }
 NFSwrite = { "nfs4":(OP_WRITE,),         "nfs3":(NFSPROC3_WRITE,) }
@@ -929,7 +931,7 @@ class RdmaTest(TestUtil):
         self.test_info(LINE_SEP)
         self.verify_io_op(pktcall)
         save_index = self.pktt.get_index()
-        if pktcall and pktcall == "ib":
+        if pktcall and pktcall in RDMA_layers:
             # This packet is NFS-over-RDMA
             optype   = pktcall.NFSop.argop
             rpcordma = pktcall.rpcordma
@@ -950,7 +952,7 @@ class RdmaTest(TestUtil):
                 ck_args = {"nwrites":1}
             elif rpcordma.reply is not None:
                 ck_args = {"nreply":1}
-                if pktreply.rpcordma.reply:
+                if pktreply is not None and pktreply.rpcordma.reply:
                     tsize = sum([x.length for x in pktreply.rpcordma.reply.target])
                 if tsize > 0:
                     nio_args = {"rdmaproc":RDMA_NOMSG}
