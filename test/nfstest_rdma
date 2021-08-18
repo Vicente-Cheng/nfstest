@@ -752,33 +752,49 @@ class RdmaTest(TestUtil):
             nextoff = roffset    # Expected offset of next fragment
             request_list = [[]]  # List of sub-requests
             for off, lastfl, size in sorted(fragment_list, key=lambda x: x[0]):
-                msize = 0
                 if off != nextoff:
                     # Missing fragment found
                     msize = off - nextoff
+                    request_list[-1].append((opstr, rhandle, LongHex(nextoff), 0, msize, 1))
                 # Append fragment to sub-request
-                request_list[-1].append((opstr, rhandle, off, lastfl, size, msize))
+                request_list[-1].append((opstr, rhandle, off, lastfl, size, 0))
                 if lastfl == 1:
                     # Start a new sub-request
                     request_list.append([])
                 nextoff = off + size
-            if len(request_list[-1]) == 0:
-                # Remove the last empty sub-request
-                request_list.pop()
+
+            # Total size for all fragments
+            tbytes = sum([x[4] for y in request_list for x in y])
+            if tbytes < dma_len:
+                # Add missing fragments for the last request
+                msize = dma_len - tbytes
+                request_list[-1].append((opstr, rhandle, LongHex(nextoff), 0, msize, 1))
 
             for reqitem in request_list:
                 # DMA length of sub-request
-                dmalen = sum([x[4]+x[5] for x in reqitem])
+                dmalen = sum([x[4] for x in reqitem])
                 # Number of sub-requests found
-                nreqs = len(reqitem)
+                nreqs = len([1 for x in reqitem if x[5] == 0])
                 if len(request_list) > 1:
                     # Display only if there are more than one sub-request
                     self.dprint('DBG2', "RDMA %s for handle %s%s (request): %d" % (iostr, handle, stagstr, nreqs))
                 psizes = set() # List of unique payload sizes for sub-request
+                missing_fragments = []  # List of missing fragments
                 for item in reqitem:
-                    opstr, rhandle, off, lastfl, size, msize = item
-                    self.dprint('DBG3', "%s: stag=%s, offset=%s, last=%d, size=%d" % item[:5])
-                    psizes.add(size)
+                    opstr, rhandle, off, lastfl, size, ismissing = item
+                    mfstr = " [missing fragment]" if ismissing else ""
+                    args = item[:-1] + (mfstr,)
+                    self.dprint('DBG3', "%s: stag=%s, offset=%s, last=%d, size=%d%s" % args)
+                    if ismissing:
+                        missing_fragments.append((off, size))
+                    else:
+                        psizes.add(size)
+
+                if len(missing_fragments) > 0:
+                    msize = sum([x[1] for x in missing_fragments])
+                    self.dprint('DBG2', "Missing %d bytes in fragments:" % msize)
+                    for off, size in missing_fragments:
+                        self.dprint('DBG3', "    Missing %d bytes at offset 0x%08x" % (size, off))
 
                 # Calculate the number of expected fragments per sub-request
                 ecount = self.get_nfragments(dmalen, iosize)
