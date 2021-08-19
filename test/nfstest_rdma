@@ -697,6 +697,19 @@ class RdmaTest(TestUtil):
             # remaining bytes for the whole segment
             dma_length = length
 
+    def add_missing_fragment(self, request_item, opstr, handle, offset, length, iosize):
+        """Add missing fragment"""
+        last_fl = 0
+        # Split fragment into multiple fragments with respect to iosize
+        while length > 0:
+            size = min(length, iosize)
+            # Set last flag if last fragment size is less than iosize
+            last_fl = 1 if size < iosize else 0
+            request_item.append((opstr, handle, LongHex(offset), last_fl, size, 1))
+            offset += size
+            length -= size
+        return last_fl
+
     def verify_iwarp_segment(self, iotype, handle, offset, length):
         """Verify iWarp segment and all its fragments for the given handle"""
         # Get correct info according to RDMA I/O type (either READ or WRITE)
@@ -755,7 +768,9 @@ class RdmaTest(TestUtil):
                 if off != nextoff:
                     # Missing fragment found
                     msize = off - nextoff
-                    request_list[-1].append((opstr, rhandle, LongHex(nextoff), 0, msize, 1))
+                    if self.add_missing_fragment(request_list[-1], opstr, rhandle, nextoff, msize, iosize):
+                        # Start a new sub-request
+                        request_list.append([])
                 # Append fragment to sub-request
                 request_list[-1].append((opstr, rhandle, off, lastfl, size, 0))
                 if lastfl == 1:
@@ -768,7 +783,7 @@ class RdmaTest(TestUtil):
             if tbytes < dma_len:
                 # Add missing fragments for the last request
                 msize = dma_len - tbytes
-                request_list[-1].append((opstr, rhandle, LongHex(nextoff), 0, msize, 1))
+                self.add_missing_fragment(request_list[-1], opstr, rhandle, nextoff, msize, iosize)
 
             for reqitem in request_list:
                 # DMA length of sub-request
