@@ -541,12 +541,16 @@ class RdmaTest(TestUtil):
             fmsg =  ": expecting %s, got %s" % (esize, size)
             self.test(expr, "%s should have correct payload size" % opstr, failmsg=fmsg)
 
-    def verify_fragments(self, iotype, iolist, count, expected=()):
+    def verify_fragments(self, iotype, iolist, count, expected=(), rpctype=None):
         """Verify RDMA I/O fragments"""
         results = ()
         rdma_h = RDMA_IO_MAP.get(iotype)
         # Direction of RDMA I/O fragments
-        srv_clnt = "server" if iotype == RDMA_READ else "client"
+        if iotype == RDMA_SEND:
+            # For RDMA_SEND use the rpctype to find out correct direction
+            srv_clnt = "server" if rpctype == rpc_const.CALL else "client"
+        else:
+            srv_clnt = "server" if iotype == RDMA_READ else "client"
         if count > 2:
             # Results should have First, Middle and Last fragments
             results = ((rdma_h["first"], 1), (rdma_h["middle"], count-2), (rdma_h["last"], 1))
@@ -1027,7 +1031,7 @@ class RdmaTest(TestUtil):
                         rpcordma = pkt.rpcordma
                     self.verify_chunk_lists(rpcordma, optype, rpctype)
                 # Verify the list of SEND fragments
-                self.verify_fragments(RDMA_SEND, send_list, count)
+                self.verify_fragments(RDMA_SEND, send_list, count, rpctype=rpctype)
 
     def verify_iwarp_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
         """Verify I/O is sent using (iWarp) RDMA SENDs instead of a chunk list"""
