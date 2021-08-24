@@ -101,7 +101,7 @@ class MPA(BaseObj):
 
         # Check if valid MPA layer
         # XXX FIXME This check does not include any markers
-        if mpalen != size:
+        if mpalen > size:
             # Not an MPA Full Operation Phase packet,
             # try if this is an MPA Connection Setup
             self._mpa_setup(pktt, mpalen, offset)
@@ -120,9 +120,15 @@ class MPA(BaseObj):
             # if there is a full capture and there is padding
             data = unpack.read(min(mpalen, size))
 
+        unpack_save = None
         if delta == 0 and unpack.size() >= 4:
             # Get the CRC-32
             self.crc = IntHex(unpack.unpack_uint())
+            if unpack.size() > 0:
+                # Save original Unpack object right after this MPA packet
+                # so it is ready if there is another MPA packet within
+                # this TCP packet
+                unpack_save = unpack
 
         if len(data) > 0:
             # Replace Unpack object with just the payload data
@@ -136,6 +142,9 @@ class MPA(BaseObj):
             # Get the un-dissected bytes
             if unpack.size() > 0:
                 self.data = unpack.read(unpack.size())
+            if unpack_save is not None:
+                # Restore Unpack object
+                pktt.unpack = unpack_save
 
     def _mpa_frame(self, pktt):
         """Dissect MPA Req/Rep Frame"""

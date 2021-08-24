@@ -325,9 +325,6 @@ class TCP(BaseObj):
             if krb:
                 pkt.add_layer("krb", krb)
             return
-        elif 20049 in [self.src_port, self.dst_port]:
-            MPA(pktt)
-            return
 
         if stream.frag_off > 0 and len(stream.buffer) == 0:
             # This RPC packet lies within previous TCP packet,
@@ -337,6 +334,21 @@ class TCP(BaseObj):
         # Get the total size
         sid = unpack.save_state()
         size = unpack.size()
+
+        if 20049 in [self.src_port, self.dst_port]:
+            MPA(pktt)
+            if pktt.pkt.mpa is None:
+                self.data = unpack.read(len(unpack))
+            if unpack.size():
+                # Save the offset of next MPA packet within this TCP packet
+                # Data offset is cumulative
+                stream.frag_off += size - unpack.size()
+                # Next MPA packet is entirely within this TCP packet
+                # Re-position the file pointer to the current offset
+                pktt.seek(pktt.boffset)
+            else:
+                stream.frag_off = 0
+            return
 
         # Try decoding the RPC header before using the stream buffer data
         # to re-sync the stream
