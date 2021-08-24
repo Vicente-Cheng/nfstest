@@ -276,6 +276,8 @@ class RdmaTest(TestUtil):
         self.test_opgroup.add_option("--small-filesize", default="4k", help=hmsg)
         hmsg = "File size to use for large files [default: %default]"
         self.test_opgroup.add_option("--large-filesize", default="1m", help=hmsg)
+        hmsg = "Mark warnings for missing fragments as failures [default: %default]"
+        self.test_opgroup.add_option("--strict", action="store_true", default=False, help=hmsg)
 
         self.scan_options()
 
@@ -817,7 +819,11 @@ class RdmaTest(TestUtil):
                 bmsg = " for segment with DMA length of zero" if ecount == 0 else ""
                 amsg = "%s should %sbe sent to %s%s" % (opstr, notstr, srv_clnt, bmsg)
                 fmsg =  ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), nreqs)
-                self.test(nreqs == ecount, amsg, failmsg=fmsg)
+                expr = nreqs == ecount or ecount == 0
+                if self.strict or expr:
+                    self.test(expr, amsg, failmsg=fmsg)
+                else:
+                    self.warning(amsg + fmsg)
 
                 if nreqs > 0:
                     amsg = "%s should have correct " % opstr
