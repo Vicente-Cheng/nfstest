@@ -286,6 +286,7 @@ class RdmaTest(TestUtil):
         self.createtraces = False
 
         self.iosize          = None # RDMA I/O size
+        self.reqsize         = None # RDMA request size
         self.maxresponsesize = None # Session max response size
         self.nfs_read_count  = 0    # Number of NFS reads already processed
         self.nfs_write_xid   = {}   # XIDs of NFS writes already processed
@@ -437,6 +438,37 @@ class RdmaTest(TestUtil):
             iosize = self.iosize
         return int(dmalen/iosize) + (1 if dmalen%iosize else 0)
 
+    def add_missing_ib_request(self, reqlist, iotype, psn, handle, offset, length):
+        """Add missing IB request and if necessary split it into multiple
+           requests of at most reqsize bytes each
+
+           reqlist:
+               Request list where missing requests will be appended
+           iotype:
+               I/O type of request: RDMA_READ or RDMA_WRITE
+           psn:
+               PSN number of first missing request
+           handle:
+               RETH remote key of request
+           offset:
+               RETH virtual address of request
+           length:
+               Total DMA length for missing requests
+        """
+        # Split request into multiple requests with respect to reqsize
+        while length > 0:
+            size = min(length, self.reqsize)
+            if iotype == RDMA_READ:
+                opcode = RDMA_READ_Request
+                fsize = 0
+            else:
+                opcode = RDMA_WRITE_First if size > self.iosize else RDMA_WRITE_Only
+                fsize = min(size, self.iosize)
+
+            reqlist.append((OpCode(opcode), psn, fsize, handle, offset, size, 0, 1))
+            psn += self.get_nfragments(size)
+            length -= size
+
     def sort_ib_fragments(self, fraglist, iotype=None, offset=None, length=None):
         """Sort IB fragments by PSN, taking care of PSN wrapping around"""
         if len(fraglist) == 0:
@@ -468,16 +500,12 @@ class RdmaTest(TestUtil):
                     opc, dpsn, size, handle, dma_off, dma_len, pindex, ismissing = retlist[index]
                 else:
                     # The last request is missing
-                    opcode = RDMA_READ_Request if iotype == RDMA_READ else (RDMA_WRITE_First if length > self.iosize else RDMA_WRITE_Only)
-                    fsize = 0 if iotype == RDMA_READ else min(length, self.iosize)
-                    reqlist.append((OpCode(opcode), nextpsn, fsize, handle, offset, length, 0, 1))
+                    self.add_missing_ib_request(reqlist, iotype, nextpsn, handle, offset, length)
                     break
                 if dma_off > offset:
                     # Add missing request
                     dsize = dma_off - offset
-                    opcode = RDMA_READ_Request if iotype == RDMA_READ else (RDMA_WRITE_First if dsize > self.iosize else RDMA_WRITE_Only)
-                    fsize = 0 if iotype == RDMA_READ else min(dsize, self.iosize)
-                    reqlist.append((OpCode(opcode), nextpsn, fsize, handle, offset, dsize, 0, 1))
+                    self.add_missing_ib_request(reqlist, iotype, nextpsn, handle, offset, dsize)
                     length -= dsize
                 reqlist.append(retlist[index])
                 nextpsn = dpsn + self.get_nfragments(dma_len)
@@ -686,11 +714,13 @@ class RdmaTest(TestUtil):
 
         # Search for all read/write requests in the segment
         requests = []
+        self.reqsize = self.iosize
         match_str = "ib.opcode in %s and ib.reth.r_key == %s" % (opreq, handle)
         while self.pktt.match(match_str):
             pindex = self.pktt.get_index()
             ibobj = self.pktt.pkt.ib
             reth = ibobj.reth
+            self.reqsize = max(self.reqsize, reth.dma_len)
             # Include the packet index in the request
             requests.append((ibobj.opcode, ibobj.psn, ibobj.psize, reth.r_key, reth.va, reth.dma_len, pindex, 0))
 
