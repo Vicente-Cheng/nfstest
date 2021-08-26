@@ -21,6 +21,7 @@ from packet.transport.ib import *
 from packet.nfs.nfs3_const import *
 from packet.nfs.nfs4_const import *
 from packet.transport.rdmap import *
+from packet.transport.ib import OpCode
 from nfstest.test_util import TestUtil
 from packet.application.rpcordma_const import *
 import packet.application.rpc_const as rpc_const
@@ -436,7 +437,7 @@ class RdmaTest(TestUtil):
             iosize = self.iosize
         return int(dmalen/iosize) + (1 if dmalen%iosize else 0)
 
-    def sort_ib_fragments(self, fraglist):
+    def sort_ib_fragments(self, fraglist, iotype=None, offset=None, length=None):
         """Sort IB fragments by PSN, taking care of PSN wrapping around"""
         if len(fraglist) == 0:
             return fraglist
@@ -456,6 +457,34 @@ class RdmaTest(TestUtil):
         else:
             # List does not wrap around, just sort the whole list
             retlist = sorted(fraglist, key=sortkey)
+
+        if None not in (iotype, offset, length):
+            # Add missing requests to the list
+            index = 0
+            reqlist = []
+            nextpsn = retlist[0][1] - self.get_nfragments(retlist[0][4] - offset)
+            while length > 0:
+                if index < len(retlist):
+                    opc, dpsn, size, handle, dma_off, dma_len, pindex, ismissing = retlist[index]
+                else:
+                    # The last request is missing
+                    opcode = RDMA_READ_Request if iotype == RDMA_READ else (RDMA_WRITE_First if length > self.iosize else RDMA_WRITE_Only)
+                    fsize = 0 if iotype == RDMA_READ else min(length, self.iosize)
+                    reqlist.append((OpCode(opcode), nextpsn, fsize, handle, offset, length, 0, 1))
+                    break
+                if dma_off > offset:
+                    # Add missing request
+                    dsize = dma_off - offset
+                    opcode = RDMA_READ_Request if iotype == RDMA_READ else (RDMA_WRITE_First if dsize > self.iosize else RDMA_WRITE_Only)
+                    fsize = 0 if iotype == RDMA_READ else min(dsize, self.iosize)
+                    reqlist.append((OpCode(opcode), nextpsn, fsize, handle, offset, dsize, 0, 1))
+                    length -= dsize
+                reqlist.append(retlist[index])
+                nextpsn = dpsn + self.get_nfragments(dma_len)
+                offset = dma_off + dma_len
+                length -= dma_len
+                index += 1
+            return reqlist
         return retlist
 
     def get_iosize(self):
@@ -563,7 +592,7 @@ class RdmaTest(TestUtil):
             fmsg =  ": expecting %s, got %s" % (esize, size)
             self.test(expr, "%s should have correct payload size" % opstr, failmsg=fmsg)
 
-    def verify_fragments(self, iotype, iolist, count, expected=(), rpctype=None):
+    def verify_fragments(self, iotype, iolist, count, rpctype=None):
         """Verify RDMA I/O fragments"""
         results = ()
         rdma_h = RDMA_IO_MAP.get(iotype)
@@ -582,10 +611,6 @@ class RdmaTest(TestUtil):
         elif count == 1:
             # Results should only have one Only fragment
             results = ((rdma_h["only"], 1),)
-
-        if len(iolist[0]) == 6 and len(expected):
-            # Verify Read Request or Write First fragment
-            self.verify_rw_request(iolist[0], expected)
 
         # Get maximum length of opcode name
         if len(iolist) == 1 and len(iolist[0]) != 3:
@@ -667,7 +692,7 @@ class RdmaTest(TestUtil):
             ibobj = self.pktt.pkt.ib
             reth = ibobj.reth
             # Include the packet index in the request
-            requests.append((ibobj.opcode, ibobj.psn, ibobj.psize, reth.r_key, reth.va, reth.dma_len, pindex))
+            requests.append((ibobj.opcode, ibobj.psn, ibobj.psize, reth.r_key, reth.va, reth.dma_len, pindex, 0))
 
         iostr = "read requests" if iotype == RDMA_READ else "write firsts"
         self.dprint('DBG2', "RDMA %s for handle %s: %d" % (iostr, handle, len(requests)))
@@ -690,10 +715,10 @@ class RdmaTest(TestUtil):
         # Verify all fragments for each request
         dma_psn = None
         dma_length = None
-        for req_info in self.sort_ib_fragments(requests):
-            pindex  = req_info[-1]
-            reqinfo = req_info[:-1]
-            (opcode, psn, size, handle, dma_off, dma_len) = reqinfo
+        for req_info in self.sort_ib_fragments(requests, iotype, offset, length):
+            opcode, psn, size, handle, dma_off, dma_len, pindex, ismissing = req_info
+            reqinfo = req_info[:-2]
+
             if dma_psn is None:
                 # Use the PSN on the request for the first expected PSN
                 dma_psn = psn
@@ -714,9 +739,17 @@ class RdmaTest(TestUtil):
                 ib = self.pktt.pkt.ib
                 fragment_list.append((ib.opcode, ib.psn, ib.psize))
 
+            # Verify Read Request or Write First fragment
+            if ismissing:
+                opstr = ib_op_codes.get(opcode)
+                self.dprint('DBG2', "%s: psn=%d, size=%d, handle=%s, offset=0x%016x, length=%d [missing request]" % reqinfo)
+                self.test(False, "%s should be sent to client" % opstr)
+            else:
+                self.verify_rw_request(reqinfo, (dma_psn, offset, dma_length))
+
             # Verify RDMA I/O fragments
             fragment_list = self.sort_ib_fragments(fragment_list)
-            self.verify_fragments(iotype, fragment_list, count, (dma_psn, offset, dma_length))
+            self.verify_fragments(iotype, fragment_list, count)
 
             dma_psn  = nextpsn # Expected PSN for next request
             offset  += dma_len # Expected offset for next request
