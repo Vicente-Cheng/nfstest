@@ -469,6 +469,47 @@ class RdmaTest(TestUtil):
             psn += self.get_nfragments(size)
             length -= size
 
+    def add_missing_ib_fragment(self, fraglist, iotype, psn, nextpsn, length, nfrags, count):
+        """Add missing IB fragment and if necessary split it into multiple
+           fragments of at most iosize bytes each
+
+           fraglist:
+               Fragment list where missing fragments will be appended
+           iotype:
+               I/O type of fragment: RDMA_READ, RDMA_WRITE or RDMA_SEND
+           psn:
+               PSN number of first fragment in the request
+           nextpsn:
+               PSN number of first missing fragment
+           length:
+               Number of bytes remaining in the request
+           nfrags:
+               Number of fragments in the request
+           count:
+               Number of missing fragments to append
+        """
+        # Split fragment into multiple fragments with respect to iosize
+        lastpsn = psn + nfrags - 1
+        for i in range(count):
+            if nextpsn == psn:
+                if nfrags == 1:
+                    # First and only fragment is missing
+                    opcode = RDMA_READ_Response_Only if iotype == RDMA_READ else RDMA_WRITE_Only
+                else:
+                    # First fragment is missing
+                    opcode = RDMA_READ_Response_First if iotype == RDMA_READ else RDMA_WRITE_First
+            elif nextpsn == lastpsn:
+                # Last fragment is missing
+                opcode = RDMA_READ_Response_Last if iotype == RDMA_READ else RDMA_WRITE_Last
+            else:
+                # Middle fragment is missing
+                opcode = RDMA_READ_Response_Middle if iotype == RDMA_READ else RDMA_WRITE_Middle
+            size = min(length, self.iosize)
+            fraglist.append((OpCode(opcode), nextpsn, size, 1))
+            length -= size
+            nextpsn += 1
+        return length
+
     def sort_ib_fragments(self, fraglist, iotype=None, offset=None, length=None):
         """Sort IB fragments by PSN, taking care of PSN wrapping around"""
         if len(fraglist) == 0:
@@ -513,6 +554,35 @@ class RdmaTest(TestUtil):
                 length -= dma_len
                 index += 1
             return reqlist
+        elif iotype in (RDMA_READ, RDMA_WRITE):
+            # Add missing fragments to the list
+            fiolist = [retlist[0]]
+            psn     = retlist[0][1] # PSN number of request
+            dma_len = retlist[0][5] # DMA length of request
+            index   = 1 # Skip the request, it has already been added to the list
+            # PSN for first fragment -- for RDMA read, the first read response
+            # has the same PSN as the request. On the other hand for RDMA write,
+            # the first write fragment is a middle/last write.
+            nextpsn = psn + (1 if iotype == RDMA_WRITE else 0)
+            # Number of fragments in request
+            nfrags = self.get_nfragments(dma_len)
+            while dma_len > 0:
+                if index < len(retlist):
+                    opc, dpsn, size, ismissing = retlist[index]
+                else:
+                    # The last fragment is missing
+                    count = nfrags - nextpsn + psn
+                    self.add_missing_ib_fragment(fiolist, iotype, psn, nextpsn, dma_len, nfrags, count)
+                    break
+                if dpsn > nextpsn:
+                    # Fragment missing right before the current fragment
+                    count = dpsn - nextpsn
+                    dma_len = self.add_missing_ib_fragment(fiolist, iotype, psn, nextpsn, dma_len, nfrags, count)
+                fiolist.append(retlist[index])
+                nextpsn = dpsn + 1
+                dma_len -= size
+                index += 1
+            return fiolist
         return retlist
 
     def get_iosize(self):
@@ -641,22 +711,25 @@ class RdmaTest(TestUtil):
             results = ((rdma_h["only"], 1),)
 
         # Get maximum length of opcode name
-        if len(iolist) == 1 and len(iolist[0]) != 3:
+        if len(iolist) == 1 and len(iolist[0]) != 4:
             maxlen = 0
         else:
-            maxlen = len(max([str(x[0]) for x in iolist if len(x) == 3], key=len))
+            maxlen = len(max([str(x[0]) for x in iolist if len(x) == 4], key=len))
 
         # Display all fragments other than the Read Request and Write First
         # fragment which were already been displayed in verify_rw_request
         for seg in iolist:
-            if len(seg) == 3:
-                self.dprint('DBG3', "%-*s: psn=%d, size=%d" % ((maxlen,) + seg))
+            if len(seg) == 4:
+                opcode, psn, size, ismissing = seg
+                mfrag = " [missing fragment]" if ismissing else ""
+                args = (maxlen, opcode, psn, size, mfrag)
+                self.dprint('DBG3', "%-*s: psn=%d, size=%d%s" % args)
 
         # Verify all the fragments
         for item in results:
             oplist, ecount = item
             # Get the number of fragments actually sent for the given OpCode
-            op_list = [x for x in iolist if x[0] in oplist]
+            op_list = [x for x in iolist if x[0] in oplist and x[3] == 0]
             io_count = len(op_list)
             if io_count > 0:
                 opcode = op_list[0][0]
@@ -767,7 +840,7 @@ class RdmaTest(TestUtil):
             mstr = "ib.opcode in %s and %s" % (oplist, get_psn_match(psn, nextpsn))
             while self.pktt.match(mstr):
                 ib = self.pktt.pkt.ib
-                fragment_list.append((ib.opcode, ib.psn, ib.psize))
+                fragment_list.append((ib.opcode, ib.psn, ib.psize, 0))
 
             # Verify Read Request or Write First fragment
             if ismissing:
@@ -778,7 +851,7 @@ class RdmaTest(TestUtil):
                 self.verify_rw_request(reqinfo, (dma_psn, offset, dma_length))
 
             # Verify RDMA I/O fragments
-            fragment_list = self.sort_ib_fragments(fragment_list)
+            fragment_list = self.sort_ib_fragments(fragment_list, iotype)
             self.verify_fragments(iotype, fragment_list, count)
 
             dma_psn  = nextpsn # Expected PSN for next request
@@ -1087,7 +1160,7 @@ class RdmaTest(TestUtil):
                 # Nothing to do here, there is only one packet
                 # for the whole NFS read/write
                 count = 1
-                send_list.append((opcode, pkt.ib.psn, pkt.ib.psize))
+                send_list.append((opcode, pkt.ib.psn, pkt.ib.psize, 0))
             elif opcode in SendList:
                 # Find all SEND First, Middle and Last fragments
                 match_str = "ib.opcode in %s" % (SendList,)
@@ -1096,7 +1169,7 @@ class RdmaTest(TestUtil):
                     ib_psn    = ibobj.psn
                     ib_count  = ibobj.psize
                     ib_opcode = ibobj.opcode
-                    send_list.append((ib_opcode, ib_psn, ib_count))
+                    send_list.append((ib_opcode, ib_psn, ib_count, 0))
                 # Make sure to get the SEND_First closest to SEND_Last
                 index = len(send_list) - 1
                 for item in reversed(send_list):
