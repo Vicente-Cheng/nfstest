@@ -511,7 +511,20 @@ class RdmaTest(TestUtil):
         return length
 
     def sort_ib_fragments(self, fraglist, iotype=None, offset=None, length=None):
-        """Sort IB fragments by PSN, taking care of PSN wrapping around"""
+        """Sort IB fragments by PSN, taking care of PSN wrapping around
+           and adding missing fragments to the list.
+
+           fraglist:
+               Fragment list to be sorted. If iotype, offset and length are
+               given, missing requests are added to the list. If only iotype
+               is given, missing fragments are added to the list.
+           iotype:
+               I/O type of fragments in list: RDMA_READ, RDMA_WRITE or RDMA_SEND
+           offset:
+               RETH virtual address of segment
+           length:
+               Total DMA length for segment
+        """
         if len(fraglist) == 0:
             return fraglist
         # Midpoint of valid PSN numbers
@@ -583,6 +596,25 @@ class RdmaTest(TestUtil):
                 dma_len -= size
                 index += 1
             return fiolist
+        elif iotype == RDMA_SEND:
+            # This is a special case since the first and last SEND cannot
+            # be missing because there would be no reassembly.
+            index = 0
+            sndlist = []
+            nextpsn = retlist[0][1]  # PSN number of first SEND fragment
+            lastpsn = retlist[-1][1] # PSN number of last SEND fragment
+            while nextpsn <= lastpsn:
+                opc, dpsn, size, ismissing = retlist[index]
+                if dpsn > nextpsn:
+                    # Middle fragment missing right before the current fragment
+                    count = dpsn - nextpsn
+                    for i in range(count):
+                        sndlist.append((OpCode(SEND_Middle), nextpsn, self.iosize, 1))
+                        nextpsn += 1
+                sndlist.append(retlist[index])
+                nextpsn += 1
+                index += 1
+            return sndlist
         return retlist
 
     def get_iosize(self):
@@ -1190,7 +1222,7 @@ class RdmaTest(TestUtil):
                         rpcordma = pkt.rpcordma
                     self.verify_chunk_lists(rpcordma, optype, rpctype)
                 # Verify the list of SEND fragments
-                send_list = self.sort_ib_fragments(send_list)
+                send_list = self.sort_ib_fragments(send_list, RDMA_SEND)
                 self.verify_fragments(RDMA_SEND, send_list, count, rpctype=rpctype)
 
     def verify_iwarp_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
