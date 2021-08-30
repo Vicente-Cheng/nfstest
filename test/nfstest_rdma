@@ -750,12 +750,21 @@ class RdmaTest(TestUtil):
 
         # Display all fragments other than the Read Request and Write First
         # fragment which were already been displayed in verify_rw_request
+        missing_fragments = []
         for seg in iolist:
             if len(seg) == 4:
                 opcode, psn, size, ismissing = seg
                 mfrag = " [missing fragment]" if ismissing else ""
                 args = (maxlen, opcode, psn, size, mfrag)
                 self.dprint('DBG3', "%-*s: psn=%d, size=%d%s" % args)
+                if ismissing:
+                    missing_fragments.append((psn, size))
+
+        if len(missing_fragments) > 0:
+            msize = sum([x[1] for x in missing_fragments])
+            self.dprint('DBG2', "Missing %d bytes in fragments:" % msize)
+            for psn, size in missing_fragments:
+                self.dprint('DBG3', "    Missing %d bytes at PSN %d" % (size, psn))
 
         # Verify all the fragments
         for item in results:
