@@ -782,7 +782,11 @@ class RdmaTest(TestUtil):
             if opcode not in WriteFOList or len(iolist[0]) != 6:
                 amsg = "%s should be sent to %s" % (ib_op_codes.get(opcode), srv_clnt)
                 fmsg =  ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), io_count)
-                self.test(io_count == ecount, amsg, failmsg=fmsg)
+                expr = io_count == ecount
+                if self.strict or expr:
+                    self.test(expr, amsg, failmsg=fmsg)
+                else:
+                    self.warning(amsg + fmsg)
 
                 if io_count > 0:
                     expr = True
@@ -887,7 +891,10 @@ class RdmaTest(TestUtil):
             if ismissing:
                 opstr = ib_op_codes.get(opcode)
                 self.dprint('DBG2', "%s: psn=%d, size=%d, handle=%s, offset=0x%016x, length=%d [missing request]" % reqinfo)
-                self.test(False, "%s should be sent to client" % opstr)
+                if self.strict:
+                    self.test(False, "%s should be sent to client" % opstr)
+                else:
+                    self.warning("%s should be sent to client" % opstr)
             else:
                 self.verify_rw_request(reqinfo, (dma_psn, offset, dma_length))
 
