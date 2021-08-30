@@ -1191,7 +1191,10 @@ class RdmaTest(TestUtil):
                     expr = tsize < self.maxresponsesize
                     fmsg = ": %d is not less than %d" % (tsize, self.maxresponsesize)
                     amsg = tmsg + "a DMA length less than maxresponsesize"
-                    self.test(expr, amsg, failmsg=fmsg)
+                    if self.strict or expr:
+                        self.test(expr, amsg, failmsg=fmsg)
+                    else:
+                        self.warning(amsg + fmsg)
         elif optype in self.nfs_op(**NFSread):
             # Verify if using DDP on NFS READ reply
             amsg = afmt % msg_h.get(nwrites, ("", "RDMA_WRITE"))
