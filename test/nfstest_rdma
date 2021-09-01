@@ -700,26 +700,26 @@ class RdmaTest(TestUtil):
         self.test(True, "%s should be sent to client" % opstr)
 
         expr = offset == dma_offset
-        fmsg =  ": expecting 0x%016x, got 0x%016x" % (dma_offset, offset)
+        fmsg = ": expecting 0x%016x, got 0x%016x" % (dma_offset, offset)
         self.test(expr, "%s should have correct virtual address" % opstr, failmsg=fmsg)
 
         expr = dma_len <= dma_length
-        fmsg =  ": expecting %d, got %d" % (dma_length, dma_len)
+        fmsg = ": expecting %d, got %d" % (dma_length, dma_len)
         self.test(expr, "%s should have correct DMA length" % opstr, failmsg=fmsg)
 
         expr = psn == dma_psn
-        fmsg =  ": expecting %s, got %s" % (dma_psn, psn)
+        fmsg = ": expecting %s, got %s" % (dma_psn, psn)
         self.test(expr, "%s should have correct PSN" % opstr, failmsg=fmsg)
 
         if opcode == RDMA_READ_Request:
             expr = size == 0
-            fmsg =  ": expecting no payload, got %s bytes" % size
+            fmsg = ": expecting no payload, got %s bytes" % size
             self.test(expr, "%s should not have any payload data" % opstr, failmsg=fmsg)
         else:
             esize = (self.iosize if opcode == RDMA_WRITE_First else dma_length)
             esize += get_padding(esize)
             expr = size == esize
-            fmsg =  ": expecting %s, got %s" % (esize, size)
+            fmsg = ": expecting %s, got %s" % (esize, size)
             self.test(expr, "%s should have correct payload size" % opstr, failmsg=fmsg)
 
     def verify_fragments(self, iotype, iolist, count, rpctype=None):
@@ -781,7 +781,7 @@ class RdmaTest(TestUtil):
             # fragment which were already been verified in verify_rw_request
             if opcode not in WriteFOList or len(iolist[0]) != 6:
                 amsg = "%s should be sent to %s" % (ib_op_codes.get(opcode), srv_clnt)
-                fmsg =  ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), io_count)
+                fmsg = ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), io_count)
                 expr = io_count == ecount
                 if self.strict or expr:
                     self.test(expr, amsg, failmsg=fmsg)
@@ -1029,7 +1029,7 @@ class RdmaTest(TestUtil):
                 notstr = "not " if ecount == 0 else ""
                 bmsg = " for segment with DMA length of zero" if ecount == 0 else ""
                 amsg = "%s should %sbe sent to %s%s" % (opstr, notstr, srv_clnt, bmsg)
-                fmsg =  ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), nreqs)
+                fmsg = ": expecting %s %s, got %s" % (ecount, plural("fragment", ecount), nreqs)
                 expr = nreqs == ecount or ecount == 0
                 if self.strict or expr:
                     self.test(expr, amsg, failmsg=fmsg)
@@ -1310,7 +1310,7 @@ class RdmaTest(TestUtil):
             return
 
         # Get the RDMA chunk lists for both the NFS call and reply
-        rpcordma_r  = pktreply.rpcordma
+        rpcordma_r = pktreply.rpcordma
         creads, cwrites, creply = self.get_chunk_lists(pktcall.rpcordma, rpc_const.CALL, display=False)
         rreads, rwrites, rreply = self.get_chunk_lists(rpcordma_r, rpc_const.REPLY)
         self.verify_chunk_lists(rpcordma_r, optype, rpc_const.REPLY, nreads, nwrites, nreply)
@@ -1333,10 +1333,10 @@ class RdmaTest(TestUtil):
             fmsg = ": reply "
             amsg = "%s reply should be sent with the same number of RDMA chunk segments as the call" % opstr
             if c_count > r_count:
-                count  = c_count - r_count
+                count = c_count - r_count
                 fmsg += "is missing %s %s" % (num_name(count), plural("segment", count))
             elif c_count < r_count:
-                count  = r_count - c_count
+                count = r_count - c_count
                 fmsg += "has %s extra %s" % (num_name(count), plural("segment", count))
             self.test(expr, amsg, failmsg=fmsg)
 
@@ -1503,7 +1503,7 @@ class RdmaTest(TestUtil):
             self.pktt.rewind(write_index+1)
         elif write_count == 0:
             # No NFS writes has been processed so far thus fail the test
-            # because there is not a sing NFS write or RPCoRDMA with a
+            # because there is not a single NFS write or RPCoRDMA with a
             # read chunk list in the packet trace
             self.test(False, "RPC-over-RDMA packet should be sent with RDMA_MSG and a read chunk list")
 
