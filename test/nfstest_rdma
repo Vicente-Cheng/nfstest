@@ -999,6 +999,9 @@ class RdmaTest(TestUtil):
                 msize = dma_len - tbytes
                 self.add_missing_fragment(request_list[-1], opstr, rhandle, nextoff, msize, iosize)
 
+            # Drop empty requests that may have been added
+            request_list = [x for x in request_list if len(x) > 0]
+
             for reqitem in request_list:
                 # DMA length of sub-request
                 dmalen = sum([x[4] for x in reqitem])
