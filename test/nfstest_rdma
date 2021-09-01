@@ -913,6 +913,7 @@ class RdmaTest(TestUtil):
     def add_missing_fragment(self, request_item, opstr, handle, offset, length, iosize):
         """Add missing fragment"""
         last_fl = 0
+        iosize = iosize if iosize > 0 else length
         # Split fragment into multiple fragments with respect to iosize
         while length > 0:
             size = min(length, iosize)
@@ -1025,6 +1026,7 @@ class RdmaTest(TestUtil):
                         self.dprint('DBG3', "    Missing %d bytes at offset 0x%08x" % (size, off))
 
                 # Calculate the number of expected fragments per sub-request
+                iosize = iosize if iosize > 0 else dmalen
                 ecount = self.get_nfragments(dmalen, iosize)
                 notstr = "not " if ecount == 0 else ""
                 bmsg = " for segment with DMA length of zero" if ecount == 0 else ""
