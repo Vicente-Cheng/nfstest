@@ -60,7 +60,7 @@ class RDMAseg(object):
                 for i in range(index - nlen):
                     # Use an empty string for missing fragments
                     # These may come later as out-of-order fragments
-                    fraglist.append("")
+                    fraglist.append(b"")
                 fraglist.append(data)
             return True
         return False
