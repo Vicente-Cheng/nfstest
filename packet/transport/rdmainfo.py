@@ -43,6 +43,10 @@ class RDMAseg(object):
         self.dmalen   = dmalen # DMA length in sub-segment
         self.fraglist = []     # List of data fragments
 
+    def __del__(self):
+        """Destructor"""
+        self.fraglist.clear()
+
     def insert_data(self, psn, data):
         """Insert data at correct position given by the psn"""
         # Make sure fragment belongs to this sub-segment
@@ -108,6 +112,11 @@ class RDMAsegment(object):
         # specifies the same RKey(or handle) for all sub-segments and the
         # DMA length for the sub-segment.
         self.seglist = []
+
+    def __del__(self):
+        """Destructor"""
+        self.fragments.clear()
+        self.seglist.clear()
 
     def valid_psn(self, psn):
         """True if given psn is valid for this segment"""
@@ -253,11 +262,20 @@ class RDMAinfo(RDMAbase):
     def reset(self):
         """Clear RDMA segments"""
         self._rdma_segments = {}
+        self.sindex = 0
     __del__ = reset
 
     def get_rdma_segment(self, handle):
         """Return RDMA segment identified by the given handle"""
         return self._rdma_segments.get(handle)
+
+    def del_rdma_segment(self, rsegment):
+        """Delete RDMA segment information"""
+        if rsegment is None:
+            return
+        self._rdma_segments.pop(rsegment.handle, None)
+        if rsegment.rhandle is not None:
+            self._rdma_segments.pop(rsegment.rhandle, None)
 
     def add_rdma_segment(self, rdma_seg, rpcrdma=None):
         """Add RDMA segment information and if the information already
@@ -391,6 +409,7 @@ class RDMAinfo(RDMAbase):
                     # in which the payload has already been padded
                     padding = False if xdrpos == 0 else True
                     data += rsegment.get_data(padding=padding)
+                    self.del_rdma_segment(rsegment)
             if len(reduced_data) > offset:
                 # Add last fragment from the reduced message
                 data += reduced_data[offset:]
@@ -532,4 +551,5 @@ class RDMAinfo(RDMAbase):
                     # bytes because this is part of the message that will
                     # be dissected and the opaque needs a 4-byte boundary
                     replydata += rsegment.get_data(padding=True)
+                    self.del_rdma_segment(rsegment)
         return replydata
