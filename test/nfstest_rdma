@@ -1528,8 +1528,22 @@ class RdmaTest(TestUtil):
             match_str = "rpc.xid == %s or rpcordma.xid == %s" % (xid, xid)
             self.pktt.rewind(writecall.record.index+1)
             writereply = self.pktt.match(match_str)
-            self.verify_io_op(writereply, OP_WRITE, rpc_const.REPLY)
-            self.verify_chunk_lists(writereply.rpcordma, OP_WRITE, rpc_const.REPLY)
+
+            if rpcordma:
+                # NFS Write using RDMA writes, set expected procedure and nreply
+                # using the RPC-over-RDMA layer of the call
+                rproc = RDMA_NOMSG if rpcordma.reply else RDMA_MSG
+                nreply = 1 if rpcordma.reply else 0
+            elif writecall and writecall.rpcordma.reply:
+                # NFS Write using RDMA sends and reply chunk is in call
+                rproc = RDMA_NOMSG
+                nreply = 1
+            else:
+                # No reply chunk in call
+                rproc = RDMA_MSG
+                nreply = 0
+            self.verify_io_op(writereply, OP_WRITE, rpc_const.REPLY, rdmaproc=rproc)
+            self.verify_chunk_lists(writereply.rpcordma, OP_WRITE, rpc_const.REPLY, nreply=nreply)
 
         self.pktt.rewind(save_index)
         return result
