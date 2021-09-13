@@ -1141,7 +1141,15 @@ class RdmaTest(TestUtil):
         self.test(len(writes) == nwrites, amsg, failmsg=fmsg)
         amsg = tmsg + "%s reply chunk" % chunk_str(nreply)
         fmsg = ", there are %d write chunks" % len(reply)
-        self.test(len(reply) == nreply, amsg, failmsg=fmsg)
+        if not self.strict and nreply == 0 and len(reply) > 0:
+            # Do not fail test if there is an unexpected reply chunk
+            amsg = tmsg.replace('should', 'may') + "%s reply chunk" % chunk_str(1)
+            self.test(len(reply) == 1, amsg, failmsg=fmsg)
+        elif self.strict and len(reply) != nreply:
+            # If strict is given, log warning if there is an unexpected reply chunk
+            self.warning(amsg + fmsg)
+        else:
+            self.test(len(reply) == nreply, amsg, failmsg=fmsg)
 
         flat_list = []
         for clist in reads+writes+reply:
