@@ -1316,7 +1316,7 @@ class RdmaTest(TestUtil):
         else:
             self.verify_ib_sends(pkt, optype, rpctype, rpcordma, chunkverify)
 
-    def verify_chunk_in_reply(self, pktcall, pktreply, optype, nreads=0, nwrites=0, nreply=0):
+    def verify_chunk_in_reply(self, rpcordma_c, pktreply, optype, nreads=0, nwrites=0, nreply=0):
         """Verify RDMA write chunk list or RDMA reply chunk in the NFS reply"""
         if pktreply is None or pktreply != "rpcordma":
             # Not an RPC-over-RDMA packet
@@ -1324,7 +1324,7 @@ class RdmaTest(TestUtil):
 
         # Get the RDMA chunk lists for both the NFS call and reply
         rpcordma_r = pktreply.rpcordma
-        creads, cwrites, creply = self.get_chunk_lists(pktcall.rpcordma, rpc_const.CALL, display=False)
+        creads, cwrites, creply = self.get_chunk_lists(rpcordma_c, rpc_const.CALL, display=False)
         rreads, rwrites, rreply = self.get_chunk_lists(rpcordma_r, rpc_const.REPLY)
         self.verify_chunk_lists(rpcordma_r, optype, rpc_const.REPLY, nreads, nwrites, nreply)
 
@@ -1413,7 +1413,7 @@ class RdmaTest(TestUtil):
 
             if len(ck_args):
                 # NFS operation using the write chunk list or reply chunk
-                self.verify_chunk_in_reply(pktcall, pktreply, optype, **ck_args)
+                self.verify_chunk_in_reply(pktcall.rpcordma, pktreply, optype, **ck_args)
                 if rpcordma.reply is not None and tsize == 0:
                     # The RDMA segment length is zero, thus there are no
                     # RDMA WRITEs and the reply is sent over SEND_Only
@@ -1543,7 +1543,9 @@ class RdmaTest(TestUtil):
                 rproc = RDMA_MSG
                 nreply = 0
             self.verify_io_op(writereply, OP_WRITE, rpc_const.REPLY, rdmaproc=rproc)
-            self.verify_chunk_lists(writereply.rpcordma, OP_WRITE, rpc_const.REPLY, nreply=nreply)
+            rpcordma = writecall.rpcordma if rpcordma is None else rpcordma
+            self.pktt.rewind(save_index)
+            self.verify_chunk_in_reply(rpcordma, writereply, OP_WRITE, nreply=nreply)
 
         self.pktt.rewind(save_index)
         return result
