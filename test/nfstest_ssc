@@ -1288,7 +1288,7 @@ class SSCTest(TestUtil):
                     except:
                         pass
 
-                    if samefile:
+                    if samefile and not inter:
                         copyobj.dst_file.filehandle = copyobj.src_file.filehandle
 
                     fmsg = ", expecting 0x%08x but got 0x%08x" % (crc32(copyobj.src_file.filehandle), crc32(src_fhandle))
@@ -1296,7 +1296,7 @@ class SSCTest(TestUtil):
                     fmsg = ", expecting 0x%08x but got 0x%08x" % (crc32(copyobj.dst_file.filehandle), crc32(dst_fhandle))
                     self.test(dst_fhandle == copyobj.dst_file.filehandle, "%s should be sent with correct destination file handle" % opstr, failmsg=fmsg)
 
-                    if samefile:
+                    if samefile and not inter:
                         dst_stid = src_stateid
                     elif copyobj.dst_lstid is None:
                         dst_stid = copyobj.dst_file.stateid
