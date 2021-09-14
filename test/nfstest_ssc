@@ -1072,6 +1072,9 @@ class SSCTest(TestUtil):
                 if self.nfs_version < 4:
                     #XXX how to check if two different servers on NFSv3?
                     diff_server = True
+            if inter and not diff_server:
+                self.test(False, "Source and destination must be different servers for inter-SSC tests")
+                return
 
             # Disable buffered matching
             self.pktt.set_pktlist()
