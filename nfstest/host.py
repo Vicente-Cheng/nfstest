@@ -201,6 +201,7 @@ class Host(BaseObj):
         self.nfs_version = float(self.nfsversion)
         self.mtdir = self.mtpoint
         self.mounted = False
+        self.mount_opts = {}
         self._nfsdebug = False
         self._tracestate = {}
         self.dbgidx = 1
@@ -557,7 +558,7 @@ class Host(BaseObj):
 
     def _find_nfs_version(self):
         """Get the NFS version from mount point"""
-        opts_h = {}
+        self.mount_opts = {}
         mount_h = {}
         try:
             # Try the "findmnt" command to get options for mount point
@@ -584,18 +585,23 @@ class Host(BaseObj):
             for optstr in mount_opts.split(","):
                 opts = optstr.split("=")
                 if len(opts) > 1:
-                    opts_h[opts[0]] = opts[1]
+                    value = opts[1]
+                    if value.isdecimal():
+                        value = int(value)
+                    elif value.replace(".", "", 1).isdecimal():
+                        value = float(value)
+                    self.mount_opts[opts[0]] = value
                 elif len(opts) > 0:
-                    opts_h[opts[0]] = 1
+                    self.mount_opts[opts[0]] = 1
             # Save "vers" option
-            vers = opts_h.get("vers")
+            vers = self.mount_opts.get("vers")
             if vers is not None:
-                minorversion = opts_h.get("minorversion")
+                minorversion = self.mount_opts.get("minorversion")
                 if minorversion is not None:
-                    # Include "minorversion" option into the saved string
-                    vers += "." + minorversion
+                    # Include "minorversion" option
+                    vers += (minorversion/10.0)
             # Set the actual NFS version mounted
-            self.nfs_version = float(vers)
+            self.nfs_version = vers
             self.dprint('DBG6', "    NFS version of mount point: %s" % vers)
 
     def mount(self, **kwargs):
