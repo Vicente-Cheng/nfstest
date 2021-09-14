@@ -1166,6 +1166,7 @@ class SSCTest(TestUtil):
                             # thus the COPY_NOTIFY stateid is save in a list
                             # to match the correct one on the COPY operation
                             srcobj.cstateid.append(pktreply.NFSop.stateid.other)
+                            self.stid_map[pktreply.NFSop.stateid.other] = "COPY_NOTIFY stateid"
 
                         self.pktt.rewind(save_index)
             else:
