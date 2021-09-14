@@ -109,6 +109,7 @@ Notes:
 SCRIPT_ID = "SSC"
 
 DATA_PATTERN = b"ABCDE"
+NCOPIES = 4
 
 INTRA_TESTS = [
     "intra01",
@@ -272,12 +273,18 @@ class SSCTest(TestUtil):
         self.copyitems = []      # List of CopyItem objects
         self.server_list = []    #  List of destination server host objects
         self.remove_dstlist = [] # List of files to be removed at cleanup
+        self.inter_ssc = False   # True if at least one inter-SSC test is given
 
         # Instantiate base object constructor
         TestUtil.__init__(self, **kwargs)
         self.opts.version = "%prog " + __version__
         # Tests are valid for NFSv4.2 and beyond
         self.opts.set_defaults(nfsversion=4.2)
+        # Inter-SSC copy length must be greater than 14*rsize, so set filesize
+        # default to have a minimum copy length of 16*rsize for the smallest
+        # possible copy which is for the inter14 test with copy length of
+        # filesize/ncopies
+        self.opts.set_defaults(filesize="%sk" % (NCOPIES*16*4))
 
         # Options specific for this test script
         hmsg = "Destination server for inter server side copy [default: %default]"
@@ -285,7 +292,7 @@ class SSCTest(TestUtil):
         hmsg = "Destination export for inter server side copy [default: %default]"
         self.test_opgroup.add_option("--dst-export", default=None, help=hmsg)
         hmsg = "Number of concurrent copies to use on intra14 and inter14 tests [default: %default]"
-        self.test_opgroup.add_option("--ncopies", type="int", default=4, help=hmsg)
+        self.test_opgroup.add_option("--ncopies", type="int", default=NCOPIES, help=hmsg)
         hmsg = "Number of source files to use concurrently on intra15 and inter15 tests [default: %default]"
         self.test_opgroup.add_option("--src-files", type="int", default=3, help=hmsg)
         hmsg = "Number of destination files to use concurrently on intra15 and inter15 tests [default: %default]"
@@ -346,12 +353,12 @@ class SSCTest(TestUtil):
                     self.testlist.remove(tname)
 
         # Find if there is at least one INTER-SSC test to run
-        inter_ssc = bool(set(self.testlist).intersection(INTER_TESTS))
+        self.inter_ssc = bool(set(self.testlist).intersection(INTER_TESTS))
 
-        if inter_ssc and self.dst_server is None:
+        if self.inter_ssc and self.dst_server is None:
             self.opts.error("option dst-server is required for inter-ssc tests")
 
-        if inter_ssc and self.dst_server is not None:
+        if self.inter_ssc and self.dst_server is not None:
             if self.dst_export is None:
                 self.opts.error("option dst-export is required when dst-server is given")
             mtpoint = self.mtpoint + "_dst"
@@ -387,6 +394,16 @@ class SSCTest(TestUtil):
 
         # Call base object's setup method
         super(SSCTest, self).setup(nfiles=nfiles)
+        rsize = self.mount_opts.get('rsize', 0)
+        if rsize > 0 and self.inter_ssc:
+            if NCOPIES > 2 and run_set.intersection(["inter14"]):
+                min_filesize = 14*NCOPIES*rsize
+            else:
+                min_filesize = 14*2*rsize
+            if self.filesize <= min_filesize:
+                self.opts.error("inter-SSC copy length must be greater than " \
+                    "14*rsize, change mount rsize option or --filesize so " \
+                    "that --filesize > %s" % str_units(min_filesize))
 
         # Create necessary files in the destination server
         if run_set.intersection(["inter10"]):
