@@ -1319,6 +1319,16 @@ class TestUtil(NFSUtil):
         """
         # Open the packet trace
         super(TestUtil, self).trace_open(*kwts, **kwds)
+        try:
+            next(self.pktt)
+        except Exception as e:
+            pass
+        finally:
+            self.pktt.rewind()
+        if self.pktt.eof:
+            raise Exception("Packet trace file is empty: use --trcdelay " \
+                            "option to give tcpdump time to flush buffer " \
+                            "to packet trace")
         if self.nfserrors:
             if self.nfserr_list is None:
                 # Use default lists
