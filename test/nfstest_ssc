@@ -271,8 +271,6 @@ class SSCTest(TestUtil):
         self.dst = None          # Host object to mount the destination server
         self.queue = None        # Inter-processes queue
         self.copyitems = []      # List of CopyItem objects
-        self.server_list = []    #  List of destination server host objects
-        self.remove_dstlist = [] # List of files to be removed at cleanup
         self.inter_ssc = False   # True if at least one inter-SSC test is given
 
         # Instantiate base object constructor
@@ -366,7 +364,6 @@ class SSCTest(TestUtil):
             ipv6 = self.proto[-1] == "6"
             self.dst.server_ipaddr = self.get_ip_address(host=self.dst_server, ipv6=ipv6)
             dst_srv = self.create_host(self.dst_server)
-            self.server_list.append(dst_srv)
 
         # Disable createtraces option but save it first for tests that do not
         # check the NFS packets to verify the assertion
@@ -415,32 +412,12 @@ class SSCTest(TestUtil):
             self.dst.mount()
             for filename in file_list:
                 dstfile = self.dst.abspath(filename)
-                self.remove_dstlist.append(dstfile)
+                self.dst.remove_list.append(dstfile)
                 self.dprint("DBG3", "Creating file [%s] %d@%d" % (dstfile, self.filesize, 0))
                 fd = os.open(dstfile, os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
                 self.write_data(fd)
                 os.close(fd)
             self.dst.umount()
-
-    def cleanup(self, **kwargs):
-        """Setup test environment"""
-        # Save nocleanup since it will be modified by the base object's
-        # cleanup method in order to cleanup just once
-        nocleanup = self.nocleanup
-        super(SSCTest, self).cleanup(**kwargs)
-
-        if self.dst and not nocleanup and self.remove_dstlist:
-            # Cleanup the destination server
-            self.dst.mount()
-            for absfile in reversed(self.remove_dstlist):
-                try:
-                    if os.path.exists(absfile):
-                        self.dprint("DBG5", "    Removing file [%s]" % absfile)
-                        os.unlink(absfile)
-                except:
-                    pass
-            # Make sure cleanup is called just once
-            self.dst = None
 
     def copy_list(self):
         """Generator to yield all CopyItem objects"""
@@ -710,7 +687,7 @@ class SSCTest(TestUtil):
                     if inter and self.dst:
                         dst_file = self.dst.abspath(dst_name)
                         if dstname is None:
-                            self.remove_dstlist.append(dst_file)
+                            self.dst.remove_list.append(dst_file)
                     else:
                         dst_file = self.abspath(dst_name)
                     # Create FileObj for destination file
