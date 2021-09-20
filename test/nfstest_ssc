@@ -246,9 +246,9 @@ class CopyItem(BaseObj):
     def file_locks(self):
         """Lock the source and destination files"""
         if self.locking:
-            self.dprint("DBG4", "Lock  source file      %s %d@%d" % (self.src_file.absfile, self.ncount, self.src_offset))
+            self.dprint("DBG4", "Lock  src file %s %d@%d" % (self.src_file.absfile, self.ncount, self.src_offset))
             getlock(self.src_file.fd, self.src_file.locktype, self.src_offset, self.ncount)
-            self.dprint("DBG4", "Lock  destination file %s %d@%d" % (self.dst_file.absfile, self.ncount, self.dst_offset))
+            self.dprint("DBG4", "Lock  dst file %s %d@%d" % (self.dst_file.absfile, self.ncount, self.dst_offset))
             getlock(self.dst_file.fd, self.dst_file.locktype, self.dst_offset, self.ncount)
 
 class SSCTest(TestUtil):
@@ -724,23 +724,23 @@ class SSCTest(TestUtil):
 
             # Open source files
             for srcobj in self.src_file_list():
-                self.dprint("DBG3", "Open  source file      %s for %s" % (srcobj.absfile, srcostr))
+                self.dprint("DBG3", "Open  src file %s for %s" % (srcobj.absfile, srcostr))
                 srcobj.fd = os.open(srcobj.absfile, srcopen)
                 if src_seek > 0:
-                    self.dprint("DBG3", "Seek  source file      %s to offset %s" % (srcobj.absfile, src_seek))
+                    self.dprint("DBG3", "Seek  src file %s to offset %s" % (srcobj.absfile, src_seek))
                     os.lseek(srcobj.fd, src_seek, os.SEEK_SET)
 
             # Open destination files
             for dstobj in self.dst_file_list():
-                self.dprint("DBG3", "Open  destination file %s for %s" % (dstobj.absfile, dstostr))
+                self.dprint("DBG3", "Open  dst file %s for %s" % (dstobj.absfile, dstostr))
                 dstobj.fd = os.open(dstobj.absfile, dstopen)
 
                 if write:
                     # Writing file before copy_file_range
-                    self.dprint("DBG3", "Write destination file %s %d@%d" % (dstobj.absfile, self.filesize, 0))
+                    self.dprint("DBG3", "Write dst file %s %d@%d" % (dstobj.absfile, self.filesize, 0))
                     self.write_data(dstobj.fd, pattern=DATA_PATTERN)
                 if dst_seek > 0:
-                    self.dprint("DBG3", "Seek  destination file %s to offset %s" % (dstobj.absfile, dst_seek))
+                    self.dprint("DBG3", "Seek  dst file %s to offset %s" % (dstobj.absfile, dst_seek))
                     os.lseek(dstobj.fd, dst_seek, os.SEEK_SET)
                 else:
                     os.lseek(dstobj.fd, 0, os.SEEK_SET)
