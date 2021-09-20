@@ -208,7 +208,6 @@ class TestUtil(NFSUtil):
         self._disp_msgs = 0
         self._empty_msg = 0
         self._fileopt = True
-        self.remove_list = []
         self.fileidx = 1
         self.diridx = 1
         self.logidx = 1
@@ -1159,9 +1158,6 @@ class TestUtil(NFSUtil):
 
     def _cleanup_files(self):
         """Cleanup files created"""
-        if not self.mounted and self.remove_list:
-            self.mount()
-
         for item in self.remote_files:
             try:
                 cmd = "scp %s:%s %s" % (item[0], item[1], self.tmpdir)
@@ -1184,26 +1180,6 @@ class TestUtil(NFSUtil):
                     os.system(self.sudo_cmd("rm -f %s" % rfile))
                 except:
                     pass
-
-        for rfile in reversed(self.remove_list):
-            try:
-                if os.path.lexists(rfile):
-                    if os.path.isfile(rfile):
-                        self.dprint('DBG5', "    Removing file [%s]" % rfile)
-                        os.unlink(rfile)
-                    elif os.path.islink(rfile):
-                        self.dprint('DBG5', "    Removing symbolic link [%s]" % rfile)
-                        os.unlink(rfile)
-                    elif os.path.isdir(rfile):
-                        self.dprint('DBG5', "    Removing directory [%s]" % rfile)
-                        os.rmdir(rfile)
-                    else:
-                        self.dprint('DBG5', "    Removing [%s]" % rfile)
-                        os.unlink(rfile)
-            except:
-                pass
-
-        self.umount()
 
     def cleanup(self):
         """Clean up test environment.
@@ -1240,6 +1216,8 @@ class TestUtil(NFSUtil):
         if not self.nocleanup:
             self._cleanup_files()
 
+        NFSUtil.cleanup(self)
+
         if cleanup_msg:
             self.dprint('DBG7', "CLEANUP done")
 
@@ -1247,7 +1225,6 @@ class TestUtil(NFSUtil):
             with open(self.xunit_report_file, "w") as f:
                 f.write(self.xunit_report_doc.toprettyxml(indent="  "))
 
-        NFSUtil.cleanup(self)
         self._close(count)
 
     def set_nfserr_list(self, nfs3list=[], nfs4list=[], nlm4list=[], mnt3list=[]):

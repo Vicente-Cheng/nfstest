@@ -217,6 +217,7 @@ class Host(BaseObj):
         self.tracefiles = []
         self.traceproc = None
         self.trcpointproc = None
+        self.remove_list = []
         self.process_list = []
         self.process_smap = {}
         self.process_dmap = {}
@@ -271,6 +272,27 @@ class Host(BaseObj):
         self.trace_stop()
         if self.need_network_reset:
             self.network_reset()
+        if not self.mounted and self.remove_list:
+            self.mount()
+
+        for rfile in reversed(self.remove_list):
+            try:
+                if os.path.lexists(rfile):
+                    if os.path.isfile(rfile):
+                        self.dprint('DBG5', "    Removing file [%s]" % rfile)
+                        os.unlink(rfile)
+                    elif os.path.islink(rfile):
+                        self.dprint('DBG5', "    Removing symbolic link [%s]" % rfile)
+                        os.unlink(rfile)
+                    elif os.path.isdir(rfile):
+                        self.dprint('DBG5', "    Removing directory [%s]" % rfile)
+                        os.rmdir(rfile)
+                    else:
+                        self.dprint('DBG5', "    Removing [%s]" % rfile)
+                        os.unlink(rfile)
+            except:
+                pass
+
         if self.mounted:
             self.umount()
         for mtpoint in self._mtpoint_created:

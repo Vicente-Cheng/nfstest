@@ -166,7 +166,9 @@ class NFSUtil(Host):
         self._ncleanup_done = True
         self.clientobj = None
         while self.clients:
-            self.clients.pop()
+            hostobj = self.clients.pop()
+            if hostobj:
+                hostobj.cleanup()
         # Call base class destructor
         Host.cleanup(self)
 
