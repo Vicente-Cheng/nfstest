@@ -55,6 +55,8 @@ from baseobj import BaseObj
 from packet.link.erf import ERF
 from packet.unpack import Unpack
 from packet.record import Record
+from packet.internet.ipv4 import IPv4
+from packet.internet.ipv6 import IPv6
 from packet.pkt import Pkt, PKT_layers
 from packet.link.ethernet import ETHERNET
 from packet.transport.rdmainfo import RDMAinfo
@@ -447,6 +449,17 @@ class Pktt(BaseObj):
         if self.header.link_type == 1:
             # Decode ethernet layer
             ETHERNET(self)
+        elif self.header.link_type == 101:
+            # Decode raw ip layer
+            uoffset = self.unpack.tell()
+            ipver = self.unpack.unpack_uchar()
+            self.unpack.seek(uoffset)
+            if (ipver >> 4) == 4:
+                # Decode IPv4 packet
+                IPv4(self)
+            elif (ipver >> 4) == 6:
+                # Decode IPv6 packet
+                IPv6(self)
         elif self.header.link_type == 197:
             # Decode extensible record format layer
             ERF(self)
