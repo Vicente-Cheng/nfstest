@@ -1516,8 +1516,7 @@ class TestUtil(NFSUtil):
                 self._print_msg(msg + tmsg, sgtid)
                 sys.stdout.flush()
         if self.createtraces:
-            traceproc = self.traceproc
-            if traceproc and self.tracefile:
+            if (self.traceproc or self.basename) and self.tracefile:
                 self.trace_stop()
                 self.trace_open()
                 self.pktt.close()
