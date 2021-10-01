@@ -1518,8 +1518,12 @@ class TestUtil(NFSUtil):
         if self.createtraces:
             if (self.traceproc or self.basename) and self.tracefile:
                 self.trace_stop()
-                self.trace_open()
-                self.pktt.close()
+                try:
+                    self.trace_open()
+                except Exception as e:
+                    self.warning(str(e))
+                finally:
+                    self.pktt.close()
         self._test_time()
 
     def _subgroup_id(self, subgroup, tid, subtest):
