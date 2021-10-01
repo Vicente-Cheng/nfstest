@@ -779,9 +779,8 @@ class Host(BaseObj):
             if capsize:
                 opts += " -C %d" % capsize
 
-            hosts = self.ipaddr
-            for cobj in clients:
-                hosts += " or %s" % cobj.ipaddr
+            # Include traffic only from unique IP addresses
+            hosts = " or ".join(set([self.ipaddr] + [x.ipaddr for x in clients]))
 
             cmd = "%s%s -n -B %d -s 0 -w %s host %s" % (self.tcpdump, opts, self.tbsize, self.tracefile, hosts)
             self.run_cmd(cmd, sudo=True, dlevel='DBG2', msg="Trace start: ", wait=False)
