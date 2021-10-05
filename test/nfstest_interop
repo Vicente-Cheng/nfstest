@@ -110,6 +110,7 @@ class InteropTest(TestUtil):
         """Append data to given file"""
         self.dprint('DBG1', "Append data to %s using NFS%s" % (absfile, version))
         fd = os.open(absfile, os.O_WRONLY|os.O_APPEND)
+        self.dprint('DBG2', "    Written data: %r" % data.decode())
         os.write(fd, data)
         os.close(fd)
         self.write_data += data
