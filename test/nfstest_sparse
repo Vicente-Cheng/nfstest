@@ -116,6 +116,7 @@ class SparseTest(TestUtil):
     def setup(self, **kwargs):
         """Setup test environment"""
         self.umount()
+        self.trace_start()
         self.mount()
         # Get block size for mounted volume
         self.statvfs = os.statvfs(self.mtdir)
@@ -136,6 +137,7 @@ class SparseTest(TestUtil):
         uargs["hole_list"] = [0, 2*self.filesize, 4*self.filesize]
         self.create_file(**uargs)
         self.umount()
+        self.trace_stop()
 
     def test_seek(self, fd, whence, msg=""):
         """Verify SEEK succeeds searching for the next data or hole
