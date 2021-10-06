@@ -694,6 +694,9 @@ class Host(BaseObj):
             mt_list.append("nconnect=%d" % nconnect)
         mtopts = ",".join(mt_list)
 
+        if server.find(":") > 0:
+            server = "[%s]" % server
+
         # Mount command
         cmd = "mount -o %s %s:%s %s" % (mtopts, server, export, mtpoint)
         self.run_cmd(cmd, sudo=True, dlevel='DBG2', msg="Mount volume: ")
