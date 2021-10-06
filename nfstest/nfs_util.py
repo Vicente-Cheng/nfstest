@@ -490,6 +490,7 @@ class NFSUtil(Host):
         maxindex      = kwargs.pop('maxindex', None)
         anyclaim      = kwargs.pop('anyclaim', False)
         nfs_version   = kwargs.pop('nfs_version', self.nfs_version)
+        save_pktcall  = None
         self.pktcall  = None
         self.pktreply = None
         self.opencall  = None
@@ -505,6 +506,7 @@ class NFSUtil(Host):
                     "src_ipaddr" : src_ipaddr,
                     "maxindex"   : maxindex,
                     "nfs_version": nfs_version,
+                    "last_call"  : True,
                     "match"      : "NFS.name == '%s'" % filename,
                 }
                 self.find_nfs_op(NFSPROC3_LOOKUP, **margs)
@@ -559,7 +561,10 @@ class NFSUtil(Host):
         while True:
             pktcall = self.pktt.match(match_str, maxindex=maxindex)
             if not pktcall:
+                self.pktcall  = save_pktcall
+                self.opencall = save_pktcall
                 return (None, None, None)
+            save_pktcall = pktcall
             xid = pktcall.rpc.xid
             open_str = "RPC.xid == %d and NFS.status == 0 and NFS.resop == %d" % (xid, OP_OPEN)
             if deleg_type is not None:
