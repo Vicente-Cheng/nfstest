@@ -1179,17 +1179,32 @@ class DelegTest(TestUtil):
                 if expr:
                    conflict_match_str += " and NFS.fh == b'%s'" % self.pktt.escape(fh1)
 
-            # Get conflicting operation packets
-            opencall, openreply = self.get_conflict_pkts(conflict_op, conflict_match_str)
+            silly_op = OP_RENAME if nfs_version > 3 else NFSPROC3_RENAME
+            silly_match_str = src_other_client_str + nfsver + "NFS.argop == %d" % silly_op
+            silly_match_str += " and NFS.name == '%s'" % self.filename
 
-            if opencall is None and conflict_type == OP_REMOVE:
+            opencall  = None
+            openreply = None
+            silly_rename = False
+            if target and conflict_type == OP_RENAME:
+                # Look for silly rename before looking for RENAME(DST)
+                opencall, openreply = self.get_conflict_pkts(silly_op, silly_match_str)
+                if opencall:
+                    self.dprint('DBG2', "Silly RENAME found instead of RENAME(DST)")
+                    silly_rename = True
+                    conflict_op == silly_op
+                    conflict_str = "RENAME"
+
+            if opencall is None:
+                # Get conflicting operation packets
+                opencall, openreply = self.get_conflict_pkts(conflict_op, conflict_match_str)
+
+            if opencall is None and conflict_type == OP_REMOVE and not (target and conflict_type == OP_RENAME):
                 # REMOVE call was not found, look for a silly rename
-                silly_op = OP_RENAME if nfs_version > 3 else NFSPROC3_RENAME
-                silly_match_str = src_other_client_str + nfsver + "NFS.argop == %d" % silly_op
-                silly_match_str += " and NFS.name == '%s'" % self.filename
                 opencall, openreply = self.get_conflict_pkts(silly_op, silly_match_str)
                 if opencall:
                     self.dprint('DBG2', "Silly RENAME found instead of REMOVE")
+                    silly_rename = True
                     conflict_op == silly_op
                     conflict_str = "RENAME"
 
@@ -1264,7 +1279,7 @@ class DelegTest(TestUtil):
                 expr = opencall.NFSop.name == self.filename
                 self.test(expr, "%s should be sent with file holding the delegation as the name" % conflict_str)
             elif conflict_op == OP_RENAME:
-                if target:
+                if target and not silly_rename:
                     expr = opencall.NFSop.newname == self.filename
                     self.test(expr, "%s should be sent with file holding the delegation as the target" % conflict_str)
                 else:
