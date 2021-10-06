@@ -385,6 +385,8 @@ class NFSUtil(Host):
                Find the call only [default: False]
            first_call:
                Return on first call even if reply is not found [default: False]
+           last_call:
+               Return last call even if reply is not found [default: False]
            nfs_version:
                NFS version to use in search [default: mounted NFS version]
 
@@ -399,6 +401,7 @@ class NFSUtil(Host):
         maxindex     = kwargs.get("maxindex",     None)
         call_only    = kwargs.get("call_only",    False)
         first_call   = kwargs.get("first_call",   False)
+        last_call    = kwargs.get("last_call",    False)
         nfs_version  = kwargs.pop('nfs_version',  self.nfs_version)
 
         mstatus = "" if status is None else "NFS.status == %d and " % status
@@ -414,6 +417,7 @@ class NFSUtil(Host):
 
         pktcall  = None
         pktreply = None
+        save_pktcall = None
         while True:
             # Find request
             pktcall = self.pktt.match(match_str, maxindex=maxindex)
@@ -425,7 +429,10 @@ class NFSUtil(Host):
                 pktreply = self.pktt.match("RPC.xid == %d and %s NFS.resop in (%d,%d)" % (xid, mstatus, op, OP_ILLEGAL), maxindex=maxindex)
                 if pktreply or first_call:
                     break
+                save_pktcall = pktcall
             else:
+                if last_call and not pktcall:
+                    pktcall = save_pktcall
                 break
         self.pktcall  = pktcall
         self.pktreply = pktreply
