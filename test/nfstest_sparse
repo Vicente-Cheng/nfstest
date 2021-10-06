@@ -110,6 +110,9 @@ class SparseTest(TestUtil):
         self.opts.set_defaults(nfsversion=4.2)
         self.scan_options()
 
+        # Disable createtraces option
+        self.createtraces = False
+
     def setup(self, **kwargs):
         """Setup test environment"""
         self.umount()
