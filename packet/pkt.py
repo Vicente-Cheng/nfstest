@@ -76,6 +76,10 @@ class Pkt(BaseObj):
     def __init__(self):
         self._layers = ["record"]
 
+    @property
+    def is_truncated(self):
+        return (not self.record or self.record.length_orig != self.record.length_inc)
+
     def __eq__(self, other):
         """Comparison method used to determine if object has a given layer"""
         if isinstance(other, str):
