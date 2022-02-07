@@ -87,6 +87,8 @@ class MPA(BaseObj):
         unpack = pktt.unpack
         record = pktt.pkt.record
         offset = unpack.tell()
+        self.psize = 0
+        self.rpsize = 0
         if unpack.size() < 8:
             return
 
@@ -98,6 +100,7 @@ class MPA(BaseObj):
         size = record.length_orig - unpack.tell() - 4
         # Do not include any padding
         size -= ((4 - ((mpalen+2) & 0x03)) & 0x03)
+        self.rpsize = size
 
         # Check if valid MPA layer
         # XXX FIXME This check does not include any markers

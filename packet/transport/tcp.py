@@ -336,9 +336,18 @@ class TCP(BaseObj):
         size = unpack.size()
 
         if 20049 in [self.src_port, self.dst_port]:
-            MPA(pktt)
-            if pktt.pkt.mpa is None:
+            if len(stream.buffer):
+                # Concatenate previous fragment
+                unpack.insert(stream.buffer)
+            mpa = MPA(pktt)
+            if pkt.mpa is None:
+                if mpa.psize > mpa.rpsize and not pkt.is_truncated:
+                    # Frame is not truncated so this may be a TCP fragment
+                    stream.add_fragment(unpack.getbytes(), self.seq)
+                    return
                 self.data = unpack.read(len(unpack))
+            else:
+                stream.buffer = b""
             if unpack.size():
                 # Save the offset of next MPA packet within this TCP packet
                 # Data offset is cumulative
