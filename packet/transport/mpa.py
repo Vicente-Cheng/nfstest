@@ -28,7 +28,7 @@ from packet.utils import IntHex, Enum
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2021 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.0"
+__version__   = "1.1"
 
 MPA_Request_Frame = 0
 MPA_Reply_Frame   = 1
@@ -56,6 +56,7 @@ class MPA(BaseObj):
            [
                # MPA Full Operation Phase
                psize = int,  # Length of ULPDU
+               pad   = int,  # Length of Padding bytes
                crc   = int,  # CRC 32 check value
            ] | [
                # Connection Setup
@@ -70,10 +71,10 @@ class MPA(BaseObj):
        )
     """
     # Class attributes
-    _attrlist = ("psize", "crc",
+    _attrlist = ("psize", "pad", "crc",
                  "ftype", "marker", "use_crc", "reject", "revision")
-    _strfmt1  = "MPA   crc: {1}, len: {0}"
-    _strfmt2  = "crc: {1}, len: {0}"
+    _strfmt1  = "MPA   crc: {2}, pad: {1}, len: {0}"
+    _strfmt2  = "crc: {2}, pad: {1}, len: {0}"
 
     def __init__(self, pktt):
         """Constructor
@@ -99,7 +100,8 @@ class MPA(BaseObj):
         # MPA payload size: excluding the MPA CRC (4 bytes)
         size = record.length_orig - unpack.tell() - 4
         # Do not include any padding
-        size -= ((4 - ((mpalen+2) & 0x03)) & 0x03)
+        self.pad = ((4 - ((mpalen+2) & 0x03)) & 0x03)
+        size -= self.pad
         self.rpsize = size
 
         # Check if valid MPA layer
@@ -122,6 +124,10 @@ class MPA(BaseObj):
             # than mpalen if this is a truncated frame. It could be larger
             # if there is a full capture and there is padding
             data = unpack.read(min(mpalen, size))
+
+        if self.pad and delta == 0 and unpack.size():
+            # Get padding bytes
+            unpack.read(min(self.pad, unpack.size()))
 
         unpack_save = None
         if delta == 0 and unpack.size() >= 4:
@@ -173,15 +179,15 @@ class MPA(BaseObj):
                 # key = 0x4d504120494420526571204672616d65
                 self._mpa_frame(pktt)
                 self.ftype    = FrameType(MPA_Request_Frame)
-                self._strfmt1 = "MPA   v{6:<3} {2}, marker: {3}, use_crc: {4}, len: {0}"
-                self._strfmt2 = "{2}, revision: {6}, marker: {3}, use_crc: {4}, len: {0}"
+                self._strfmt1 = "MPA   v{7:<3} {3}, marker: {4}, use_crc: {5}, len: {0}"
+                self._strfmt2 = "{3}, revision: {7}, marker: {4}, use_crc: {5}, len: {0}"
             elif key == b"MPA ID Rep Frame":
                 # MPA Reply Frame
                 # key = 0x4d504120494420526570204672616d65
                 self._mpa_frame(pktt)
                 self.ftype    = FrameType(MPA_Reply_Frame)
-                self._strfmt1 = "MPA   v{6:<3} {2},   marker: {3}, use_crc: {4}, len: {0}, reject: {5}"
-                self._strfmt2 = "{2}, revision: {6}, marker: {3}, use_crc: {4}, reject: {5}, len: {0}"
+                self._strfmt1 = "MPA   v{7:<3} {3},   marker: {4}, use_crc: {5}, len: {0}, reject: {6}"
+                self._strfmt2 = "{3}, revision: {7}, marker: {4}, use_crc: {5}, reject: {6}, len: {0}"
         if self.ftype is None:
             # No MPA Req/Rep Frame
             unpack.seek(offset)
