@@ -33,7 +33,7 @@ from packet.utils import OptionFlags, ShortHex
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.6"
+__version__   = "1.7"
 
 UINT32_MAX = 0xffffffff
 
@@ -343,6 +343,7 @@ class TCP(BaseObj):
             if pkt.mpa is None:
                 if mpa.psize > mpa.rpsize and not pkt.is_truncated:
                     # Frame is not truncated so this may be a TCP fragment
+                    unpack.restore_state(sid)
                     stream.add_fragment(unpack.getbytes(), self.seq)
                     return
                 self.data = unpack.read(len(unpack))
