@@ -98,7 +98,11 @@ class MPA(BaseObj):
         self.psize = mpalen
 
         # MPA payload size: excluding the MPA CRC (4 bytes)
-        size = record.length_orig - unpack.tell() - 4
+        if record.length_orig < len(unpack):
+            # Reassembled message of TCP fragments
+            size = unpack.size()
+        else:
+            size = record.length_orig - unpack.tell() - 4
         # Do not include any padding
         self.pad = ((4 - ((mpalen+2) & 0x03)) & 0x03)
         size -= self.pad
