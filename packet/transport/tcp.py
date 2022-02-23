@@ -346,8 +346,14 @@ class TCP(BaseObj):
                     unpack.restore_state(sid)
                     stream.add_fragment(unpack.getbytes(), self.seq)
                     return
+                else:
+                    if len(stream.buffer) > 0:
+                        stream.frag_off = 0
+                    stream.buffer = b""
                 self.data = unpack.read(len(unpack))
             else:
+                if len(stream.buffer) > 0:
+                    stream.frag_off = 0
                 stream.buffer = b""
             if unpack.size():
                 # Save the offset of next MPA packet within this TCP packet
