@@ -36,7 +36,7 @@ from packet.pktt import Pktt
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.5"
+__version__   = "1.6"
 
 class Host(BaseObj):
     """Host object
@@ -827,6 +827,14 @@ class Host(BaseObj):
         """
         if tracefile is None:
             tracefile = self.tracefile
+        if not os.path.exists(tracefile):
+            # Trace file does not exist, try to open the compressed file
+            basename, ext = os.path.splitext(tracefile)
+            if ext != ".gz":
+                # Add the gz extension to the trace file
+                trcfile = tracefile + ".gz"
+                if os.path.exists(trcfile):
+                    tracefile = trcfile
         self.dprint('DBG1', "trace_open [%s]" % tracefile)
         self.pktt = Pktt(tracefile, **kwargs)
         return self.pktt
