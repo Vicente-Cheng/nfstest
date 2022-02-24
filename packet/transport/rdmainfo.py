@@ -23,7 +23,7 @@ from packet.utils import RDMAbase
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2017 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.0"
+__version__   = "1.1"
 
 class RDMAseg(object):
     """RDMA sub-segment object
@@ -100,9 +100,7 @@ class RDMAsegment(object):
         self.length  = rdma_seg.length
         self.xdrpos  = getattr(rdma_seg, "position", 0)  # RDMA read chunk XDR position
         self.rpcrdma = rpcrdma # RPC-over-RDMA object used for RDMA reads
-        self.rhandle = None    # Read Response handle belonging to this segment
-        self.roffset = None    # Read Response offset belonging to this segment
-        self.rlength = None    # Read Request length
+        self.rhandle = None    # Sink Steering Tag in iWarp request
         self.fragments = {}    # List of iWarp data fragments
 
         # List of sub-segments (RDMAseg)
@@ -168,7 +166,7 @@ class RDMAsegment(object):
         return seg
 
     def add_data(self, psn, data):
-        """Add fragment data"""
+        """Add Infiniband fragment data"""
         # Search for correct sub-segment
         for seg in self.seglist:
             if seg.insert_data(psn, data):
@@ -185,7 +183,7 @@ class RDMAsegment(object):
                 data += seg.get_data(padding)
         elif len(self.fragments):
             # Get data from all iWarp fragments
-            nextoff = self.get_offset()
+            nextoff = self.offset
             for offset in sorted(self.fragments.keys()):
                 # Check for missing fragments
                 count = offset - nextoff
@@ -207,7 +205,7 @@ class RDMAsegment(object):
                 size += seg.get_size()
         else:
             # Get size from all iWarp fragments
-            nextoff = self.get_offset()
+            nextoff = self.offset
             for offset in sorted(self.fragments.keys()):
                 # Check for missing fragments
                 count = offset - nextoff
@@ -218,19 +216,28 @@ class RDMAsegment(object):
                 nextoff = offset + len(self.fragments[offset])
         return size
 
-    def get_offset(self):
-        """Return the segment offset used for writes or read responses"""
-        return self.offset if self.roffset is None else self.roffset
-
-    def add_request(self, rdmap):
-        """Add iWarp read request"""
-        self.rhandle = rdmap.sinkstag
-        self.roffset = rdmap.sinksto
-        self.rlength = rdmap.dma_len
-
-    def add_fragment(self, rdmap, unpack):
+    def add_fragment(self, offset, data):
         """Add iWarp fragment to segment"""
-        self.fragments[rdmap.offset] = unpack.read(rdmap.psize)
+        self.fragments[offset] = data
+
+class RDMArequest(object):
+    """RDMA iWarp Request object"""
+    def __init__(self, rdmap, rsegment):
+        self.srcstag  = rdmap.srcstag
+        self.srcsto   = rdmap.srcsto
+        self.sinksto  = rdmap.sinksto
+        self.dma_len  = rdmap.dma_len
+        self.rsegment = rsegment
+
+    def __contains__(self, offset):
+        """Membership test operator.
+           Return true if offset belongs to this request
+        """
+        return (offset >= self.sinksto and offset < (self.sinksto + self.dma_len))
+
+    def get_offset(self, offset):
+        """Return offset translated from sink to src"""
+        return (offset - self.sinksto + self.srcsto)
 
 class RDMAinfo(RDMAbase):
     """RDMA info object used for reassembly
@@ -253,6 +260,8 @@ class RDMAinfo(RDMAbase):
     def __init__(self):
         # RDMA Reads/Writes/Reply segments {key: handle, value: RDMAsegment}
         self._rdma_segments = {}
+        # iWarp Requests to map sink -> src {key: sinkstag, value: [RDMArequest,]}
+        self._rdma_iwarp_requests = {}
 
     def size(self):
         """Return the number RDMA segments"""
@@ -262,6 +271,7 @@ class RDMAinfo(RDMAbase):
     def reset(self):
         """Clear RDMA segments"""
         self._rdma_segments = {}
+        self._rdma_iwarp_requests = {}
         self.sindex = 0
     __del__ = reset
 
@@ -275,7 +285,7 @@ class RDMAinfo(RDMAbase):
             return
         self._rdma_segments.pop(rsegment.handle, None)
         if rsegment.rhandle is not None:
-            self._rdma_segments.pop(rsegment.rhandle, None)
+            self._rdma_iwarp_requests.pop(rsegment.rhandle, None)
 
     def add_rdma_segment(self, rdma_seg, rpcrdma=None):
         """Add RDMA segment information and if the information already
@@ -291,7 +301,7 @@ class RDMAinfo(RDMAbase):
         return rsegment
 
     def add_rdma_data(self, psn, unpack, reth=None, only=False, read=False):
-        """Add RDMA fragment data"""
+        """Add Infiniband fragment data"""
         if reth:
             # The RETH object header is given which is the case for an OpCode
             # like *Only or *First, use the RETH RKey(or handle) to get the
@@ -320,11 +330,21 @@ class RDMAinfo(RDMAbase):
                         rsegment.add_data(psn, unpack.read(size))
                     return rsegment
 
-    def add_iwarp_data(self, rdmap, unpack):
+    def add_iwarp_data(self, rdmap, unpack, isread=False):
         """Add iWarp fragment data"""
-        rsegment = self.get_rdma_segment(rdmap.stag)
+        if isread:
+            rsegment = None
+            # Get request to map sink -> src
+            for request in self._rdma_iwarp_requests.get(rdmap.stag, []):
+                if rdmap.offset in request:
+                    rsegment = request.rsegment
+                    offset = request.get_offset(rdmap.offset)
+                    break
+        else:
+            offset = rdmap.offset
+            rsegment = self.get_rdma_segment(rdmap.stag)
         if rsegment is not None:
-            rsegment.add_fragment(rdmap, unpack)
+            rsegment.add_fragment(offset, unpack.read(rdmap.psize))
         return rsegment
 
     def add_iwarp_request(self, rdmap):
@@ -332,12 +352,13 @@ class RDMAinfo(RDMAbase):
         # The data source STag is the handle given in the read chunk segment
         rsegment = self.get_rdma_segment(rdmap.srcstag)
         if rsegment is not None:
-            rsegment.add_request(rdmap)
-            # Create another segment entry using the data sink STag since
-            # this is the handle to be used in the RDMA read responses.
-            # This creates a mapping between the read responses and the
-            # read chunk segment.
-            self._rdma_segments[rdmap.sinkstag] = rsegment
+            # Get or create a new mapping list
+            rdmareqs = self._rdma_iwarp_requests.setdefault(rdmap.sinkstag, [])
+            # Add request sink stag to segment object so requests for segment
+            # can be removed
+            rsegment.rhandle = rdmap.sinkstag
+            # Append request to create a mapping: sink -> src
+            rdmareqs.append(RDMArequest(rdmap, rsegment))
 
     def reassemble_rdma_reads(self, unpack, psn=None, only=False, rdmap=None):
         """Reassemble RDMA read chunks
@@ -363,7 +384,7 @@ class RDMAinfo(RDMAbase):
         if rdmap is None:
             rsegment = self.add_rdma_data(psn, unpack, only=only, read=only)
         else:
-            rsegment = self.add_iwarp_data(rdmap, unpack)
+            rsegment = self.add_iwarp_data(rdmap, unpack, True)
         if rsegment is None or (rdmap is not None and rdmap.lastfl == 0):
             # Do not try to reassemble the RDMA reads if this is not
             # a read response last
