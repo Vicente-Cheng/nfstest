@@ -30,7 +30,7 @@ import packet.application.rpc_const as rpc_const
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2020 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.0"
+__version__   = "1.1"
 
 USAGE = """%prog --server <server> [options]
 
@@ -938,11 +938,12 @@ class RdmaTest(TestUtil):
                 rdmapobj = self.pktt.pkt.rdmap
                 reqlen += rdmapobj.dma_len
                 # Include the packet index in the request
-                requests.append((rdmapobj.opcode, rdmapobj.psize, rdmapobj.sinkstag, rdmapobj.sinksto, rdmapobj.dma_len))
+                requests.append((rdmapobj.opcode, rdmapobj.srcsto, rdmapobj.psize, rdmapobj.sinkstag,
+                                 rdmapobj.sinksto, rdmapobj.dma_len, self.pktt.pkt.record.index))
             self.dprint('DBG2', "RDMA read requests for handle %s: %d" % (handle, len(requests)))
         else:
             opres = RDMA_Write
-            requests = [(opres, length, handle, offset, length)]
+            requests = [(opres, offset, length, handle, offset, length, self.pktt.get_index())]
 
         opstr = rdmap_op_codes.get(opres)
         # Direction of RDMA I/O fragments
@@ -950,9 +951,10 @@ class RdmaTest(TestUtil):
 
         for reqinfo in requests:
             # Verify all fragments
-            opreq, psize, rhandle, roffset, dma_len = reqinfo
+            opreq, soffset, psize, rhandle, roffset, dma_len, pktindex = reqinfo
             if iotype == RDMA_READ:
-                self.dprint('DBG2', "%s: src:(%s, %s), sink:(%s, %s), dma_len: %s" % (opreq, handle, offset, rhandle, roffset, dma_len))
+                args = (opreq, handle, soffset, rhandle, roffset, dma_len)
+                self.dprint('DBG2', "%s: src:(%s, %s), sink:(%s, %s), dma_len: %s" % args)
                 self.test(True, "%s should be sent to client" % opreq)
                 amsg = "%s should have correct " % opreq
                 self.test(True, amsg + "virtual address")
@@ -965,6 +967,7 @@ class RdmaTest(TestUtil):
             mstr += "rdmap.offset >= %d and rdmap.offset < %d" % (roffset, roffset + dma_len)
             iosize = 0
             fragment_list = []
+            self.pktt.rewind(pktindex)
             while self.pktt.match(mstr):
                 rdmapobj = self.pktt.pkt.rdmap
                 fragment_list.append((rdmapobj.offset, rdmapobj.lastfl, rdmapobj.psize))
