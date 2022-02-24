@@ -540,6 +540,8 @@ class RDMAinfo(RDMAbase):
                         # available to upper layer objects which inherit
                         # from packet.utils.RDMAbase
                         self.rdma_write_chunks[-1].append(rsegment)
+                        if rsegment.get_size() > 0:
+                            self.del_rdma_segment(rsegment)
 
                 if len(self.rdma_write_chunks[-1]) == 0:
                     # Clear list of RDMA write chunks if no segments were added
