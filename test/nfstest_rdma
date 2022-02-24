@@ -1501,7 +1501,9 @@ class RdmaTest(TestUtil):
 
             # Search for the NFS write
             self.pktt.rewind(pkt_rdma_msg.record.index)
-            self.find_nfs_op(self.nfs_op(OP_WRITE, NFSPROC3_WRITE), call_only=True)
+            # Match the XID as well to make sure the correct NFS WRITE is matched
+            mxidstr = "rpc.xid == 0x%08x" % rpcordma.xid
+            self.find_nfs_op(self.nfs_op(OP_WRITE, NFSPROC3_WRITE), match=mxidstr, call_only=True)
             writecall = self.pktt.pkt
             self.verify_io_op(writecall, OP_WRITE, rpc_const.CALL, isrpcordma=False)
         elif pkt_rdma_msg and pkt_rdma_msg.NFSop is not None:
