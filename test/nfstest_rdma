@@ -1542,6 +1542,11 @@ class RdmaTest(TestUtil):
                 # No reply chunk in call
                 rproc = RDMA_MSG
                 nreply = 0
+            # Make sure to use correct proc when the reply chunk is empty
+            if writereply and writereply.rpcordma and writereply.rpcordma.reply:
+                if sum([x.length for x in writereply.rpcordma.reply.target]) == 0:
+                    # Reply chunk is empty -- no RDMA transfer
+                    rproc = RDMA_MSG
             self.verify_io_op(writereply, OP_WRITE, rpc_const.REPLY, rdmaproc=rproc)
             rpcordma = writecall.rpcordma if rpcordma is None else rpcordma
             self.pktt.rewind(save_index)
