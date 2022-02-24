@@ -188,8 +188,8 @@ class RDMAsegment(object):
                 # Check for missing fragments
                 count = offset - nextoff
                 if count > 0:
-                   # There are missing fragments
-                   data += bytes(count)
+                    # There are missing fragments
+                    data += bytes(count)
                 data += self.fragments[offset]
                 nextoff = offset + len(self.fragments[offset])
             if not padding and len(data) > self.length:
@@ -210,8 +210,8 @@ class RDMAsegment(object):
                 # Check for missing fragments
                 count = offset - nextoff
                 if count > 0:
-                   # There are missing fragments
-                   size += count
+                    # There are missing fragments
+                    size += count
                 size += len(self.fragments[offset])
                 nextoff = offset + len(self.fragments[offset])
         return size
