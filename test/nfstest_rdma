@@ -933,7 +933,7 @@ class RdmaTest(TestUtil):
             opres = RDMA_Read_Response
             # Search for all read requests in the segment
             match_str  = "rdmap.opcode == %d and rdmap.srcstag == %s and " % (RDMA_Read_Request, handle)
-            match_str += "rdmap.srcsto >= %d and rdmap.srcsto < %d" % (offset, offset + length)
+            match_str += "rdmap.srcsto >= %s and rdmap.srcsto < 0x%016x" % (offset, offset + length)
             while self.pktt.match(match_str):
                 rdmapobj = self.pktt.pkt.rdmap
                 reqlen += rdmapobj.dma_len
@@ -964,7 +964,7 @@ class RdmaTest(TestUtil):
 
             # Search for all fragments belonging to this request
             mstr  = "rdmap.opcode == %d and rdmap.stag == %s and " % (opres, rhandle)
-            mstr += "rdmap.offset >= %d and rdmap.offset < %d" % (roffset, roffset + dma_len)
+            mstr += "rdmap.offset >= %s and rdmap.offset < 0x%016x" % (roffset, roffset + dma_len)
             iosize = 0
             fragment_list = []
             self.pktt.rewind(pktindex)
@@ -1029,7 +1029,7 @@ class RdmaTest(TestUtil):
                     msize = sum([x[1] for x in missing_fragments])
                     self.dprint('DBG2', "Missing %d bytes in fragments:" % msize)
                     for off, size in missing_fragments:
-                        self.dprint('DBG3', "    Missing %d bytes at offset 0x%08x" % (size, off))
+                        self.dprint('DBG3', "    Missing %d bytes at offset 0x%016x" % (size, off))
 
                 # Calculate the number of expected fragments per sub-request
                 iosize = iosize if iosize > 0 else dmalen
@@ -1163,14 +1163,14 @@ class RdmaTest(TestUtil):
             nhandles = len(handle_list)      # Number of handles
             uhandles = len(set(handle_list)) # Number of unique handles
             amsg = tmsg + "all unique RDMA chunk handles"
-            fmsg = ": expecting %d unique handles but got %d" % (nhandles, uhandles)
+            fmsg = ": expecting %d unique handles but got %d" % (uhandles, nhandles)
             self.test(uhandles == nhandles, amsg, failmsg=fmsg)
 
             offset_list = [x[-2] for x in flat_list]
             noffsets = len(offset_list)      # Number of offsets
             uoffsets = len(set(offset_list)) # Number of unique offsets
             amsg = tmsg + "all unique RDMA chunk virtual addresses"
-            fmsg = ": expecting %d unique virtual addresses but got %d" % (noffsets, uoffsets)
+            fmsg = ": expecting %d unique virtual addresses but got %d" % (uoffsets, noffsets)
             self.test(uoffsets == noffsets, amsg, failmsg=fmsg)
 
         afmt = "%sDDP (using %s opcodes)"
@@ -1365,7 +1365,7 @@ class RdmaTest(TestUtil):
                 self.dprint('DBG2', "RDMA %s chunk segment: handle=%s, offset=0x%016x, length=%d" % dargs)
                 fmsg = ": reply handle does not match the call handle"
                 self.test(rhandle == chandle, tmsg + "handle", failmsg=fmsg)
-                fmsg = ": reply RDMA offset (%d) should be equal to call RDMA offset (%d)" % (roffset, coffset)
+                fmsg = ": reply RDMA offset (%s) should be equal to call RDMA offset (%s)" % (roffset, coffset)
                 self.test(roffset == coffset, tmsg + "virtual address", failmsg=fmsg)
                 if nreply > 0 and rpcordma_r.proc == RDMA_MSG:
                     emsg = " of zero when proc is RDMA_MSG"
