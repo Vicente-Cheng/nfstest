@@ -489,7 +489,7 @@ def create_manpage(src, dst):
     functions = []
     is_local_function = False
     for line in _lstrip(func_list):
-        regex = re.search(r'(\w+)\((.*)\)', line)
+        regex = re.search(r'^\s*(\w+)\((.*)\)$', line)
         if not regex:
             regex = re.search(r'(\w+)\s+(lambda)\s+(.*)', line)
         if regex:
