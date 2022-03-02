@@ -502,7 +502,10 @@ def create_manpage(src, dst):
             if data[1] != "..." or data[0] not in mod_funcs:
                 # Only include functions defined locally,
                 # do not include any function from imported modules
-                functions.append('.SS %s' % line)
+                if len(functions) > 0:
+                    functions.append('.P\n.B %s' % line)
+                else:
+                    functions.append('.B %s' % line)
                 is_local_function = True
         elif is_local_function:
             func_desc.append(line)
@@ -557,7 +560,7 @@ def create_manpage(src, dst):
                     print(line, file=fd)
                 print('.fi', file=fd)
     if functions:
-        print('.SH FUNCTIONS', file=fd)
+        print('.SH FUNCTIONS\n.nf', file=fd)
         for line in functions:
             print(line, file=fd)
     if options and progname != 'NFStest':
