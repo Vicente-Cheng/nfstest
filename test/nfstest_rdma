@@ -1281,6 +1281,16 @@ class RdmaTest(TestUtil):
                     rdmap = self.pktt.pkt.rdmap
                     send_list.append((rdmap.opcode, rdmap.offset, rdmap.psize, rdmap.lastfl))
 
+                # Filter the SENDs for the NFS read/write, start from the end
+                # of the list and find the first SEND packet (lastfl == 0)
+                count = 0
+                for op, offset, size, lastfl in reversed(send_list):
+                    if count > 0 and lastfl:
+                        break
+                    count += 1
+                if count < len(send_list):
+                    send_list = send_list[-count:]
+
             if len(send_list):
                 if chunkverify:
                     # Verify the RDMA chunk lists
