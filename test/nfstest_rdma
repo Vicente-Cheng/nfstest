@@ -1262,12 +1262,16 @@ class RdmaTest(TestUtil):
 
     def verify_iwarp_sends(self, pkt, optype, rpctype, rpcordma=None, chunkverify=True):
         """Verify I/O is sent using (iWarp) RDMA SENDs instead of a chunk list"""
-        if pkt and pkt in RDMA_layers:
+        if pkt and pkt == "rdmap":
             send_list = []
             # Index of NFS write call or read reply
             io_index = pkt.record.index
-            opcode   = pkt.rdmap.opcode if self.isiwarp else pkt.ib.opcode
-            if opcode in iWarpSendList:
+            opcode   = pkt.rdmap.opcode
+            if pkt.rdmap.offset == 0:
+                # There is only one SEND for this NFS read/write
+                rdmap = pkt.rdmap
+                send_list.append((rdmap.opcode, rdmap.offset, rdmap.psize, rdmap.lastfl))
+            elif opcode in iWarpSendList:
                 # Find all Send fragments
                 msn = pkt.ddp.msn
                 match_str = "ddp.queue == %d and " % pkt.ddp.queue + \
