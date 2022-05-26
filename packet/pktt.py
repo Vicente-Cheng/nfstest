@@ -56,6 +56,7 @@ from packet.link.erf import ERF
 from packet.unpack import Unpack
 from packet.record import Record
 from packet.link.sllv1 import SLLv1
+from packet.link.sllv2 import SLLv2
 from packet.internet.ipv4 import IPv4
 from packet.internet.ipv6 import IPv6
 from packet.pkt import Pkt, PKT_layers
@@ -464,6 +465,9 @@ class Pktt(BaseObj):
         elif self.header.link_type == 113:
             # Decode Linux "cooked" v1 capture encapsulation layer
             SLLv1(self)
+        elif self.header.link_type == 276:
+            # Decode Linux "cooked" v2 capture encapsulation layer
+            SLLv2(self)
         elif self.header.link_type == 197:
             # Decode extensible record format layer
             ERF(self)
