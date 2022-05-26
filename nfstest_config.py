@@ -156,6 +156,7 @@ NFSTEST_ALLMODS = [
     'packet/link/ethernet.py',
     'packet/link/ethernet_const.py',
     'packet/link/macaddr.py',
+    'packet/link/sllv1.py',
     'packet/link/vlan.py',
     'packet/nfs/mount3.py',
     'packet/nfs/mount3_const.py',

@@ -55,6 +55,7 @@ from baseobj import BaseObj
 from packet.link.erf import ERF
 from packet.unpack import Unpack
 from packet.record import Record
+from packet.link.sllv1 import SLLv1
 from packet.internet.ipv4 import IPv4
 from packet.internet.ipv6 import IPv6
 from packet.pkt import Pkt, PKT_layers
@@ -415,7 +416,7 @@ class Pktt(BaseObj):
             # Frame number is one for every record header on the pcap trace
             # On the other hand self.index is the packet number. Since there
             # could be multiple packets on a single frame self.index could
-            # be larger the self.frame except that self.index start at 0
+            # be larger than self.frame except that self.index start at 0
             # while self.frame starts at 1.
             # The frame number can be used to match packets with other tools
             # like wireshark
@@ -460,6 +461,9 @@ class Pktt(BaseObj):
             elif (ipver >> 4) == 6:
                 # Decode IPv6 packet
                 IPv6(self)
+        elif self.header.link_type == 113:
+            # Decode Linux "cooked" v1 capture encapsulation layer
+            SLLv1(self)
         elif self.header.link_type == 197:
             # Decode extensible record format layer
             ERF(self)
