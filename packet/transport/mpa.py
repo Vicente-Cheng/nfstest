@@ -94,7 +94,7 @@ class MPA(BaseObj):
             return
 
         # Decode the MPA length
-        mpalen = unpack.unpack_short()
+        mpalen = unpack.unpack_ushort()
         self.psize = mpalen
 
         # MPA payload size: excluding the MPA CRC (4 bytes)
