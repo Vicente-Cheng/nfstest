@@ -334,6 +334,8 @@ class DelegTest(TestUtil):
         if self.client_nfsvers is not None:
             nfsvers_list = self.str_list(self.client_nfsvers)
             for client_args in client_list:
+                if self.proto[-1] == "6" and len(client_args.get("proto")) and client_args["proto"][-1] != 6:
+                    client_args["proto"] += "6"
                 for nfsver in nfsvers_list:
                     if nfsver != self.nfsversion:
                         client_args["nfsversion"] = nfsver
