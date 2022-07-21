@@ -156,6 +156,7 @@ class RDMAP(BaseObj):
         unpack = pktt.unpack
         offset = unpack.tell()
         rdma_info = pktt._rdma_info
+        rpcordma = None
 
         if self.opcode in (Send, Send_Invalidate, Send_SE, Send_SE_Invalidate):
             if self.lastfl:
@@ -186,7 +187,10 @@ class RDMAP(BaseObj):
                 sdata[self.offset] = unpack.read(self.psize)
                 return
 
-            rpcordma = RPCoRDMA(unpack)
+            try:
+                rpcordma = RPCoRDMA(unpack)
+            except:
+                pass
             if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
                 pktt.pkt.add_layer("rpcordma", rpcordma)
                 if rpcordma.proc == rdma.RDMA_ERROR:
