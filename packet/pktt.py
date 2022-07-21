@@ -1083,12 +1083,12 @@ class Pktt(BaseObj):
           and (os.getpgrp() == os.tcgetpgrp(sys.stderr.fileno())):
             rows, columns = struct.unpack('hh', fcntl.ioctl(2, termios.TIOCGWINSZ, "1234"))
             if columns < 100:
-                sps = 30
+                sps = 40
             else:
                 # Terminal is wide enough, include bytes/sec
-                sps = 42
+                sps = 52
             # Progress bar length
-            wlen = int(columns) - len(str_units(self.filesize)) - sps
+            wlen = int(columns) - sps
             # Number of bytes per progress bar unit
             xunit = float(self.filesize)/wlen
             # Progress bar units done so far
@@ -1123,12 +1123,12 @@ class Pktt(BaseObj):
                 pbar = " [\033[32m\033[42m%s\033[m%s] " % ("="*xdone, " "*slen)
                 # Add progress percentage and how many bytes have been
                 # processed so far relative to the total number of bytes
-                pbar += "%5.1f%% %9s/%s" % (progress, str_units(self.offset), str_units(self.filesize))
+                pbar += "%5.1f%% %9s/%-9s" % (progress, str_units(self.offset), str_units(self.filesize))
                 if columns < 100:
-                    sys.stderr.write("%s %-6s\r" % (pbar, str_time(otime)))
+                    sys.stderr.write("%s %8s\r" % (pbar, str_time(otime)))
                 else:
                     # Terminal is wide enough, include bytes/sec
-                    sys.stderr.write("%s %9s/s %-6s\r" % (pbar, str_units(bps), str_time(otime)))
+                    sys.stderr.write("%s %9s/s %8s\r" % (pbar, str_units(bps), str_time(otime)))
                 if done:
                     sys.stderr.write("\n")
 
