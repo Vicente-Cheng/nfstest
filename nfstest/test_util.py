@@ -411,6 +411,8 @@ class TestUtil(NFSUtil):
         self.log_opgroup.add_option("--tag", default="", help=hmsg)
         hmsg = "Do not use terminal colors on output"
         self.log_opgroup.add_option("--notty", action="store_true", default=False, help=hmsg)
+        hmsg = "Use terminal colors on output -- useful when running with nohup"
+        self.log_opgroup.add_option("--isatty", action="store_true", default=self.isatty, help=hmsg)
         self.opts.add_option_group(self.log_opgroup)
 
         self.cap_opgroup = OptionGroup(self.opts, "Packet trace options")
@@ -959,6 +961,7 @@ class TestUtil(NFSUtil):
 
             if opts.notty:
                 # Do not use terminal colors
+                opts.isatty = False
                 self.isatty = False
 
             try:
