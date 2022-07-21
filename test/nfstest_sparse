@@ -233,7 +233,7 @@ class SparseTest(TestUtil):
                 self.test(pktreply and pktreply.nfs.status == NFS4ERR_NXIO, "SEEK should return NFS4ERR_NXIO", failmsg=fmsg)
             else:
                 self.test(pktreply and pktreply.nfs.status == 0, "SEEK should return NFS4_OK")
-                if pktreply:
+                if pktreply and pktreply.nfs.status == 0:
                     idx = pktcall.NFSidx
                     rseekobj = pktreply.nfs.array[idx]
                     fmsg = ", expecting %d but got %d" % (doffset, rseekobj.offset)
