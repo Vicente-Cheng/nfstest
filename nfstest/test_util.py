@@ -241,6 +241,9 @@ class TestUtil(NFSUtil):
         self.xunit_report_doc = None
         self.test_results = []
         self._tcleanup_done = False
+        self.keeptraces = False
+        self.rmtraces = False
+        self.tracefiles = []
 
         # Trace marker info
         self.trace_marker_name = "F__NFSTEST_MARKER__F__"
