@@ -358,11 +358,14 @@ class DelegTest(TestUtil):
         self.verify_client_option(TEST_CLIENT_DICT)
 
         # Start remote procedure server(s) remotely
-        self.clientobj = None
-        for client_args in client_list:
-            client_name = client_args.pop("client", "")
-            self.create_host(client_name, **client_args)
-            self.create_rexec(client_name)
+        try:
+            self.clientobj = None
+            for client_args in client_list:
+                client_name = client_args.pop("client", "")
+                self.create_host(client_name, **client_args)
+                self.create_rexec(client_name)
+        except:
+            self.test(False, traceback.format_exc())
 
         # Verify the lock ranges do not overlap
         end1 = self.lock_offset  + self.lock_len - 1
