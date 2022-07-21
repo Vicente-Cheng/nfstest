@@ -52,6 +52,7 @@ import ctypes
 import struct
 import inspect
 import textwrap
+import traceback
 from formatstr import *
 import nfstest_config as c
 from baseobj import BaseObj
@@ -1318,20 +1319,23 @@ class TestUtil(NFSUtil):
                     "nlm4":   self.nlm4err_list,
                     "mount3": self.mnt3err_list,
                 }
-            # Scan for NFS errors
-            for pkt in self.pktt:
-                for objname in ("nfs", "nlm", "mount"):
-                    nfsobj = getattr(pkt, objname, None)
-                    if nfsobj:
-                        # Get status
-                        status = getattr(nfsobj, "status", 0)
-                        if status != 0:
-                            nfsver = pkt.rpc.version
-                            name = objname + str(nfsver)
-                            exp_err_list = self.nfserr_list.get(name)
-                            if exp_err_list is not None and status not in exp_err_list:
-                                # Report error not on list of expected errors
-                                self.warning(str(nfsobj))
+            try:
+                # Scan for NFS errors
+                for pkt in self.pktt:
+                    for objname in ("nfs", "nlm", "mount"):
+                        nfsobj = getattr(pkt, objname, None)
+                        if nfsobj:
+                            # Get status
+                            status = getattr(nfsobj, "status", 0)
+                            if status != 0:
+                                nfsver = pkt.rpc.version
+                                name = objname + str(nfsver)
+                                exp_err_list = self.nfserr_list.get(name)
+                                if exp_err_list is not None and status not in exp_err_list:
+                                    # Report error not on list of expected errors
+                                    self.warning(str(nfsobj))
+            except:
+                self.test(False, traceback.format_exc())
             self.nfserr_list = None
             self.pktt.rewind()
         return self.pktt
