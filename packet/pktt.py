@@ -1089,10 +1089,8 @@ class Pktt(BaseObj):
                 sps = 52
             # Progress bar length
             wlen = int(columns) - sps
-            # Number of bytes per progress bar unit
-            xunit = float(self.filesize)/wlen
             # Progress bar units done so far
-            xdone = int(self.offset/xunit)
+            xdone = int(wlen*self.offset/self.filesize)
             xtime = time.time()
             progress = 100.0*self.offset/self.filesize
 
