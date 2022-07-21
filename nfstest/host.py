@@ -197,6 +197,7 @@ class Host(BaseObj):
         self.sudo         = kwargs.pop("sudo",         c.NFSTEST_SUDO)
 
         # Initialize object variables
+        self.nocleanup = True
         self._hcleanup_done = False
         self.nfs_version = float(self.nfsversion)
         self.mtdir = self.mtpoint
@@ -268,6 +269,8 @@ class Host(BaseObj):
         """Gracefully unmount volume and reset network"""
         if self._hcleanup_done:
             return
+        if self.nocleanup:
+            self.remove_list = []
         self._hcleanup_done = True
         self.trace_stop()
         if self.need_network_reset:
