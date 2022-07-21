@@ -698,9 +698,13 @@ class IB(BaseObj):
         unpack = pktt.unpack
         offset = unpack.tell()
         rdma_info = pktt.rdma_info
+        rpcordma = None
 
         if self.opcode in (RC + SEND_Only, RC + SEND_Only_Invalidate):
-            rpcordma = RPCoRDMA(unpack)
+            try:
+                rpcordma = RPCoRDMA(unpack)
+            except:
+                pass
             if rpcordma and rpcordma.vers == 1 and rdma.rdma_proc.get(rpcordma.proc):
                 pkt.add_layer("rpcordma", rpcordma)
                 if rpcordma.proc == rdma.RDMA_ERROR:
