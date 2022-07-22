@@ -19,9 +19,9 @@ import time
 import formatstr
 import packet.utils as utils
 import packet.record as record
+from packet.pktt import Pktt,crc32
 import packet.nfs.nfs3_const as nfs3
 import packet.nfs.nfs4_const as nfs4
-from packet.pktt import Pktt,crc32,crc16
 from optparse import OptionParser,OptionGroup,IndentedHelpFormatter,SUPPRESS_HELP
 
 # Module constants
@@ -318,9 +318,9 @@ if not fh_list and (dirfhcrc32 is not None or len(paths) == 0):
                         isnfsv4 = True
                         for item in pkt.nfs.array:
                             if item.resop == nfs4.OP_OPEN:
-                                stid_list.append(crc16(item.stateid.other))
+                                stid_list.append(crc32(item.stateid.other))
                                 if item.delegation.deleg_type in [nfs4.OPEN_DELEGATE_READ, nfs4.OPEN_DELEGATE_WRITE]:
-                                    stid_list.append(crc16(item.delegation.stateid.other))
+                                    stid_list.append(crc32(item.delegation.stateid.other))
                             elif item.resop == nfs4.OP_GETFH:
                                 fh_list.append(crc32(item.fh))
                                 break
@@ -330,7 +330,7 @@ teststid_xids = []
 if fh_list:
     # Look for all packets for given stateid and file handle
     fhstr = " or ".join(["crc32(nfs.fh) == %d" % fh for fh in fh_list])
-    stidstr = " or ".join(["crc16(nfs.stateid.other) == %d" % stid for stid in stid_list])
+    stidstr = " or ".join(["crc32(nfs.stateid.other) == %d" % stid for stid in stid_list])
     nlmstr = " or ".join(["crc32(nlm.fh) == %d" % fh for fh in fh_list])
     if isnfsv4:
         opstr = "(rpc.version > 3 and nfs.op == %d)" % nfs4.OP_TEST_STATEID
@@ -353,16 +353,16 @@ if fh_list:
                     if item.status != 0:
                         continue
                     if item.resop == nfs4.OP_OPEN:
-                        stid_list.append(crc16(item.stateid.other))
+                        stid_list.append(crc32(item.stateid.other))
                         if item.delegation.deleg_type in [nfs4.OPEN_DELEGATE_READ, nfs4.OPEN_DELEGATE_WRITE]:
-                            stid_list.append(crc16(item.delegation.stateid.other))
+                            stid_list.append(crc32(item.delegation.stateid.other))
                     elif item.resop == nfs4.OP_GETFH:
                         fh_list.append(crc32(item.fh))
                         break
                     elif item.resop == nfs4.OP_LOCK:
-                        stid_list.append(crc16(item.stateid.other))
+                        stid_list.append(crc32(item.stateid.other))
                     elif item.resop == nfs4.OP_LAYOUTGET:
-                        stid_list.append(crc16(item.stateid.other))
+                        stid_list.append(crc32(item.stateid.other))
                         for layout in item.layout:
                             fh_list.extend([crc32(fh) for fh in layout.content.body.fh_list])
         else:
@@ -377,7 +377,7 @@ if fh_list:
                         break
                     elif item.op == nfs4.OP_TEST_STATEID:
                         for stid in item.stateids:
-                            if crc16(stid) not in stid_list:
+                            if crc32(stid) not in stid_list:
                                 # The matched TEST_STATEID does not have any stateids we are looking for
                                 teststid_xids.append(xid)
                                 mflag = True
@@ -391,7 +391,7 @@ if fh_list:
         stid_list = list(set(stid_list))
 
         fhstr = " or ".join(["crc32(nfs.fh) == %d" % fh for fh in fh_list])
-        stidstr = " or ".join(["crc16(nfs.stateid.other) == %d" % stid for stid in stid_list])
+        stidstr = " or ".join(["crc32(nfs.stateid.other) == %d" % stid for stid in stid_list])
         nlmstr = " or ".join(["crc32(nlm.fh) == %d" % fh for fh in fh_list])
         mstr = " or ".join(filter(None, [stidstr, fhstr, nlmstr, filestr, opstr]))
 
