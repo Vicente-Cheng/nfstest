@@ -117,7 +117,7 @@ def int_units(value):
            String to convert
 
        Examples:
-           out = num_units("1MB") # out = 1048576
+           out = int_units("1MB") # out = 1048576
     """
     if isinstance(value, str):
         v, m = re.search(r"([-\+\.\d]+)\s*(\w?)", value).groups()
