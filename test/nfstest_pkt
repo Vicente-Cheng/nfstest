@@ -133,11 +133,10 @@ Examples:
     $ %prog --nfs-mainop 1 -l nfs /tmp/trace.cap
 
     # Have all CRC16 strings displayed as plain strings
-    # e.g., display unformatted state ids
     $ %prog --crc16 0 /tmp/trace.cap
 
     # Have all CRC32 strings displayed as plain strings
-    # e.g., display unformatted file handles
+    # e.g., display unformatted file handles or state ids
     $ %prog --crc32 0 /tmp/trace.cap
 
     # Display packets using India time zone
