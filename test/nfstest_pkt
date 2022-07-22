@@ -16,6 +16,7 @@ import os
 import re
 import sys
 import formatstr
+import traceback
 import packet.pkt
 import packet.utils as utils
 from packet.pktt import Pktt
@@ -370,10 +371,13 @@ for tfile in trace_files:
     if vopts.match == "True":
         # Do not use the match method, instead use the iterator method
         # which is about 36% faster than match
-        for pkt in pkttobj:
-            if maxindex is not None and pkt.record.index >= maxindex:
-                break
-            display_packet(pkttobj)
+        try:
+            for pkt in pkttobj:
+                if maxindex is not None and pkt.record.index >= maxindex:
+                    break
+                display_packet(pkttobj)
+        except:
+            print(traceback.format_exc())
     else:
         while pkttobj.match(vopts.match, rewind=False, reply=vopts.reply, maxindex=maxindex):
             display_packet(pkttobj)
