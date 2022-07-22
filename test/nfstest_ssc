@@ -472,7 +472,7 @@ class SSCTest(TestUtil):
         save_index = self.pktt.get_index()
         mstr = "nfs.name == '%s'" % filename
         if dirfh is not None:
-            mstr = "crc32(nfs.fh) == %d and " % crc32(dirfh) + mstr
+            mstr = "crc32(nfs.fh) == 0x%08x and " % crc32(dirfh) + mstr
         (pktcall, pktreply) = self.find_nfs_op(NFSPROC3_LOOKUP, ipaddr=kwargs["ipaddr"], port=kwargs["port"], match=mstr)
         if pktcall is None:
             self.pktt.rewind(save_index)
@@ -486,7 +486,7 @@ class SSCTest(TestUtil):
         """Search the packets for the lock stateid given by the file handle"""
         if fhandle is None:
             return
-        kwargs["match"] = "crc32(nfs.fh) == %d" % crc32(fhandle)
+        kwargs["match"] = "crc32(nfs.fh) == 0x%08x" % crc32(fhandle)
         self.find_nfs_op(OP_LOCK, **kwargs)
         if self.pktreply:
             self.pktt.rewind(self.pktcall.record.index+1)
@@ -1341,7 +1341,7 @@ class SSCTest(TestUtil):
                                 self.pktt.rewind(pktcall.record.index + 1)
 
                                 # Look for CB_OFFLOAD to get the actual result of the COPY
-                                mstr = "crc16(nfs.stateid.other) == %d" % crc16(copyobj.copyid.other)
+                                mstr = "crc32(nfs.stateid.other) == 0x%08x" % crc32(copyobj.copyid.other)
                                 (pktcall, pktreply) = self.find_nfs_op(OP_CB_OFFLOAD, ipaddr=self.client_ipaddr, port=None, nfs_version=None, match=mstr)
                                 self.test(pktcall, "CB_OFFLOAD should be sent by %sserver when COPY returns synchronous=0" % svrstr)
                                 if pktcall is not None:
@@ -1387,7 +1387,7 @@ class SSCTest(TestUtil):
                                     preply.NFSop = creply
                                 else:
                                     # Search for COMMIT after the COPY/CB_OFFLOAD
-                                    mstr = "crc32(nfs.fh) == %d" % crc32(dst_fhandle)
+                                    mstr = "crc32(nfs.fh) == 0x%08x" % crc32(dst_fhandle)
                                     (pcall, preply) = self.find_nfs_op(OP_COMMIT, ipaddr=args["ipaddr"], port=args["port"], match=mstr)
                                     if committed == UNSTABLE4:
                                         self.test(pcall, "COMMIT should be sent to %sserver when %s returns UNSTABLE4" % (svrstr, opstr))
