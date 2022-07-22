@@ -216,10 +216,12 @@ class SparseTest(TestUtil):
                 offset = file_size - 1
 
             self.trace_open()
-            (pktcall, pktreply) = self.find_nfs_op(OP_SEEK, status=None)
+            (pktcall, pktreply) = self.find_nfs_op(OP_SEEK, status=None, last_call=True)
             self.dprint('DBG7', str(pktcall))
             self.dprint('DBG7', str(pktreply))
             self.test(pktcall, "SEEK should be sent to the server")
+            if pktcall is None:
+                return
             seekobj = pktcall.NFSop
             fmsg = ", expecting %s but got %s" % (self.stid_str(self.stateid), self.stid_str(seekobj.stateid.other))
             self.test(seekobj.stateid == self.stateid, "SEEK should be sent with correct stateid", failmsg=fmsg)
@@ -227,6 +229,10 @@ class SparseTest(TestUtil):
             self.test(seekobj.offset == seek_offset, "SEEK should be sent with correct offset", failmsg=fmsg)
             fmsg = ", expecting %s but got %s" % (data_content4.get(what,what), seekobj.offset)
             self.test(seekobj.what == what, "SEEK should be sent with %s" % seekobj.what, failmsg=fmsg)
+
+            self.test(pktreply, "SEEK should be sent to the client")
+            if pktreply is None:
+                return
 
             if whence == SEEK_DATA and self.sfile.endhole and doffset == offset_list[-1]:
                 fmsg = ", expecting NFS4ERR_NXIO but got %s" % pktreply.nfs.status
