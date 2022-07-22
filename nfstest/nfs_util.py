@@ -89,7 +89,7 @@ class NFSUtil(Host):
            # Get the file handle for the given path
            dirfh = x.get_pathfh("/vol1/data")
 
-           # Display the state id in CRC16 format
+           # Display the state id in CRC32 format
            stidstr = x.stid_str(stateid)
 
            # Get the number of bytes available in the given directory
@@ -1883,8 +1883,8 @@ class NFSUtil(Host):
         return dirfh
 
     def stid_str(self, stateid):
-        """Display the state id in CRC16 format"""
-        stid = self.format("{0:crc16}", stateid)
+        """Display the state id in CRC32 format"""
+        stid = self.format("{0:crc32}", stateid)
         return self.stid_map.get(stateid, stid)
 
     def get_freebytes(self, dir=None):
