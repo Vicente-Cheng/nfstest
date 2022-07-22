@@ -1360,7 +1360,7 @@ class SSCTest(TestUtil):
                                         cbid      = pktcall.NFSop.info.stateid
                                         fmsg = ""
                                         if cbid is not None:
-                                            fmsg = " but got 0x%04x" % crc16(cbid.other)
+                                            fmsg = " but got 0x%08x" % crc32(cbid.other)
                                         self.test(cbid is None, "CB_OFFLOAD should not return a callback id", failmsg=fmsg)
                                     if pktreply:
                                         status = pktreply.NFSop.status
