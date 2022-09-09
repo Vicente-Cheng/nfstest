@@ -225,7 +225,6 @@ class Host(BaseObj):
         self._checkmtpoint = []
         self._checkdatadir = []
         self._invalidmtpoint = []
-        self._mtpoint_created = []
         self.need_network_reset = False
         self.fqdn = socket.getfqdn(self.host)
         ipv6 = self.proto[-1] == '6'
@@ -298,12 +297,6 @@ class Host(BaseObj):
 
         if self.mounted:
             self.umount()
-        for mtpoint in self._mtpoint_created:
-            try:
-                cmd = "rmdir %s" % mtpoint
-                self.run_cmd(cmd, sudo=True, dlevel='DBG3', msg="Removing mount point directory: ")
-            except:
-                pass
 
     def nfsvers(self, version=None):
         """Return major and minor version for the given NFS version
@@ -557,7 +550,6 @@ class Host(BaseObj):
         if not exist:
             cmd = "mkdir -p %s" % mtpoint
             self.run_cmd(cmd, sudo=True, dlevel='DBG3', msg="Creating mount point directory: ")
-            self._mtpoint_created.append(mtpoint)
         elif not isdir:
             self._invalidmtpoint.append(mtpoint)
             raise Exception("Mount point %s is not a directory" % mtpoint)
