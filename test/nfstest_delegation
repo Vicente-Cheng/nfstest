@@ -1286,6 +1286,7 @@ class DelegTest(TestUtil):
                     self.test(lockcall is None, "LOCK should not be sent when holding a %s delegation on the file" % mode_str)
                 self.pktt.rewind(conflict_index)
 
+            wrdexpr = False
             deleg2_stid = None
             open2_stid = None
             mode2_str = mode_str
@@ -1306,6 +1307,7 @@ class DelegTest(TestUtil):
                         open2_stid = o_stid
                         deleg_type = self.openreply.NFSop.delegation.deleg_type
                         mode2_str  = deleg_str[self.openreply.NFSop.delegation.deleg_type]
+                        wrdexpr = (self.opencall.NFSop.access == OPEN4_SHARE_ACCESS_WRITE and deleg_type == OPEN_DELEGATE_READ)
 
                         # Find the DELEGRETURN for this new delegation
                         (delegreturncall, delegreturnreply) = self.find_nfs_op(OP_DELEGRETURN, src_ipaddr=self.client_ipaddr)
@@ -1358,7 +1360,7 @@ class DelegTest(TestUtil):
             # Find OPEN sent from the client right before returning the delegation
             (fh, op_stid2, deleg_stid2) = self.find_open(filename=self.filename, deleg_stateid=deleg_stid, src_ipaddr=self.client_ipaddr, fh=open_fh)
             open_index = self.pktt.get_index()
-            if fh is not None or claim_cur in [os.O_RDONLY, os.O_WRONLY]:
+            if fh is not None or (not wrdexpr and claim_cur in [os.O_RDONLY, os.O_WRONLY]):
                 expr1 = deleg_type == OPEN_DELEGATE_READ  and claim_cur == os.O_RDONLY
                 expr2 = deleg_type == OPEN_DELEGATE_WRITE and claim_cur == os.O_WRONLY
                 # OPEN is only sent if main open and pending open are different
@@ -1392,7 +1394,7 @@ class DelegTest(TestUtil):
             lock_stid2 = lock_stid
             lock_stid = None
             locker = None
-            if lock and delegreturncall:
+            if lock and delegreturncall and not wrdexpr:
                 # Verify the LOCK before DELEGRETURN
                 lop_stid = lock_stid2 if lock_stid2 else open_stid if op_stid2 is None else op_stid2
                 lock_stid = self.verify_lock(io_type, mode_str, lop_stid, self.lock_offset, open_index, delegreturn_index)
@@ -1420,8 +1422,12 @@ class DelegTest(TestUtil):
                 return
             mds_stat = [NFS4_OK, NFS3_OK]
             ds_stat  = [NFS4_OK]
-            stid_type = LOCK_STID if lock and lock_stid else OPEN_STID
-            stateid = lock_stid if stid_type == LOCK_STID else open_stid
+            if wrdexpr and lock_stid2:
+                stid_type = LOCK_STID if lock and lock_stid2 else OPEN_STID
+                stateid = lock_stid2 if stid_type == LOCK_STID else open_stid
+            else:
+                stid_type = LOCK_STID if lock and lock_stid else OPEN_STID
+                stateid = lock_stid if stid_type == LOCK_STID else open_stid
             if conflict_op == OP_OPEN:
                 self.test(openreply.NFSop.delegation.deleg_type == OPEN_DELEGATE_NONE, "Delegation should not be granted for the second client")
             elif conflict_type == OP_REMOVE or (conflict_type == OP_RENAME and target):
