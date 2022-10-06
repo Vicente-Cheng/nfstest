@@ -526,7 +526,7 @@ class DelegTest(TestUtil):
         if fdko is not None:
             self.rexecobj.run(os.close, fdko)
 
-    def setup_test(self, open_type, io_type, mount=False, nfiles=0, lexec=False):
+    def setup_test(self, io_type, mount=False, nfiles=0, lexec=False):
         """Setup test by mounting server and hold open a file so that the open
            owner sticks around so a delegation is granted on next open using
            the same open owner -- this is done to avoid a bug on the client
@@ -774,7 +774,7 @@ class DelegTest(TestUtil):
             elif stat:
                 extra_str += " with file stat"
             self.test_group("Basic %s delegation test%s" % (mode_str, extra_str))
-            self.setup_test(open_type, io_type, nfiles=nfiles, lexec=True)
+            self.setup_test(io_type, nfiles=nfiles, lexec=True)
 
             if stat:
                 try:
@@ -983,7 +983,7 @@ class DelegTest(TestUtil):
 
             extra_str += "%s%s" % (lock_str, claim_str)
             self.test_group("Recall %s delegation with %s%s" % (mode_str, conflict_str, extra_str))
-            self.setup_test(open_type, io_type, mount=True, nfiles=nfiles, lexec=(claim_cur is not None))
+            self.setup_test(io_type, mount=True, nfiles=nfiles, lexec=(claim_cur is not None))
 
             # Open file, should get a DELEGATION
             try:
