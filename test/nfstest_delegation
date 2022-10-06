@@ -1158,7 +1158,7 @@ class DelegTest(TestUtil):
             if conflict_type == OP_REMOVE or (conflict_type == OP_RENAME and target):
                 self.set_nfserr_list(
                     nfs3list=[NFS3ERR_NOENT, NFS3ERR_JUKEBOX],
-                    nfs4list=[NFS4ERR_NOENT, NFS4ERR_STALE, NFS4ERR_BAD_STATEID],
+                    nfs4list=[NFS4ERR_NOENT, NFS4ERR_DELAY, NFS4ERR_STALE, NFS4ERR_BAD_STATEID],
                 )
             else:
                 self.set_nfserr_list(
