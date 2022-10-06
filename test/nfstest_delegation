@@ -26,7 +26,7 @@ from nfstest.test_util import TestUtil
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.8"
+__version__   = "1.9"
 
 USAGE = """%prog --server <server> [--client <client>] [options]
 
@@ -335,6 +335,20 @@ class DelegTest(TestUtil):
         self.test_opgroup.add_option("--truncate", action="store_true", default=False, help=hhelp)
         self.scan_options()
 
+        self.rfindex = 1
+        self.nrfiles = 1
+        for tname in self.testlist:
+            if group_test(tname, GROUP_RDELEG) or \
+               group_test(tname, GROUP_STAT)   or \
+               group_test(tname, GROUP_REMOVE) or \
+               group_test(tname, GROUP_RENAME) or \
+               group_test(tname, GROUP_IORWRD) or \
+               group_test(tname, GROUP_CTREAD):
+                self.nrfiles += 1
+
+            if group_test(tname, GROUP_TARGET):
+                self.nrfiles += 1
+
         # Disable createtraces option
         self.createtraces = False
 
@@ -390,6 +404,11 @@ class DelegTest(TestUtil):
         if end1 >= self.lock_poffset and end2 >= self.lock_offset:
             # Ranges overlap
             self.opts.error("Lock ranges overlap: (lock-offset, lock-len) and (lock-poffset, lock-len)")
+
+    def setup(self):
+        """Setup test environment"""
+        # Call base object's setup method
+        super(DelegTest, self).setup(nfiles=self.nrfiles)
 
     def lock_file(self, fd, open_type, absfile, lock_offset=0, lock_len=0):
         """Lock file given by the file descriptor.
@@ -505,13 +524,6 @@ class DelegTest(TestUtil):
            the same open owner -- this is done to avoid a bug on the client
            where open owner is reaped at close
         """
-        if nfiles > 0:
-            self.umount()
-            self.mount()
-            # Create new files before starting the test
-            for i in range(nfiles):
-                self.create_file()
-
         self.umount()
         if mount and self.clientobj is not None:
             # Unmount server on remote client
@@ -531,14 +543,14 @@ class DelegTest(TestUtil):
             # Mount server on remote client
             self.clientobj.mount()
 
-        if nfiles == 0:
-            if io_type == OPEN_READ:
-                # Use existing file
-                self.filename = self.files[1]
-                self.absfile = self.abspath(self.filename)
-            else:
-                # Create new file
-                self.get_filename()
+        if io_type == OPEN_READ or nfiles > 0:
+            # Use existing file
+            self.filename = self.files[self.rfindex]
+            self.absfile = self.abspath(self.filename)
+            self.rfindex += 1
+        else:
+            # Create new file
+            self.get_filename()
 
         # Hold a file open so that the open owner sticks around
         # (bug on the client where OO's are reaped at close)
@@ -931,13 +943,14 @@ class DelegTest(TestUtil):
                 if conflict_type == OP_READ:
                     conflict_str = "READ"
                     conflict_op = NFSPROC3_READ
-                    # Use an existing file because reading and empty file
+                    # Use an existing file because reading an empty file
                     # in NFSv3 will not send the READ procedure
                     nfiles = 1
                 else:
                     conflict_str = "WRITE"
                     conflict_op = NFSPROC3_WRITE
             else:
+                nfiles = 1 if conflict_type == OP_READ else 0
                 ctype = "READ" if conflict_type == OP_READ else "WRITE"
                 conflict_str = "OPEN (%s)" % ctype
                 conflict_op = OP_OPEN
@@ -1045,7 +1058,8 @@ class DelegTest(TestUtil):
                     self.rexecobj.run(os.unlink, r_absfile)
                 elif conflict_type == OP_RENAME:
                     if target:
-                        fname = self.files[-2]
+                        fname = self.files[self.rfindex]
+                        self.rfindex += 1
                         srcname = self.clientobj.abspath(fname)
                         dmsg = "Rename into the file (DST) from another client"
                         self.dprint("DBG2", "%s to recall delegation [%s -> %s]" % (dmsg, fname, self.filename))
@@ -1720,7 +1734,7 @@ class DelegTest(TestUtil):
 x = DelegTest(usage=USAGE, testnames=TESTNAMES, testgroups=TESTGROUPS, sid=SCRIPT_ID)
 
 try:
-    x.setup(nfiles=2)
+    x.setup()
 
     # Run all the tests
     x.run_tests()
