@@ -13,6 +13,7 @@
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #===============================================================================
 import os
+import time
 import errno
 import fcntl
 import struct
@@ -333,7 +334,12 @@ class DelegTest(TestUtil):
         self.test_opgroup.add_option("--lock-len", type="int", default=4096, help=hhelp)
         hhelp = "Truncate file when writing from the second file for the recall tests"
         self.test_opgroup.add_option("--truncate", action="store_true", default=False, help=hhelp)
+        hhelp = "Seconds to delay after setup so all opens are released [default: %default]"
+        self.test_opgroup.add_option("--setup-delay", type="float", default=4.0, help=hhelp)
         self.scan_options()
+
+        if len(self.basename) > 0:
+            self.setup_delay = 0.0
 
         self.rfindex = 1
         self.nrfiles = 1
@@ -409,6 +415,8 @@ class DelegTest(TestUtil):
         """Setup test environment"""
         # Call base object's setup method
         super(DelegTest, self).setup(nfiles=self.nrfiles)
+        # Delay so all opens are released and delegations could be granted
+        time.sleep(self.setup_delay)
 
     def lock_file(self, fd, open_type, absfile, lock_offset=0, lock_len=0):
         """Lock file given by the file descriptor.
