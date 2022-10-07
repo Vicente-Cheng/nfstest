@@ -425,7 +425,7 @@ class TestUtil(NFSUtil):
         hmsg = "Capture buffer size for tcpdump [default: %default]"
         self.cap_opgroup.add_option("--tbsize", default="192k", help=hmsg)
         hmsg = "Seconds to delay before stopping packet trace [default: %default]"
-        self.cap_opgroup.add_option("--trcdelay", type="float", default=0.0, help=hmsg)
+        self.cap_opgroup.add_option("--trcdelay", type="float", default=2.0, help=hmsg)
         hmsg = "Do not remove any trace files [default: remove trace files if no errors]"
         self.cap_opgroup.add_option("--keeptraces", action="store_true", default=False, help=hmsg)
         hmsg = "Remove trace files [default: remove trace files if no errors]"
