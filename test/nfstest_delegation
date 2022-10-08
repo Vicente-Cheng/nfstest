@@ -314,6 +314,8 @@ class DelegTest(TestUtil):
         """
         TestUtil.__init__(self, **kwargs)
         self.test_opgroup.version = "%prog " + __version__
+
+        # Options specific for this test script
         hhelp = "Remote NFS client and options used for recall delegation tests. " \
                 "Clients are separated by a ',' and each client definition is " \
                 "a list of arguments separated by a ':' given in the following " \
@@ -1125,7 +1127,7 @@ class DelegTest(TestUtil):
                     expected = errno.errorcode[errno.ESTALE]
                     error = errno.errorcode[exerr.errno]
                     fmsg =  ": expecting %s, got %s" % (expected, error)
-                    self.dprint("DBG4", "%s returns: %s" % (dmsg, str(exerr)))
+                    self.dprint("DBG3", "%s returns: %s" % (dmsg, str(exerr)))
                     self.test(exerr.errno == errno.ESTALE, "%s may return an error" % dmsg, failmsg=fmsg)
                 else:
                     fmsg = ", failed with %s" % exerr
