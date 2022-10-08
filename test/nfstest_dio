@@ -771,10 +771,10 @@ class DioTest(TestUtil):
             if write:
                 while len(self.files) < 4:
                     self.get_filename()
-                file = self.files[3]
+                filename = self.files[3]
             else:
-                file = self.files[0]
-            absfile = self.abspath(file)
+                filename = self.files[0]
+            absfile = self.abspath(filename)
 
             if deleg:
                 oofile = self.abspath(self.files[2])
@@ -843,7 +843,7 @@ class DioTest(TestUtil):
         try:
             self.trace_open()
             self.set_pktlist()
-            (filehandle, open_stateid, deleg_stateid) = self.find_open(filename=file)
+            (filehandle, open_stateid, deleg_stateid) = self.find_open(filename=filename)
             save_index = self.pktt.get_index()
             if deleg_stateid != None:
                 self.dprint('DBG3', "Delegation is granted")
@@ -1205,10 +1205,10 @@ class DioTest(TestUtil):
             if write:
                 while len(self.files) < 4:
                     self.get_filename()
-                file = self.files[3]
+                filename = self.files[3]
             else:
-                file = self.files[0]
-            absfile = self.abspath(file)
+                filename = self.files[0]
+            absfile = self.abspath(filename)
             self.dprint('DBG2', "Open file %s for %s" % (absfile, io_str))
             fd = posix.open(absfile, io_mode|posix.O_DIRECT)
             self.libc.lseek(fd, offset, 0)
@@ -1234,7 +1234,7 @@ class DioTest(TestUtil):
             self.trace_open()
             self.set_pktlist()
             nfs_version = self.nfs_version
-            (filehandle, open_stateid, deleg_stateid) = self.find_open(filename=file, claimfh=self.file_handles[write], anyclaim=True)
+            (filehandle, open_stateid, deleg_stateid) = self.find_open(filename=filename, claimfh=self.file_handles[write], anyclaim=True)
             if filehandle:
                 self.file_handles[write] = filehandle
                 save_index = self.pktt.get_index()
