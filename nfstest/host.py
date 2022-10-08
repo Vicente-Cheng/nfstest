@@ -36,7 +36,7 @@ from packet.pktt import Pktt
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.6"
+__version__   = "1.7"
 
 class Host(BaseObj):
     """Host object
@@ -281,16 +281,16 @@ class Host(BaseObj):
             try:
                 if os.path.lexists(rfile):
                     if os.path.isfile(rfile):
-                        self.dprint('DBG5', "    Removing file [%s]" % rfile)
+                        self.dprint('DBG4', "    Removing file [%s]" % rfile)
                         os.unlink(rfile)
                     elif os.path.islink(rfile):
-                        self.dprint('DBG5', "    Removing symbolic link [%s]" % rfile)
+                        self.dprint('DBG4', "    Removing symbolic link [%s]" % rfile)
                         os.unlink(rfile)
                     elif os.path.isdir(rfile):
-                        self.dprint('DBG5', "    Removing directory [%s]" % rfile)
+                        self.dprint('DBG4', "    Removing directory [%s]" % rfile)
                         os.rmdir(rfile)
                     else:
-                        self.dprint('DBG5', "    Removing [%s]" % rfile)
+                        self.dprint('DBG4', "    Removing [%s]" % rfile)
                         os.unlink(rfile)
             except:
                 pass
@@ -332,7 +332,7 @@ class Host(BaseObj):
     def get_pids(self, pid):
         """Get all descendant PIDs for the given PID"""
         # Get all process ids with their respective parent process ids
-        out = self.run_cmd("ps -ef", dlevel='DBG2', msg="Get all processes: ")
+        out = self.run_cmd("ps -ef", dlevel='DBG5', msg="Get all processes: ")
         pids = {}
         for line in out.split("\n"):
             info = line.split()
@@ -717,7 +717,7 @@ class Host(BaseObj):
         if self.mtpoint in self._invalidmtpoint:
             return
 
-        self.dprint('DBG3', "Sync all buffers to disk")
+        self.dprint('DBG5', "Sync all buffers to disk")
         self.libc.sync()
 
         # Try to umount 5 times
@@ -800,10 +800,9 @@ class Host(BaseObj):
         """Stop the trace started by trace_start()."""
         try:
             if self.traceproc:
-                self.dprint('DBG2', "Trace stop")
                 time.sleep(self.trcdelay)
                 # Make sure the process gets killed and wait for it to finish
-                self.stop_cmd(self.traceproc, dlevel='DBG2', msg="Stopping packet trace capture: ")
+                self.stop_cmd(self.traceproc, dlevel='DBG5', msg="Stopping packet trace capture: ")
                 self.traceproc = None
             if not self.notrace and self._nfsdebug:
                 self.nfs_debug_reset()
@@ -1001,7 +1000,7 @@ class Host(BaseObj):
         """
         try:
             cmd = "%s route get %s" % (c.NFSTEST_CMD_IP, ipaddr)
-            out = self.run_cmd(cmd, dlevel='DBG1', msg="Get routing info: ")
+            out = self.run_cmd(cmd, dlevel='DBG5', msg="Get routing info: ")
             regex = re.search(r"(\svia\s+(\S+))?\sdev\s+(\S+).*\ssrc\s+(\S+)", out)
             if regex:
                 return regex.groups()[1:]
