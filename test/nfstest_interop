@@ -75,6 +75,8 @@ class InteropTest(TestUtil):
         """
         TestUtil.__init__(self, **kwargs)
         self.opts.version = "%prog " + __version__
+
+        # Options specific for this test script
         hmsg = "Size of data to be written by each version of NFS [default: '%default']"
         self.test_opgroup.add_option("--datasize", type="int", default=10, help=hmsg)
         self.scan_options()
@@ -161,7 +163,7 @@ class InteropTest(TestUtil):
                 # Open a different file to make sure the a READ delegation
                 # is granted for the file under test
                 rd_absfile = self.abspath(self.files[0])
-                self.dprint('DBG1', "Opening file %s using NFS%s so owner sticks around" % (rd_absfile, version))
+                self.dprint('DBG4', "Opening file %s using NFS%s so owner sticks around" % (rd_absfile, version))
                 ofd = os.open(rd_absfile, os.O_RDONLY)
 
             self.dprint('DBG1', "Create empty file %s using NFS%s" % (self.absfile, version))
