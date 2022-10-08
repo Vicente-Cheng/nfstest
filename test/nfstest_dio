@@ -682,7 +682,8 @@ class DioTest(TestUtil):
         try:
             fd = None
             self.test_group("Verify fstat() gets correct file size after writing")
-            self.alloc_buffers()
+            wsize = max(self.wsize, int(self.filesize/8))
+            self.alloc_buffers(size=wsize)
             self.umount()
             self.mount()
 
@@ -694,7 +695,7 @@ class DioTest(TestUtil):
             ngood = 0
             offset = 0
             while offset < self.filesize:
-                count = self.do_write(fd, offset, self.wsize, delay=0)
+                count = self.do_write(fd, offset, wsize, delay=0)
                 offset += count
                 idx += 1
                 fs = posix.fstat(fd)
@@ -704,7 +705,7 @@ class DioTest(TestUtil):
 
             # Write at a large offset of 10G
             offset = 10 * 1024 * 1024 * 1024
-            count = self.do_write(fd, offset, self.wsize, delay=0)
+            count = self.do_write(fd, offset, wsize, delay=0)
             fs = posix.fstat(fd)
             size = offset + count
             self.test(fs.st_size==size, "The fstat() should get correct file size after writing at offset = 10G", failmsg="\nexpecting %d, got %d" % (size, fs.st_size))
