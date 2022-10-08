@@ -449,11 +449,13 @@ class DioTest(TestUtil):
             open_args = 0
         return (open_args, info)
 
-    def read_file(self, file, direct=True, aligned=True, delay=None):
+    def read_file(self, absfile, rsize=None, direct=True, aligned=True, delay=None):
         """Read file and compare read data with known data pattern.
 
-           file:
+           absfile:
                File to read
+           rsize:
+               Number of bytes to write per call [default: --rsize]
            direct:
                Open file using O_DIRECT if true [default: True]
            aligned:
@@ -464,12 +466,13 @@ class DioTest(TestUtil):
            Return total number of bytes read.
         """
         (open_args, info) = self._get_info(direct)
-        self.dprint('DBG2', "Open file %s for reading%s" % (file, info))
-        fd = posix.open(file, posix.O_RDONLY|open_args)
+        self.dprint('DBG2', "Open file %s for reading%s" % (absfile, info))
+        fd = posix.open(absfile, posix.O_RDONLY|open_args)
         try:
             offset = 0
+            rsize = self.rsize if rsize is None else rsize
             while True:
-                data = self.do_read(fd, offset, self.rsize, aligned=aligned, delay=delay)
+                data = self.do_read(fd, offset, rsize, aligned=aligned, delay=delay)
                 count = len(data)
                 cdata = self.data_pattern(offset, count)
                 if count == 0 or data != cdata:
@@ -479,11 +482,13 @@ class DioTest(TestUtil):
             posix.close(fd)
         return offset
 
-    def write_file(self, file, direct=True, aligned=True, delay=None):
+    def write_file(self, absfile, wsize=None, direct=True, aligned=True, delay=None):
         """Write file with known data pattern.
 
-           file:
+           absfile:
                File to write
+           wsize:
+               Number of bytes to write per call [default: --wsize]
            direct:
                Open file using O_DIRECT if true [default: True]
            aligned:
@@ -494,14 +499,15 @@ class DioTest(TestUtil):
            Return total number of bytes written.
         """
         (open_args, info) = self._get_info(direct)
-        self.dprint('DBG2', "Open file %s for writing%s" % (file, info))
-        fd = posix.open(file, posix.O_WRONLY|posix.O_CREAT|open_args, 0o644)
+        self.dprint('DBG2', "Open file %s for writing%s" % (absfile, info))
+        fd = posix.open(absfile, posix.O_WRONLY|posix.O_CREAT|open_args, 0o644)
         offset = 0
+        wsize = self.wsize if wsize is None else wsize
         while offset < self.filesize:
             count = self.filesize - offset
-            if count > self.wsize:
-                count = self.wsize
-            count = self.do_write(fd, offset, self.wsize, delay=delay)
+            if count > wsize:
+                count = wsize
+            count = self.do_write(fd, offset, wsize, delay=delay)
             offset += count
         posix.close(fd)
         return offset
@@ -646,24 +652,25 @@ class DioTest(TestUtil):
         """
         try:
             self.test_group("Verify data correctness when reading/writing using direct I/O")
-            self.alloc_buffers()
+            iosize = max(self.rsize, self.wsize, int(self.filesize/8))
+            self.alloc_buffers(size=iosize)
             self.umount()
             self.mount()
 
             # Read file using direct I/O on a file created with buffered I/O
             # and verify data read with known data on file
-            count = self.read_file(self.abspath(self.files[0]), delay=0)
+            count = self.read_file(self.abspath(self.files[0]), rsize=iosize, delay=0)
             self.test(count == self.filesize, "File created with buffered I/O is read correctly with direct I/O")
 
             # Create file using direct I/O
             self.get_filename()
-            self.write_file(self.absfile, delay=0)
+            self.write_file(self.absfile, wsize=iosize, delay=0)
 
             self.umount()
             self.mount()
 
             # Verify written data by reading the file using buffered I/O
-            count = self.read_file(self.absfile, direct=False, delay=0)
+            count = self.read_file(self.absfile, rsize=iosize, direct=False, delay=0)
             self.test(count == self.filesize, "File created with direct I/O is read correctly with buffered I/O")
             self.umount()
         except Exception:
