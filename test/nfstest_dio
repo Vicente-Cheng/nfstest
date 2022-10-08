@@ -395,7 +395,7 @@ class DioTest(TestUtil):
            aligned:
                Use aligned buffer if true [default: True]
            delay:
-               Delay read in seconds [default: no delay]
+               Delay read in seconds [default: --iodelay]
 
            Return data read.
         """
@@ -421,7 +421,7 @@ class DioTest(TestUtil):
            aligned:
                Use aligned buffer if true [default: True]
            delay:
-               Delay write in seconds [default: no delay]
+               Delay write in seconds [default: --iodelay]
 
            Return number of bytes written.
         """
@@ -459,7 +459,7 @@ class DioTest(TestUtil):
            aligned:
                Use aligned buffer if true [default: True]
            delay:
-               Delay each read in seconds [default: no delay]
+               Delay each read in seconds [default: --iodelay]
 
            Return total number of bytes read.
         """
@@ -489,7 +489,7 @@ class DioTest(TestUtil):
            aligned:
                Use aligned buffer if true [default: True]
            delay:
-               Delay each write in seconds [default: no delay]
+               Delay each write in seconds [default: --iodelay]
 
            Return total number of bytes written.
         """
