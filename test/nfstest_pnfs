@@ -496,7 +496,6 @@ class pNFSTest(TestUtil):
                 self.session_ids[self.sessionid] = "MDS"
 
         # Find OPEN request
-        self.dprint('DBG2', "Find OPEN for file %s" % filename)
         (filehandle, open_stateid, deleg_stateid) = self.find_open(filename=filename, claimfh=openfh.get('fh'), anyclaim=True)
         if deleg_stateid:
             deleg_type = self.pktt.pkt.NFSop.delegation.deleg_type
@@ -732,7 +731,7 @@ class pNFSTest(TestUtil):
 
                 fstat = os.stat(testfile)
                 self.test(fstat.st_size == self.filesize, "Size of file on %s should be correct" % ver, failmsg=", expecting %d and got %d" % (self.filesize, fstat.st_size))
-                self.dprint('DBG3', "Read file %s @0" % testfile)
+                self.dprint('DBG2', "Read file %s @0" % testfile)
                 fd = open(testfile, "rb")
                 try:
                     data = fd.read()
@@ -741,7 +740,7 @@ class pNFSTest(TestUtil):
                 self.test(data == orig_data, "Data written using pNFS is read correctly from %s" % ver)
 
                 # Create file using current NFS version
-                self.create_file()
+                self.create_file(dlevels=['DBG1'])
                 files.append(self.absfile)
                 self.umount()
         except Exception:
@@ -759,7 +758,7 @@ class pNFSTest(TestUtil):
             for testfile in files:
                 fstat = os.stat(testfile)
                 self.test(fstat.st_size == self.filesize, "Size of file on pNFS should be correct", failmsg=", expecting %d and got %d" % (self.filesize, fstat.st_size))
-                self.dprint('DBG3', "Read file %s @0" % testfile)
+                self.dprint('DBG2', "Read file %s @0" % testfile)
                 fd = open(testfile, "rb")
                 try:
                     data = fd.read()
@@ -811,10 +810,10 @@ class pNFSTest(TestUtil):
             self.mount()
 
             # Create file on Nth stripe only
-            self.dprint('DBG3', "Create file on %s stripe only [stripe size: %d]" % (ordinal_number(stripe_index+1), self.stripe_size))
+            self.dprint('DBG1', "Create file on %s stripe only [stripe size: %d]" % (ordinal_number(stripe_index+1), self.stripe_size))
             wsize = int(self.stripe_size/2)
             offset = stripe_index * self.stripe_size
-            self.create_file(offset=offset, size=wsize)
+            self.create_file(offset=offset, size=wsize, dlevels=['DBG1'])
             filesize = offset + wsize
 
             # Get list of DS with I/O
@@ -839,7 +838,7 @@ class pNFSTest(TestUtil):
     def read_file(self, filename, msg=None):
         """Read whole file"""
         msg = msg if msg else "Open file [%s] for reading" % filename
-        self.dprint('DBG3', msg)
+        self.dprint('DBG1', msg)
         fd = os.open(self.abspath(filename), os.O_RDONLY)
         try:
             while len(os.read(fd, self.rsize)): pass
@@ -859,9 +858,9 @@ class pNFSTest(TestUtil):
             self.mount()
             if write:
                 # Create file
-                filename = self.create_file()
+                filename = self.create_file(dlevels=['DBG1'])
                 # Create second file on same session
-                filename2 = self.create_file()
+                filename2 = self.create_file(dlevels=['DBG1'])
             else:
                 # Read file
                 filename = self.files[0]
@@ -875,7 +874,7 @@ class pNFSTest(TestUtil):
                 self.insert_trace_marker()
 
             if swrite:
-                self.dprint('DBG3', "Open first file again on same session [%s] writing %d@%d" % (filename, self.filesize, 0))
+                self.dprint('DBG1', "Open first file again on same session [%s] writing %d@%d" % (filename, self.filesize, 0))
                 fd = os.open(self.abspath(filename), os.O_WRONLY|os.O_CREAT|os.O_SYNC)
                 try:
                     os.write(fd, self.data_pattern(0, self.filesize))
@@ -949,11 +948,11 @@ class pNFSTest(TestUtil):
         self.mount()
         filename = self.files[0]
         absfile = self.abspath(filename)
-        self.dprint('DBG3', "Open file [%s]" % filename)
+        self.dprint('DBG1', "Open file [%s]" % filename)
         fd = os.open(absfile, open_type)
 
         try:
-            self.dprint('DBG3', "Lock file (F_SETLKW)")
+            self.dprint('DBG2', "Lock file (F_SETLKW)")
             haslock = True
             lockdata = struct.pack('hhllhh', lock_type, 0, 0, 0, 0, 0)
             rv = fcntl.fcntl(fd, fcntl.F_SETLKW, lockdata)
@@ -962,13 +961,13 @@ class pNFSTest(TestUtil):
             haslock = False
 
         if setattr:
-            self.dprint('DBG3', "Truncating file to 0 bytes")
+            self.dprint('DBG2', "Truncating file to 0 bytes")
             os.ftruncate(fd, 0)
         elif iomode == LAYOUTIOMODE4_READ:
-            self.dprint('DBG3', "Reading %d@0" % self.filesize)
+            self.dprint('DBG2', "Reading %d@0" % self.filesize)
             os.read(fd, self.filesize)
         else:
-            self.dprint('DBG3', "Writing %d@%d" % (self.filesize, 0))
+            self.dprint('DBG2', "Writing %d@%d" % (self.filesize, 0))
             os.write(fd, self.data_pattern(0, self.filesize))
 
         os.close(fd)
@@ -994,20 +993,20 @@ class pNFSTest(TestUtil):
         self.mount()
         filename = self.files[2]
         absfile = self.abspath(filename)
-        self.dprint('DBG3', "Open file [%s]" % filename)
+        self.dprint('DBG1', "Open file [%s]" % filename)
         fd = os.open(absfile, os.O_WRONLY|os.O_CREAT|os.O_SYNC)
 
         haslock = False
         if lock:
             try:
-                self.dprint('DBG3', "Lock file (F_SETLKW)")
+                self.dprint('DBG2', "Lock file (F_SETLKW)")
                 lockdata = struct.pack('hhllhh', fcntl.F_WRLCK, 0, 0, 0, 0, 0)
                 rv = fcntl.fcntl(fd, fcntl.F_SETLKW, lockdata)
                 haslock = True
             except Exception as e:
                 self.test(False, "Unable to get lock on file: %r" % e)
 
-        self.dprint('DBG3', "Truncating file to %d bytes" % size)
+        self.dprint('DBG2', "Truncating file to %d bytes" % size)
         os.ftruncate(fd, size)
         os.close(fd)
         fstat = os.stat(absfile)
@@ -1089,18 +1088,18 @@ class pNFSTest(TestUtil):
             self.trace_start()
             self.mount()
             filename = self.files[0]
-            self.dprint('DBG3', "Open file [%s] for both reading and writing" % filename)
+            self.dprint('DBG1', "Open file [%s] for both reading and writing" % filename)
             fd = os.open(self.abspath(filename), os.O_RDWR|os.O_CREAT|os.O_SYNC)
             try:
                 rsize = 0
-                self.dprint('DBG3', "Reading file %d@0" % self.rsize)
+                self.dprint('DBG2', "Reading file %d@0" % self.rsize)
                 rsize = len(os.read(fd, self.rsize))
 
                 # Insert a marker in the packet trace
                 self.insert_trace_marker()
 
                 offset = int(self.filesize/2)
-                self.dprint('DBG3', "Writing %d@%d" % (self.wsize, offset))
+                self.dprint('DBG2', "Writing %d@%d" % (self.wsize, offset))
                 os.lseek(fd, offset, 0)
                 os.write(fd, self.data_pattern(offset, self.wsize))
             finally:
@@ -1149,12 +1148,12 @@ class pNFSTest(TestUtil):
             self.trace_start()
             self.mount()
             filename = self.files[0]
-            self.dprint('DBG3', "Open file [%s] for both reading and writing" % filename)
+            self.dprint('DBG1', "Open file [%s] for both reading and writing" % filename)
             fd = os.open(self.abspath(filename), os.O_RDWR|os.O_CREAT|os.O_SYNC)
             try:
                 rsize = 0
                 offset = int(self.filesize/2)
-                self.dprint('DBG3', "Writing %d@%d" % (self.wsize, offset))
+                self.dprint('DBG2', "Writing %d@%d" % (self.wsize, offset))
                 os.lseek(fd, offset, 0)
                 os.write(fd, self.data_pattern(offset, self.wsize))
                 # Flush data to make sure the client sends the write first
@@ -1163,11 +1162,10 @@ class pNFSTest(TestUtil):
                 # Insert a marker in the packet trace
                 self.insert_trace_marker()
 
-                self.dprint('DBG3', "Reading file %d@0" % self.rsize)
+                self.dprint('DBG2', "Reading file %d@0" % self.rsize)
                 os.lseek(fd, 0, 0)
                 rsize = len(os.read(fd, self.rsize))
             finally:
-                self.dprint('DBG3', "Closing file")
                 os.close(fd)
             self.umount()
             self.trace_stop()
@@ -1219,17 +1217,17 @@ class pNFSTest(TestUtil):
             # Do not use O_SYNC to avoid the client sending a LAYOUTCOMMIT before sending
             # the READ's -- READ replies will have eof set
             # Use O_TRUNC to force the client to ask for RW layout by truncating the file
-            self.dprint('DBG3', "Open file [%s] for both reading and writing" % self.absfile)
+            self.dprint('DBG1', "Open file [%s] for both reading and writing" % self.absfile)
             fd = os.open(self.absfile, os.O_RDWR|os.O_CREAT|os.O_TRUNC)
             try:
-                self.dprint('DBG3', "Writing %d@%d" % (self.stripe_size, self.stripe_size))
+                self.dprint('DBG2', "Writing %d@%d" % (self.stripe_size, self.stripe_size))
                 os.lseek(fd, self.stripe_size, 0)
                 os.write(fd, self.data_pattern(self.stripe_size, self.stripe_size))
                 # Make sure client sends the write to server before the read
                 #os.fsync(fd) # XXX cannot flush because it will not return eof on read
                 time.sleep(5)
 
-                self.dprint('DBG3', "Reading file %d@0" % self.rsize)
+                self.dprint('DBG2', "Reading file %d@0" % self.rsize)
                 os.lseek(fd, 0, 0)
                 data = os.read(fd, self.rsize)
             finally:
@@ -1318,13 +1316,13 @@ class pNFSTest(TestUtil):
             # Read file
             filename1 = self.files[0]
             absfile = self.abspath(filename1)
-            self.dprint('DBG3', "Open file [%s] for reading" % absfile)
+            self.dprint('DBG1', "Open file [%s] for reading" % absfile)
             fd = os.open(absfile, os.O_RDONLY)
             os.read(fd, self.filesize)
             os.close(fd)
 
             # Write file
-            filename2 = self.create_file()
+            filename2 = self.create_file(dlevels=['DBG1'])
 
             self.umount()
             self.trace_stop()
