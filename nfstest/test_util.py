@@ -1813,7 +1813,7 @@ class TestUtil(NFSUtil):
            verbose:
                Verbosity level [default: 0]
            dlevels:
-               Debug level list to use [default: ["DBG3", "DBG4", "DBG5"]]
+               Debug level list to use [default: ["DBG2", "DBG3", "DBG4"]]
 
            Returns the file name created, the file name is also stored
            in the object attribute filename -- attribute absfile is also
@@ -1821,7 +1821,7 @@ class TestUtil(NFSUtil):
 
            File created is removed at cleanup.
         """
-        _dlevels  = ["DBG3", "DBG4", "DBG5"]
+        _dlevels  = ["DBG2", "DBG3", "DBG4"]
         pattern   = kwds.pop("pattern",   None)
         ftype     = kwds.pop("ftype",     FTYPE_FILE)
         hole_list = kwds.pop("hole_list", None)
