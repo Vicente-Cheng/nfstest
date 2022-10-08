@@ -276,6 +276,8 @@ class LockTest(TestUtil):
         """
         TestUtil.__init__(self, **kwargs)
         self.opts.version = "%prog " + __version__
+
+        # Options specific for this test script
         hmsg = "Remote NFS client and options used for conflicting lock tests. " \
                "Clients are separated by a ',' and each client definition is " \
                "a list of arguments separated by a ':' given in the following " \
@@ -525,11 +527,11 @@ class LockTest(TestUtil):
         if pinfo:
             # OPEN on different process or remote client
             pstr = "client" if pinfo.remote else "process"
-            self.dprint('DBG3', "Open file for %s [%s] on %s %s" % (ostr, filename, pinfo.proc_ordnum, pstr))
+            self.dprint('DBG2', "Open file for %s [%s] on %s %s" % (ostr, filename, pinfo.proc_ordnum, pstr))
             fd = pinfo.run(os.open, absfile, otype)
         else:
             # OPEN locally
-            self.dprint('DBG3', "Open file for %s [%s]" % (ostr, filename))
+            self.dprint('DBG2', "Open file for %s [%s]" % (ostr, filename))
             fd = os.open(absfile, otype)
         return fd
 
@@ -579,7 +581,7 @@ class LockTest(TestUtil):
             if pinfo:
                 # Lock file in different process or remote client
                 pstr = "client" if pinfo.remote else "process"
-                self.dprint('DBG3', info + " on %s %s @%.2f" % (pinfo.proc_ordnum, pstr, self.get_time()))
+                self.dprint('DBG1', info + " on %s %s @%.2f" % (pinfo.proc_ordnum, pstr, self.get_time()))
                 nowait = True if stype == F_SETLKW else False
                 out = pinfo.run("getlock", fd, ltype, offset, length, stype, self.lockw_timeout, NOWAIT=nowait)
                 if nowait:
@@ -596,7 +598,7 @@ class LockTest(TestUtil):
                             out = pinfo.results()
             else:
                 # Lock file locally
-                self.dprint('DBG3', info)
+                self.dprint('DBG1', info)
                 getlock(fd, ltype, offset, length, stype, self.lockw_timeout)
         except IOError as ioerr:
             # Set up fail message if expecting no errors
@@ -643,7 +645,7 @@ class LockTest(TestUtil):
         self.dprint('DBG3', "Wait %.2f secs to unlock conflicting lock @%.2f" % (self.unlock_delay, self.get_time()))
         dbgmsg = "Check if blocked lock is still waiting"
         while True:
-            self.dprint('DBG7', "%s @%.2f" % (dbgmsg, self.get_time()))
+            self.dprint('DBG3', "%s @%.2f" % (dbgmsg, self.get_time()))
             if need_unlock and (expr or time.time() - stime >= self.unlock_delay):
                 # Unlock current file lock so the blocked lock could be granted
                 msg = "Unlocking full file after delay should be granted"
