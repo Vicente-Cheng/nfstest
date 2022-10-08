@@ -31,7 +31,7 @@ from multiprocessing import Process,JoinableQueue
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2016 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.1"
+__version__   = "1.2"
 
 USAGE = """%prog --server <server> [options]
 
@@ -246,9 +246,9 @@ class CopyItem(BaseObj):
     def file_locks(self):
         """Lock the source and destination files"""
         if self.locking:
-            self.dprint("DBG4", "Lock  src file %s %d@%d" % (self.src_file.absfile, self.ncount, self.src_offset))
+            self.dprint("DBG3", "Lock  src file %s %d@%d" % (self.src_file.absfile, self.ncount, self.src_offset))
             getlock(self.src_file.fd, self.src_file.locktype, self.src_offset, self.ncount)
-            self.dprint("DBG4", "Lock  dst file %s %d@%d" % (self.dst_file.absfile, self.ncount, self.dst_offset))
+            self.dprint("DBG3", "Lock  dst file %s %d@%d" % (self.dst_file.absfile, self.ncount, self.dst_offset))
             getlock(self.dst_file.fd, self.dst_file.locktype, self.dst_offset, self.ncount)
 
 class SSCTest(TestUtil):
@@ -276,6 +276,8 @@ class SSCTest(TestUtil):
         # Instantiate base object constructor
         TestUtil.__init__(self, **kwargs)
         self.opts.version = "%prog " + __version__
+
+        # Set default script options
         # Tests are valid for NFSv4.2 and beyond
         self.opts.set_defaults(nfsversion=4.2)
         # Inter-SSC copy length must be greater than 14*rsize, so set filesize
@@ -413,7 +415,7 @@ class SSCTest(TestUtil):
             for filename in file_list:
                 dstfile = self.dst.abspath(filename)
                 self.dst.remove_list.append(dstfile)
-                self.dprint("DBG3", "Creating file [%s] %d@%d" % (dstfile, self.filesize, 0))
+                self.dprint("DBG2", "Creating file [%s] %d@%d" % (dstfile, self.filesize, 0))
                 fd = os.open(dstfile, os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
                 self.write_data(fd)
                 os.close(fd)
@@ -532,7 +534,7 @@ class SSCTest(TestUtil):
             copyobj.file_locks()
             soff = ctypes.pointer(ctypes.c_longlong(srcoff))
             doff = ctypes.pointer(ctypes.c_longlong(dstoff))
-            self.dprint("DBG3", "COPY %s -> %s with size = %d, offset(%s -> %s) (%d)" % (sname, dname, nbytes, srcoff, dstoff, tid))
+            self.dprint("DBG1", "COPY %s -> %s with size = %d, offset(%s -> %s) (%d)" % (sname, dname, nbytes, srcoff, dstoff, tid))
             count = self.copy_file_range(copyobj.src_file.fd, soff, copyobj.dst_file.fd, doff, nbytes, 0)
             if count == -1:
                 errorno = ctypes.get_errno()
@@ -541,7 +543,7 @@ class SSCTest(TestUtil):
             dst_tell = os.lseek(copyobj.dst_file.fd, 0, os.SEEK_CUR)
             src_off = ptr_contents(soff)
             dst_off = ptr_contents(doff)
-            self.dprint("DBG4", "COPY returns %d%s (soff:%s, doff:%s) (spos:%d, dpos:%d) (%d)" % (count, errstr, src_off, dst_off, src_tell, dst_tell, tid))
+            self.dprint("DBG2", "COPY returns %d%s (soff:%s, doff:%s) (spos:%d, dpos:%d) (%d)" % (count, errstr, src_off, dst_off, src_tell, dst_tell, tid))
         except:
             self.queue.put([tid, 1, traceback.format_exc()])
             return 1
@@ -724,7 +726,7 @@ class SSCTest(TestUtil):
 
             # Open source files
             for srcobj in self.src_file_list():
-                self.dprint("DBG3", "Open  src file %s for %s" % (srcobj.absfile, srcostr))
+                self.dprint("DBG2", "Open  src file %s for %s" % (srcobj.absfile, srcostr))
                 srcobj.fd = os.open(srcobj.absfile, srcopen)
                 if src_seek > 0:
                     self.dprint("DBG3", "Seek  src file %s to offset %s" % (srcobj.absfile, src_seek))
@@ -732,7 +734,7 @@ class SSCTest(TestUtil):
 
             # Open destination files
             for dstobj in self.dst_file_list():
-                self.dprint("DBG3", "Open  dst file %s for %s" % (dstobj.absfile, dstostr))
+                self.dprint("DBG2", "Open  dst file %s for %s" % (dstobj.absfile, dstostr))
                 dstobj.fd = os.open(dstobj.absfile, dstopen)
 
                 if write:
@@ -765,7 +767,7 @@ class SSCTest(TestUtil):
             copyobj.file_locks()
             sname = copyobj.src_file.filename
             dname = copyobj.dst_file.filename
-            self.dprint("DBG3", "COPY %s -> %s with size = %d, offset(%s -> %s)" % (sname, dname, copyobj.nbytes, copyobj.src_offset, dst_off))
+            self.dprint("DBG1", "COPY %s -> %s with size = %d, offset(%s -> %s)" % (sname, dname, copyobj.nbytes, copyobj.src_offset, dst_off))
             count = self.copy_file_range(copyobj.src_file.fd, srcoff, copyobj.dst_file.fd, dstoff, copyobj.nbytes, 0)
             if count == -1:
                 errorno = ctypes.get_errno()
@@ -774,7 +776,7 @@ class SSCTest(TestUtil):
             d_off = ptr_contents(dstoff)
             src_tell = os.lseek(copyobj.src_file.fd, 0, os.SEEK_CUR)
             dst_tell = os.lseek(copyobj.dst_file.fd, 0, os.SEEK_CUR)
-            self.dprint("DBG4", "COPY returns %d%s off(src:%s, dst:%s) pos(src:%d, dst:%d)" % (count, errstr, s_off, d_off, src_tell, dst_tell))
+            self.dprint("DBG2", "COPY returns %d%s off(src:%s, dst:%s) pos(src:%d, dst:%d)" % (count, errstr, s_off, d_off, src_tell, dst_tell))
             copyobj.count    = count
             copyobj.src_off  = s_off
             copyobj.dst_off  = d_off
