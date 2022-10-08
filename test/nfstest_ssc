@@ -1156,7 +1156,7 @@ class SSCTest(TestUtil):
             # stateid to use in COPY
             self.pktt.rewind(open_index)
             for dstobj in self.dst_file_list():
-                self.get_stateid(dstobj.filename, **args)
+                self.get_stateid(dstobj.filename, **args, write=True)
                 if self.opencall is None:
                     # Search NFSv3 packets
                     self.find_v3_open(dstobj.filename, dirfh=src_topfh, **args)
