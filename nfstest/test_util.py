@@ -402,7 +402,7 @@ class TestUtil(NFSUtil):
 
         self.log_opgroup = OptionGroup(self.opts, "Logging options")
         hmsg = "Verbose level for debug messages [default: '%default']"
-        self.log_opgroup.add_option("-v", "--verbose", default="none", help=hmsg)
+        self.log_opgroup.add_option("-v", "--verbose", default="opts|info|dbg1|dbg2|dbg3", help=hmsg)
         hmsg = "Verbose level for test messages [default: '%default']"
         self.log_opgroup.add_option("--tverbose", default=_rtverbose_map[self.tverbose], help=hmsg)
         hmsg = "Create log file"
