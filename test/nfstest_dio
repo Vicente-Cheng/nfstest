@@ -27,7 +27,7 @@ from nfstest.test_util import TestUtil
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "1.4"
+__version__   = "1.5"
 
 USAGE = """%prog --server <server> [options]
 
@@ -137,8 +137,12 @@ class DioTest(TestUtil):
         """
         TestUtil.__init__(self, **kwargs)
         self.opts.version = "%prog " + __version__
+
+        # Set default script options
         self.opts.set_defaults(filesize=262144)
         self.opts.set_defaults(mtopts="hard,intr")
+
+        # Options specific for this test script
         hmsg = "List of I/O types to test [default: '%default']"
         self.test_opgroup.add_option("--iotype", default='read,write', help=hmsg)
         hmsg = "List of buffered I/O types to test [default: '%default']"
@@ -216,11 +220,11 @@ class DioTest(TestUtil):
             fd = None
             ofd = None
             oofile = self.abspath(self.files[0])
-            self.dprint('DBG3', "Open file %s so open owner sticks around" % oofile)
+            self.dprint('DBG4', "Open file %s so open owner sticks around" % oofile)
             ofd = open(oofile, 'r')
             self.create_file()
             rfile = self.abspath(self.files[1])
-            self.dprint('DBG3', "Open file %s for reading" % rfile)
+            self.dprint('DBG2', "Open file %s for reading" % rfile)
             fd = open(rfile, 'r')
             fd.read(self.rsize)
         finally:
@@ -347,7 +351,7 @@ class DioTest(TestUtil):
             if buffer is None:
                 raise Exception("Could not allocate %saligned buffer" % align_str)
 
-        self.dprint('DBG7', "Allocated %saligned buffer of %d bytes @ 0x%x" % (align_str, size, buffer.value))
+        self.dprint('DBG3', "Allocated %saligned buffer of %d bytes @ 0x%x" % (align_str, size, buffer.value))
         # Save allocated buffer so it can be freed by free_buffers()
         self.fbuffers.append(buffer)
         if fill:
@@ -369,10 +373,9 @@ class DioTest(TestUtil):
         """Free all allocated buffers created by mem_alloc()."""
         try:
             if len(self.fbuffers):
-                self.dprint('DBG7', "Freeing allocated buffers")
                 while len(self.fbuffers):
                     if self.fbuffers[0] != None:
-                        self.dprint('DBG7', "    Freeing allocated buffer 0x%x" % self.fbuffers[0].value)
+                        self.dprint('DBG4', "Freeing allocated buffer 0x%x" % self.fbuffers[0].value)
                         self.libc.free(self.fbuffers[0])
                     # Remove buffer from list so this function can be called
                     # multiple times
@@ -400,7 +403,7 @@ class DioTest(TestUtil):
         self.dprint('DBG3', "Read file %d@%d" % (size, offset))
         self.libc.lseek(fd, offset, 0)
         count = self.libc.read(fd, buffer, size)
-        self.dprint('DBG3', "Read returned %d bytes" % count)
+        self.dprint('DBG4', "Read returned %d bytes" % count)
         data = ctypes.string_at(buffer, count)
         # Slow down traffic for tcpdump to capture all packets
         self.delay_io(delay)
@@ -429,7 +432,7 @@ class DioTest(TestUtil):
         self.dprint('DBG3', "Write file %d@%d" % (size, offset))
         self.libc.lseek(fd, offset, 0)
         count = self.libc.write(fd, buffer, size)
-        self.dprint('DBG3', "Write returned %d bytes" % count)
+        self.dprint('DBG4', "Write returned %d bytes" % count)
         # Slow down traffic for tcpdump to capture all packets
         self.delay_io(delay)
         return count
@@ -461,7 +464,7 @@ class DioTest(TestUtil):
            Return total number of bytes read.
         """
         (open_args, info) = self._get_info(direct)
-        self.dprint('DBG3', "Open file %s for reading%s" % (file, info))
+        self.dprint('DBG2', "Open file %s for reading%s" % (file, info))
         fd = posix.open(file, posix.O_RDONLY|open_args)
         try:
             offset = 0
@@ -491,7 +494,7 @@ class DioTest(TestUtil):
            Return total number of bytes written.
         """
         (open_args, info) = self._get_info(direct)
-        self.dprint('DBG3', "Open file %s for writing%s" % (file, info))
+        self.dprint('DBG2', "Open file %s for writing%s" % (file, info))
         fd = posix.open(file, posix.O_WRONLY|posix.O_CREAT|open_args, 0o644)
         offset = 0
         while offset < self.filesize:
@@ -519,7 +522,7 @@ class DioTest(TestUtil):
             self.mount()
             buffer = self.mem_alloc(2*self.rsize, aligned=aligned)
             absfile = self.abspath(self.files[0])
-            self.dprint('DBG3', "Open file %s for reading" % absfile)
+            self.dprint('DBG2', "Open file %s for reading" % absfile)
             fd = posix.open(absfile, posix.O_RDONLY|posix.O_DIRECT)
             offset = self.filesize - self.rsize
             self.dprint('DBG3', "Read file %d@%d" % (self.rsize, offset))
@@ -566,12 +569,12 @@ class DioTest(TestUtil):
             if read_ahead:
                 filename = self.files[0]
                 absfile = self.abspath(filename)
-                self.dprint('DBG3', "Open file %s for reading" % absfile)
+                self.dprint('DBG2', "Open file %s for reading" % absfile)
                 fd = posix.open(absfile, posix.O_RDONLY|posix.O_DIRECT)
             else:
                 self.get_filename()
                 filename = self.filename
-                self.dprint('DBG3', "Open file %s for writing" % self.absfile)
+                self.dprint('DBG2', "Open file %s for writing" % self.absfile)
                 fd = posix.open(self.absfile, posix.O_RDWR|posix.O_CREAT|posix.O_DIRECT)
 
                 offset = 0
@@ -677,7 +680,7 @@ class DioTest(TestUtil):
             self.mount()
 
             self.get_filename()
-            self.dprint('DBG3', "Open file %s for writing" % self.absfile)
+            self.dprint('DBG2', "Open file %s for writing" % self.absfile)
             fd = posix.open(self.absfile, posix.O_WRONLY|posix.O_CREAT|posix.O_DIRECT, 0o644)
 
             idx = 0
@@ -767,10 +770,10 @@ class DioTest(TestUtil):
 
             if deleg:
                 oofile = self.abspath(self.files[2])
-                self.dprint('DBG3', "Open file %s so open owner sticks around" % oofile)
+                self.dprint('DBG4', "Open file %s so open owner sticks around" % oofile)
                 ofd = open(oofile, 'r')
 
-            self.dprint('DBG3', "Open file %s for %s" % (absfile, io_str))
+            self.dprint('DBG2', "Open file %s for %s" % (absfile, io_str))
             fd = posix.open(absfile, io_mode|posix.O_DIRECT)
 
             if buffered_write != None:
@@ -782,7 +785,7 @@ class DioTest(TestUtil):
                 else:
                     bfile = self.files[1]
                 babsfile = self.abspath(bfile)
-                self.dprint('DBG3', "Open file %s for %s (buffered)" % (babsfile, bio_str))
+                self.dprint('DBG2', "Open file %s for %s (buffered)" % (babsfile, bio_str))
                 bfd = os.open(babsfile, bio_mode)
 
             off = 0
@@ -807,11 +810,11 @@ class DioTest(TestUtil):
                     if buffered_write:
                         self.dprint('DBG3', "Write file %d@%d (buffered)" % (bsize, boffset))
                         count = os.write(bfd, self.data_pattern(boffset, bsize))
-                        self.dprint('DBG3', "Write returned %d bytes" % count)
+                        self.dprint('DBG4', "Write returned %d bytes" % count)
                     else:
                         self.dprint('DBG3', "Read file %d@%d (buffered)" % (bsize, boffset))
                         data = os.read(bfd, bsize)
-                        self.dprint('DBG3', "Read returned %d bytes" % len(data))
+                        self.dprint('DBG4', "Read returned %d bytes" % len(data))
                     boffset += bsize
                     # Slow down traffic for tcpdump to capture all packets
                     self.delay_io()
@@ -916,7 +919,7 @@ class DioTest(TestUtil):
                                     toffset  = item.get('offset')
                                     tsize    = item.get('size')
                                     taligned = item.get('aligned')
-                                    self.dprint('DBG5', "%s (%d@%d) is sent out of order but within the same I/O call" % (io_str, tsize, toffset))
+                                    self.dprint('DBG4', "%s (%d@%d) is sent out of order but within the same I/O call" % (io_str, tsize, toffset))
                                     break
                     if len(align_hash) and (self.newstyle or taligned) and self.ispnfs:
                         dsidx = 0
@@ -1166,7 +1169,6 @@ class DioTest(TestUtil):
             if not check:
                 self.test_group("Verify %s %s%scontiguous vector [%s]" % (io_str, off_str, con_str, ", ".join(head_vec)))
 
-            self.dprint('DBG3', "Create buffers")
             idx = 0
             off = offset
             buffers = []
@@ -1199,7 +1201,7 @@ class DioTest(TestUtil):
             else:
                 file = self.files[0]
             absfile = self.abspath(file)
-            self.dprint('DBG3', "Open file %s for %s" % (absfile, io_str))
+            self.dprint('DBG2', "Open file %s for %s" % (absfile, io_str))
             fd = posix.open(absfile, io_mode|posix.O_DIRECT)
             self.libc.lseek(fd, offset, 0)
             wr_str = "Writing" if write  else "Reading"
