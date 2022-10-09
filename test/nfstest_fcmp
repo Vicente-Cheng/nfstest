@@ -105,6 +105,7 @@ class FcmpTest(TestUtil):
 
             self.trace_start()
             self.clientobj.mount()
+            self.mtdir = self.clientobj.mtdir
             try:
                 fmsg = ""
                 expr = True
