@@ -3577,7 +3577,8 @@ typedef opaque         xattrvalue4<>;
  * GETXATTR - Get an Extended Attribute of a File
  * ======================================================================
  */
-/* STRFMT1: name:{0} */
+/* OBJATTR: fh=self.nfs4_fh */
+/* STRFMT1: FH:{fh:crc32} name:{0} */
 struct GETXATTR4args {
     /* CURRENT_FH: file */
     xattrkey4   name;
@@ -3601,7 +3602,8 @@ enum setxattr_option4 {
     SETXATTR4_REPLACE     = 2
 };
 
-/* STRFMT1: {0} name:{1} */
+/* OBJATTR: fh=self.nfs4_fh */
+/* STRFMT1: FH:{fh:crc32} {0} name:{1} */
 struct SETXATTR4args {
     /* CURRENT_FH: file */
     setxattr_option4  option;
@@ -3621,7 +3623,8 @@ union SETXATTR4res switch (nfsstat4 status) {
  * LISTXATTRS - List Extended Attributes of a File
  * ======================================================================
  */
-/* STRFMT1: cookie:{0} maxcount:{1} */
+/* OBJATTR: fh=self.nfs4_fh */
+/* STRFMT1: FH:{fh:crc32} cookie:{0} maxcount:{1} */
 struct LISTXATTRS4args {
     /* CURRENT_FH: file */
     nfs_cookie4    cookie;
@@ -3647,7 +3650,8 @@ union LISTXATTRS4res switch (nfsstat4 status) {
  * REMOVEXATTR - Remove an Extended Attribute of a File
  * ======================================================================
  */
-/* STRFMT1: name:{0} */
+/* OBJATTR: fh=self.nfs4_fh */
+/* STRFMT1: FH:{fh:crc32} name:{0} */
 struct REMOVEXATTR4args {
     /* CURRENT_FH: file */
     xattrkey4      name;
