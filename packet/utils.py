@@ -121,7 +121,7 @@ class Enum(int):
         """
         value = self._enumdict.get(self)
         if value is None:
-            return super(Enum, self).__str__()
+            return int.__str__(int(self))
         else:
             return value[self._offset:]
 
