@@ -1170,6 +1170,11 @@ class DelegTest(TestUtil):
             self.trace_open()
             self.set_pktlist()
 
+            # Find OPEN on second mount
+            (open2fh, open2stid, deleg2stid) = self.find_open(filename=self.filename, src_ipaddr=self.clientobj.ipaddr, nfs_version=self.clientobj.nfs_version)
+            self.pktt.rewind(0)
+
+            # Find OPEN on main mount
             (open_fh, open_stid, deleg_stid) = self.find_open(filename=self.filename, deleg_type=deleg_type, src_ipaddr=self.client_ipaddr)
             self.verify_open(open_fh)
             self.test(deleg_stid != None, "%s delegation should be granted" % mode_str)
@@ -1178,6 +1183,9 @@ class DelegTest(TestUtil):
             if deleg_stid is None:
                 # Delegation was not granted
                 return
+
+            if open2fh is None:
+                open2fh = open_fh
 
             open_stateid = None
             if open_stid is not None:
@@ -1211,7 +1219,7 @@ class DelegTest(TestUtil):
             conflict_match_str = src_other_client_str + nfsver + "NFS.argop == %d" % conflict_op
             if conflict_op == OP_OPEN:
                 conflict_match_str += " and (NFS.claim.name == '%s' or" % self.filename
-                conflict_match_str += " (NFS.fh == b'%s' and NFS.claim.claim == %d))" % (self.pktt.escape(open_fh), CLAIM_FH)
+                conflict_match_str += " (NFS.fh == b'%s' and NFS.claim.claim == %d))" % (self.pktt.escape(open2fh), CLAIM_FH)
             elif target and conflict_type == OP_RENAME:
                 conflict_match_str += " and NFS.newname == '%s'" % self.filename
             elif conflict_type in [OP_REMOVE, OP_RENAME]:
