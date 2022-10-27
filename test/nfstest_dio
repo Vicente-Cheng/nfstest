@@ -189,6 +189,7 @@ class DioTest(TestUtil):
         if self.deleg_list is None:
             self.opts.error("invalid type given in --withdeleg [%s]" % self.withdeleg)
 
+        self.testidx = 1
         self.fbuffers = []
 
         # Prototypes for libc functions
@@ -1176,6 +1177,9 @@ class DioTest(TestUtil):
 
             if not check:
                 self.test_group("Verify %s %s%scontiguous vector [%s]" % (io_str, off_str, con_str, ", ".join(head_vec)))
+                sub_testname = "%s_%03d" % (self.testname, self.testidx)
+                self.dprint("INFO", "Running %s" % sub_testname)
+                self.testidx += 1
 
             idx = 0
             off = offset
@@ -1353,6 +1357,7 @@ class DioTest(TestUtil):
 
     def _vectored_io_test(self):
         """Verify vectored I/O functionality."""
+        self.testidx = 1
         hsize = int(self.PAGESIZE/2)
         for write in self.io_list:
             #=======================================================================
