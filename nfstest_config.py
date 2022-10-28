@@ -118,6 +118,7 @@ NFSTEST_SCRIPTS = [
     'test/nfstest_rdma',
     'test/nfstest_sparse',
     'test/nfstest_ssc',
+    'test/nfstest_xattr',
     'test/nfstest_xid',
 ]
 NFSTEST_ALLMODS = [

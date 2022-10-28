@@ -1,0 +1,1107 @@
+#!/usr/bin/env python3
+#===============================================================================
+# Copyright 2022 NetApp, Inc. All Rights Reserved,
+# contribution by Jorge Mora <mora@netapp.com>
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#===============================================================================
+import os
+import re
+import errno
+import traceback
+import nfstest_config as c
+from baseobj import BaseObj
+from formatstr import crc32
+from packet.nfs.nfs4_const import *
+from nfstest.test_util import TestUtil
+
+# Module constants
+__author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
+__copyright__ = "Copyright (C) 2022 NetApp, Inc."
+__license__   = "GPL v2"
+__version__   = "1.1"
+
+USAGE = """%prog --server <server> [options]
+
+Extended Attributes tests
+=========================
+Verify correct functionality of extended attributes
+
+Extended attributes are name:value pairs associated permanently with files
+and directories, similar to the environment strings associated with a
+process. An attribute may be defined or undefined. If it is defined, its
+value may be empty or non-empty. Extended attributes are extensions to the
+normal attributes which are associated with all inodes in the system. They
+are often used to provide additional functionality to a filesystem.
+
+Tests are divided into five groups: getxattr, setxattr, removexattr,
+listxattr and cinfo. The getxattr tests verify the retrieval of extended
+attribute values. The setxattr tests verify the creation or modification
+of extended attributes. The removexattr tests verify the removal of
+extended attributes. The listxattr tests verify the listing of extended
+attributes. And finally, the cinfo tests verify the change info returned
+by the server is correct when the file is either modified or not from a
+different client.
+
+Furthermore, when a different client is holding a read delegation, verify
+the delegation is recalled only when creating, modifying or removing an
+extended attribute. On the other hand, verify the read delegation is not
+recalled when listing attributes or retrieving their values.
+
+Negative testing is included like retrieval or removal of an extended
+attribute name which does not exist. Creating an attribute which already
+exists should fail while using XATTR_CREATE flag. Trying to modify an
+attribute which does not exist should fail if using XATTR_REPLACE flag.
+
+Examples:
+    The only required option is --server
+    $ %prog --server 192.168.0.11
+
+Notes:
+    The user id in the local host and the host specified by --client must
+    have access to run commands as root using the 'sudo' command without
+    the need for a password.
+
+    The user id must be able to 'ssh' to remote host without the need for
+    a password.
+
+    Valid only for NFS version 4.2 and above."""
+
+# Test script ID
+SCRIPT_ID = "XATTR"
+
+# Test group flags
+GROUP_GETXATTR    = (1 <<  0)
+GROUP_SETXATTR    = (1 <<  1)
+GROUP_REMOVEXATTR = (1 <<  2)
+GROUP_LISTXATTRS  = (1 <<  3)
+GROUP_CINFO       = (1 <<  4)
+GROUP_LIMIT       = (1 <<  5)
+GROUP_NOXATTRS    = (1 <<  6)
+GROUP_MANYXATTRS  = (1 <<  7)
+GROUP_NODELEG     = (1 <<  8)
+GROUP_DELEG       = (1 <<  9)
+GROUP_NOMODIFY    = (1 << 10)
+GROUP_MODIFY      = (1 << 11)
+
+TESTNAMES_ALL = [
+    ( "ngetxattr01",    GROUP_GETXATTR|GROUP_NODELEG ),
+    ( "ngetxattr02",    GROUP_GETXATTR|GROUP_NODELEG ),
+    ( "dgetxattr01",    GROUP_GETXATTR|GROUP_DELEG ),
+    ( "dgetxattr02",    GROUP_GETXATTR|GROUP_DELEG ),
+    ( "nsetxattr01",    GROUP_SETXATTR|GROUP_NODELEG ),
+    ( "nsetxattr02",    GROUP_SETXATTR|GROUP_NODELEG ),
+    ( "nsetxattr03",    GROUP_SETXATTR|GROUP_NODELEG ),
+    ( "nsetxattr04",    GROUP_SETXATTR|GROUP_NODELEG ),
+    ( "nsetxattr05",    GROUP_SETXATTR|GROUP_NODELEG ),
+    ( "nsetxattr06",    GROUP_SETXATTR|GROUP_NODELEG ),
+    ( "dsetxattr01",    GROUP_SETXATTR|GROUP_DELEG ),
+    ( "dsetxattr02",    GROUP_SETXATTR|GROUP_DELEG ),
+    ( "dsetxattr03",    GROUP_SETXATTR|GROUP_DELEG ),
+    ( "dsetxattr04",    GROUP_SETXATTR|GROUP_DELEG ),
+    ( "dsetxattr05",    GROUP_SETXATTR|GROUP_DELEG ),
+    ( "dsetxattr06",    GROUP_SETXATTR|GROUP_DELEG ),
+    ( "nremovexattr01", GROUP_REMOVEXATTR|GROUP_NODELEG ),
+    ( "nremovexattr02", GROUP_REMOVEXATTR|GROUP_NODELEG ),
+    ( "dremovexattr01", GROUP_REMOVEXATTR|GROUP_DELEG ),
+    ( "dremovexattr02", GROUP_REMOVEXATTR|GROUP_DELEG ),
+    ( "nlistxattr01",   GROUP_LISTXATTRS|GROUP_NODELEG|GROUP_NOXATTRS ),
+    ( "nlistxattr02",   GROUP_LISTXATTRS|GROUP_NODELEG ),
+    ( "nlistxattr03",   GROUP_LISTXATTRS|GROUP_NODELEG|GROUP_MANYXATTRS ),
+    ( "dlistxattr01",   GROUP_LISTXATTRS|GROUP_DELEG|GROUP_NOXATTRS ),
+    ( "dlistxattr02",   GROUP_LISTXATTRS|GROUP_DELEG ),
+    ( "dlistxattr03",   GROUP_LISTXATTRS|GROUP_DELEG|GROUP_MANYXATTRS ),
+    ( "ncinfo01",       GROUP_CINFO|GROUP_NOMODIFY ),
+    ( "ncinfo02",       GROUP_CINFO|GROUP_NOMODIFY ),
+    ( "ncinfo03",       GROUP_CINFO|GROUP_NOMODIFY ),
+    ( "ncinfo04",       GROUP_CINFO|GROUP_NOMODIFY ),
+    ( "mcinfo01",       GROUP_CINFO|GROUP_MODIFY ),
+    ( "mcinfo02",       GROUP_CINFO|GROUP_MODIFY ),
+    ( "mcinfo03",       GROUP_CINFO|GROUP_MODIFY ),
+    ( "mcinfo04",       GROUP_CINFO|GROUP_MODIFY ),
+]
+
+TESTNAMES_DICT = dict(TESTNAMES_ALL)
+
+def group_test(tname, group):
+    """Return True if test belongs to the given group"""
+    testgroup = TESTNAMES_DICT.get(tname)
+    if testgroup is not None and (testgroup & group) == group:
+        return True
+    return False
+
+def group_list(group):
+    """Return a list of all tests belonging to the given group"""
+    return [x[0] for x in TESTNAMES_ALL if group_test(x[0], group)]
+
+TESTNAMES_GETXATTR     = group_list(GROUP_GETXATTR)
+TESTNAMES_NGETXATTR    = group_list(GROUP_GETXATTR|GROUP_NODELEG)
+TESTNAMES_DGETXATTR    = group_list(GROUP_GETXATTR|GROUP_DELEG)
+TESTNAMES_SETXATTR     = group_list(GROUP_SETXATTR)
+TESTNAMES_NSETXATTR    = group_list(GROUP_SETXATTR|GROUP_NODELEG)
+TESTNAMES_DSETXATTR    = group_list(GROUP_SETXATTR|GROUP_DELEG)
+TESTNAMES_REMOVEXATTR  = group_list(GROUP_REMOVEXATTR)
+TESTNAMES_NREMOVEXATTR = group_list(GROUP_REMOVEXATTR|GROUP_NODELEG)
+TESTNAMES_DREMOVEXATTR = group_list(GROUP_REMOVEXATTR|GROUP_DELEG)
+TESTNAMES_LISTXATTRS   = group_list(GROUP_LISTXATTRS)
+TESTNAMES_NLISTXATTRS  = group_list(GROUP_LISTXATTRS|GROUP_NODELEG)
+TESTNAMES_DLISTXATTRS  = group_list(GROUP_LISTXATTRS|GROUP_DELEG)
+TESTNAMES_CINFO        = group_list(GROUP_CINFO)
+TESTNAMES_NCINFO       = group_list(GROUP_CINFO|GROUP_NOMODIFY)
+TESTNAMES_MCINFO       = group_list(GROUP_CINFO|GROUP_MODIFY)
+
+# Include the test groups in the list of test names
+# so they are displayed in the help
+TESTNAMES = TESTNAMES_GETXATTR + \
+            TESTNAMES_SETXATTR + \
+            TESTNAMES_REMOVEXATTR + \
+            TESTNAMES_LISTXATTRS + \
+            TESTNAMES_CINFO + \
+            ["getxattr", "ngetxattr", "dgetxattr"] + \
+            ["setxattr", "nsetxattr", "dsetxattr"] + \
+            ["removexattr", "nremovexattr", "dremovexattr"] + \
+            ["listxattr", "nlistxattr", "dlistxattr"]  + \
+            ["cinfo", "ncinfo", "mcinfo"]
+
+TESTGROUPS = {
+    "getxattr": {
+         "tests": TESTNAMES_GETXATTR,
+         "desc": "Run all GETXATTR tests: ",
+    },
+    "ngetxattr": {
+         "tests": TESTNAMES_NGETXATTR,
+         "desc": "Run all GETXATTR tests when no open on second client: ",
+    },
+    "dgetxattr": {
+         "tests": TESTNAMES_DGETXATTR,
+         "desc": "Run all GETXATTR tests when delegation is granted on second client: ",
+    },
+    "setxattr": {
+         "tests": TESTNAMES_SETXATTR,
+         "desc": "Run all SETXATTR tests: ",
+    },
+    "nsetxattr": {
+         "tests": TESTNAMES_NSETXATTR,
+         "desc": "Run all SETXATTR tests when no open on second client: ",
+    },
+    "dsetxattr": {
+         "tests": TESTNAMES_DSETXATTR,
+         "desc": "Run all SETXATTR tests when delegation is granted on second client: ",
+    },
+    "removexattr": {
+         "tests": TESTNAMES_REMOVEXATTR,
+         "desc": "Run all REMOVEXATTR tests: ",
+    },
+    "nremovexattr": {
+         "tests": TESTNAMES_NREMOVEXATTR,
+         "desc": "Run all REMOVEXATTR tests when no open on second client: ",
+    },
+    "dremovexattr": {
+         "tests": TESTNAMES_DREMOVEXATTR,
+         "desc": "Run all REMOVEXATTR tests when delegation is granted on second client: ",
+    },
+    "listxattr": {
+         "tests": TESTNAMES_LISTXATTRS,
+         "desc": "Run all LISTXATTRS tests: ",
+    },
+    "nlistxattr": {
+         "tests": TESTNAMES_NLISTXATTRS,
+         "desc": "Run all LISTXATTRS tests when no open on second client: ",
+    },
+    "dlistxattr": {
+         "tests": TESTNAMES_DLISTXATTRS,
+         "desc": "Run all LISTXATTRS tests when delegation is granted on second client: ",
+    },
+    "cinfo": {
+         "tests": TESTNAMES_CINFO,
+         "desc": "Run all CINFO tests: ",
+    },
+    "ncinfo": {
+         "tests": TESTNAMES_NCINFO,
+         "desc": "Run all CINFO tests when no open on second client: ",
+    },
+    "mcinfo": {
+         "tests": TESTNAMES_MCINFO,
+         "desc": "Run all CINFO tests when file is modified on second client: ",
+    },
+}
+
+stype_map = {
+    0                : SETXATTR4_EITHER,
+    os.XATTR_CREATE  : SETXATTR4_CREATE,
+    os.XATTR_REPLACE : SETXATTR4_REPLACE,
+}
+
+class XATTRTest(TestUtil):
+    """XATTRTest object
+
+       XATTRTest() -> New test object
+
+       Usage:
+           x = XATTRTest(testnames=["intra01", "intra02", "intra03", ...])
+
+           # Run all the tests
+           x.run_tests()
+           x.exit()
+    """
+    def __init__(self, **kwargs):
+        """Constructor
+
+           Initialize object's private data.
+        """
+        # Instantiate base object constructor
+        TestUtil.__init__(self, **kwargs)
+        self.opts.version = "%prog " + __version__
+        # Tests are valid for NFSv4.2 and beyond
+        self.opts.set_defaults(nfsversion=4.2)
+        hhelp = "Number of extended attributes to create for listxattr tests " \
+                "with many attributes [default: %default]"
+        self.test_opgroup.add_option("--num-xattrs", type="int", default=20, help=hhelp)
+        hhelp = "Remote NFS client and options used for delegation tests. " \
+                "Clients are separated by a ',' and each client definition is " \
+                "a list of arguments separated by a ':' given in the following " \
+                "order if positional arguments is used (see examples): " \
+                "clientname:server:export:nfsversion:port:proto:sec:mtpoint " \
+                "[default: '%default']"
+        self.test_opgroup.add_option("--client", default='nfsversion=3:proto=tcp:port=2049', help=hhelp)
+        hhelp = "Comma separated list of valid NFS versions to use in the " \
+                "--client option. An NFS version from this list, which is " \
+                "different than that given by --nfsversion, is selected and " \
+                "included in the --client option [default: %default]"
+        self.test_opgroup.add_option("--client-nfsvers", default="4.0,4.1", help=hhelp)
+
+        self.scan_options()
+
+        self.xattrbase = "user.xattr"
+        self.xattrdidx = {}
+        self.dgfileidx = 1
+        self.removeidx = 2
+        self.mxattridx = 0
+
+        self.xattrname = ""
+        self.xattr_values = {}
+        self.name_fh = {}
+
+        # Disable createtraces option but save it first for tests that do not
+        # check the NFS packets to verify the assertion
+        self._createtraces = self.createtraces
+        self.createtraces = False
+
+        # Process the --client option
+        client_list = self.process_client_option(remote=None)
+        if self.client_nfsvers is not None:
+            nfsvers_list = self.str_list(self.client_nfsvers)
+            for client_args in client_list:
+                if self.proto[-1] == "6" and len(client_args.get("proto")) and client_args["proto"][-1] != 6:
+                    client_args["proto"] += "6"
+                for nfsver in nfsvers_list:
+                    if nfsver != self.nfsversion:
+                        client_args["nfsversion"] = nfsver
+                        break
+                else:
+                    self.opts.error("At least one NFS version in --client-nfsvers '%s' " \
+                                    "must be different then --nfsversion %s" % \
+                                    (self.client_nfsvers, self.nfsversion))
+
+        # Start remote procedure server(s) remotely
+        try:
+            self.clientobj = None
+            for client_args in client_list:
+                client_name = client_args.pop("client", "")
+                self.create_host(client_name, **client_args)
+                self.create_rexec(client_name)
+        except:
+            self.test(False, traceback.format_exc())
+
+    def get_findex(self):
+        """Return index for last file created with create_file()"""
+        return (len(self.files) - 1)
+
+    def setup(self):
+        """Setup test environment"""
+        self.dprint('DBG7', "SETUP starts")
+        self.kofileidx  = 0  # Index so open owner sticks around
+        self.noxattridx = 0  # Index for file with no extended attributes
+        self.xattridx   = 1  # Index for file with extended attributes
+
+        run_tests     = set(self.testlist)
+        deleg_list    = set(group_list(GROUP_DELEG))
+        deleg_tests   = run_tests & deleg_list
+        nodeleg_tests = run_tests - deleg_list
+
+        nremove = 0
+        nmxattr = 0
+        for tname in self.testlist:
+            if group_test(tname, GROUP_REMOVEXATTR|GROUP_NODELEG):
+                nremove += 1
+            elif group_test(tname, GROUP_MANYXATTRS|GROUP_NODELEG):
+                nmxattr = 1
+
+        try:
+            self.trace_start()
+            self.mount()
+
+            if deleg_tests:
+                # Create file so open owner sticks around
+                self.create_file()
+                self.kofileidx = self.get_findex()
+
+            if nodeleg_tests:
+                # Create files for non-deleg tests
+                self.create_file()
+                self.noxattridx = self.get_findex()
+                self.create_file()
+                self.xattridx   = self.get_findex()
+                for i in range(1 + nremove):
+                    self.set_xattr(self.filename, indent=4)
+
+                if nmxattr:
+                    self.create_file()
+                    self.mxattridx = self.get_findex()
+                    for i in range(self.num_xattrs):
+                        self.set_xattr(self.filename, indent=4)
+
+            # File index for deleg tests
+            self.dgfileidx = self.get_findex() + 1
+
+            for tname in self.testlist:
+                if group_test(tname, GROUP_DELEG):
+                    # Need a different file for each test having a delegation
+                    self.create_file()
+                    if group_test(tname, GROUP_MANYXATTRS):
+                        nxattrs = self.num_xattrs
+                    elif group_test(tname, GROUP_NOXATTRS):
+                        nxattrs = 0
+                    elif group_test(tname, GROUP_REMOVEXATTR):
+                        # Make sure there is one xattr left after the remove
+                        nxattrs = 2
+                    else:
+                        nxattrs = 1
+                    for i in range(nxattrs):
+                        self.set_xattr(self.filename, indent=4)
+        finally:
+            self.umount()
+            self.trace_stop()
+            self.trace_open()
+            self.pktt.close()
+
+        self.dprint('DBG7', "SETUP done")
+
+    def set_xattr(self, filename, name=None, value=None, stype=0, indent=0, xmsg=""):
+        """Create extended attribute on the file"""
+        absfile = self.abspath(filename)
+        if name is None:
+            # No name given so create a unique name
+            idx = self.xattrdidx.setdefault(filename, 1)
+            name = "%s%02d" % (self.xattrbase, idx)
+            self.xattrdidx[filename] += 1
+        else:
+            # Use an arbitrary attribute index for named xattrs so the
+            # contents are different for all attributes
+            idx = 4096 + self.xattrdidx.setdefault(filename, 1)
+        self.xattrname = name
+        if value is None:
+            # Contents for the extended attribute are based on the index
+            value = self.data_pattern((idx-1)*32, 32)
+
+        self.xattr_values[name] = value
+
+        # Create extended attribute
+        indentstr = " " * indent
+        self.dprint('DBG1', "%sSet extended attribute [%s] for %r%s" % (indentstr, name, absfile, xmsg))
+        os.setxattr(absfile, name, value, flags=stype)
+        return name
+
+    def get_deleg_remote(self, filename):
+        """Get a read delegation on the remote client."""
+        fdko = None
+        absfile = self.clientobj.abspath(filename)
+        if self.clientobj and self.clientobj.nfs_version < 4:
+            # There are no delegations in NFSv3 so there is no need
+            # to open a file so the open owner sticks around
+            self.dprint("DBG2", "Open file on the remote client [%s]" % absfile)
+        else:
+            # Open file so open owner sticks around so a delegation
+            # is granted when opening the file under test
+            fdko = self.rexecobj.run(os.open, self.clientobj.abspath(self.files[self.kofileidx]), os.O_RDONLY)
+            self.dprint("DBG2", "Get a read delegation on the remote client [%s]" % absfile)
+        # Open the file under test
+        fdrd = self.rexecobj.run(os.open, absfile, os.O_RDONLY)
+        self.dprint("DBG4", "Close %s on the remote client" % absfile)
+        self.rexecobj.run(os.close, fdrd)
+        if fdko is not None:
+            self.rexecobj.run(os.close, fdko)
+
+    def get_filehandles(self):
+        """Create mapping of file handles to file names"""
+        self.name_fh = {}
+        matchstr  = self.match_nfs_version(self.nfs_version)
+        matchstr += "nfs.argop in %s" % ((OP_LOOKUP, OP_OPEN, OP_PUTROOTFH),)
+        self.pktt.clear_xid_list()
+        while self.pktt.match(matchstr, reply=True, rewind=False):
+            pkt = self.pktt.pkt
+            if pkt.rpc.type == 1 and pkt.nfs.status == NFS4_OK:
+                pkt_call  = self.pktt.pkt_call
+                fh = getattr(self.getop(pkt, OP_GETFH), "fh", None)
+                if pkt_call.NFSop.op == OP_PUTROOTFH:
+                    self.name_fh["/"] = fh
+                else:
+                    self.name_fh[pkt_call.NFSop.name] = fh
+        self.pktt.rewind()
+
+    def get_assertion(self, failure, error, amsg=""):
+        """Return correct fail message when expecting an error"""
+        errstr = errno.errorcode.get(failure, "success")
+        errnostr = errno.errorcode.get(error, error)
+        # Assertion expression
+        expr = (failure == error)
+        # Set proper fail message
+        if error and failure:
+            fmsg = ", but got %s" % errnostr
+        elif error and not failure:
+            fmsg = ", expecting success but got %s" % errnostr
+        elif failure:
+            fmsg = ", but it succeeded"
+        else:
+            fmsg = ""
+
+        if failure:
+            # If expecting a failure, change the assertion message
+            amsg = "fail with %s" % errstr
+        return expr, amsg, fmsg
+
+    def verify_xattr_call(self, pkt, opcode, opstr, fh, ename=None, stype=0, cookie=0):
+        """Verify Packet Call"""
+        callobj  = pkt.NFSop
+        ename = self.xattrname if ename is None else ename
+
+        self.test(pkt, "%s call  should be sent to server" % opstr)
+        expr = (fh == callobj.fh)
+        fmsg = ", expecting 0x%08x but got 0x%08x" % (crc32(fh), crc32(callobj.fh))
+        self.test(expr, "%s call  should be sent with correct file handle" % opstr, failmsg=fmsg)
+
+        if opcode == OP_LISTXATTRS:
+            expr = (callobj.cookie == cookie)
+            fmsg = ", expecting %d but got %d" % (cookie, callobj.cookie)
+            self.test(expr, "%s call  should be sent with correct cookie" % opstr, failmsg=fmsg)
+            expr = (callobj.maxcount > 0)
+            fmsg = ", expecting > %d but got %d" % (0, callobj.maxcount)
+            self.test(expr, "%s call  should be sent with correct maxcount" % opstr, failmsg=fmsg)
+        elif opcode in (OP_GETXATTR, OP_SETXATTR, OP_REMOVEXATTR):
+            xname = ename.replace("user.", "")
+            expr = (callobj.name == xname)
+            fmsg = ", expecting %r but got %r" % (xname, callobj.name)
+            self.test(expr, "%s call  should be sent with correct attribute name" % opstr, failmsg=fmsg)
+            if opcode == OP_SETXATTR:
+                xvalue = self.xattr_values.get(ename)
+                expr = (callobj.value == xvalue)
+                fmsg = ", expecting %r but got %r" % (xvalue, callobj.value)
+                self.test(expr, "%s call  should be sent with correct attribute value" % opstr, failmsg=fmsg)
+                xoption = stype_map.get(stype)
+                expr = (callobj.option == xoption)
+                fmsg = ", expecting %r but got %r" % (xoption, callobj.option)
+                self.test(expr, "%s call  should be sent with correct option" % opstr, failmsg=fmsg)
+
+    def verify_xattr_reply(self, pkt, idx, opcode, opstr, estatus, ename=None, user_xattrs=[], cinfo=None, cinfodiff=False, emsg=""):
+        """Verify Packet Reply"""
+        self.test(pkt, "%s reply should be sent to client" % opstr)
+
+        ename = self.xattrname if ename is None else ename
+        replyobj = pkt.nfs.array[idx]
+        expr = (pkt.nfs.status == estatus)
+        estr = nfsstat4.get(estatus, estatus)
+        fmsg = ", but got %s" % pkt.nfs.status
+        self.test(expr, "%s reply should return %s%s" % (opstr, estr, emsg), failmsg=fmsg)
+
+        cookie = 0
+        if pkt.nfs.status == NFS4_OK:
+            if opcode == OP_LISTXATTRS:
+                cookie = replyobj.cookie
+                if len(user_xattrs) == 0:
+                    expr = (len(replyobj.names) == 0)
+                    fmsg = ", expecting %d but got %d" % (0, len(replyobj.names))
+                    self.test(expr, "%s reply should return an empty list of attributes" % opstr, failmsg=fmsg)
+                    expr = (cookie == 0)
+                    fmsg = ", expecting %d but got %d" % (0, cookie)
+                    self.test(expr, "%s reply should return cookie = 0 when no attributes are returned" % opstr, failmsg=fmsg)
+                else:
+                    expr = (len(replyobj.names) > 0)
+                    fmsg = ", expecting %d but got %d" % (0, len(replyobj.names))
+                    self.test(expr, "%s reply should return list of attributes" % opstr, failmsg=fmsg)
+                    if replyobj.eof:
+                        expr = (cookie >= 0)
+                        fmsg = ", expecting >= %d but got %d" % (0, cookie)
+                        amsg = "%s reply should return any cookie when eof=True" % opstr
+                    else:
+                        expr = (cookie > 0)
+                        fmsg = ", expecting > %d but got %d" % (0, cookie)
+                        amsg = "%s reply should return a cookie > 0 when eof=False" % opstr
+                    self.test(expr, amsg, failmsg=fmsg)
+                if len(user_xattrs) > len(replyobj.names):
+                    beof = False
+                else:
+                    beof = True
+                fmsg = ", expecting %s but got %s" % (beof, replyobj.eof)
+                self.test(replyobj.eof == beof, "%s reply should return eof=%s" % (opstr, beof), failmsg=fmsg)
+            elif opcode == OP_GETXATTR:
+                expr = (replyobj.value == self.xattr_values.get(ename))
+                self.test(expr, "%s reply should return correct attribute value" % opstr)
+            elif opcode in (OP_SETXATTR, OP_REMOVEXATTR):
+                expr = (replyobj.info.before != replyobj.info.after)
+                amsg = "%s reply should return correct change info" % opstr
+                if not expr:
+                    fmsg = ", expecting before(%s) != after(%s)" % (replyobj.info.before, replyobj.info.after)
+                elif cinfo is not None:
+                    self.dprint('DBG2', str(replyobj.info))
+                    if cinfo > 0:
+                        if cinfodiff:
+                            expr = (expr and (replyobj.info.before != cinfo))
+                            amsg += " [the file has been modified]"
+                            fmsg = ", expecting <before> != %s" % cinfo
+                        else:
+                            expr = (expr and (replyobj.info.before == cinfo))
+                            fmsg = ", expecting before(%s) but got %s" % (cinfo, replyobj.info.before)
+                self.test(expr, amsg, failmsg=fmsg)
+        return cookie
+
+    def verify_xattr_support(self):
+        """Verify extended attributes are supported in the server"""
+        matchstr  = "nfs.argop == %d and " % OP_GETATTR
+        matchstr += "(%d in nfs.attributes or " % FATTR4_SUPPORTED_ATTRS
+        matchstr += "%d in nfs.attributes)" % FATTR4_XATTR_SUPPORT
+        fname_list = []
+        fattr_xattr = {}
+        self.pktt.clear_xid_list()
+        while self.pktt.match(matchstr, reply=True, rewind=False):
+            pkt = self.pktt.pkt
+            if pkt.rpc.type == 1:
+                pkt_call = self.pktt.pkt_call
+                callobj  = pkt_call.NFSop
+                replyobj = pkt.nfs.array[pkt_call.NFSidx]
+                filename = None
+                for fname, fh in self.name_fh.items():
+                    if fh == callobj.fh:
+                        filename = fname
+                        break
+                if filename not in fname_list:
+                    fname_list.append(filename)
+                support_h = fattr_xattr.setdefault(filename, {"supported":False, "xattrsupport":False})
+                if callobj and FATTR4_XATTR_SUPPORT in callobj.attributes and replyobj and not support_h.get("xattrsupport"):
+                    support_h["xattrsupport"] = bool(replyobj.attributes.get(FATTR4_XATTR_SUPPORT, False))
+                elif replyobj and replyobj.attributes and not support_h.get("supported"):
+                    obj = replyobj.attributes.get(FATTR4_SUPPORTED_ATTRS)
+                    if obj:
+                        support_h["supported"] = bool(FATTR4_XATTR_SUPPORT in obj.attributes)
+        for filename in fname_list:
+            support_h = fattr_xattr.get(filename)
+            self.test(support_h["supported"], "Server returns FATTR4_XATTR_SUPPORT in list of supported attributes for %r" % filename)
+            self.test(support_h["xattrsupport"], "Server returns FATTR4_XATTR_SUPPORT=TRUE for %r" % filename)
+        self.pktt.rewind()
+
+    def test_xattr(self, opcode, **kwargs):
+        """Verify extended attributes"""
+        fileidx  = kwargs.get("fileidx",  self.xattridx) # Index of file to use for testing
+        stype    = kwargs.get("stype",    0)       # SETXATTR create/replace flag
+        failure  = kwargs.get("failure",  0)       # Expected failure for function
+        estatus  = kwargs.get("estatus", NFS4_OK)  # Expected NFSv4 status
+        exists   = kwargs.get("exists",   0)       # Use existing attribute name
+        namelen  = kwargs.get("namelen",  0)       # Length of attribute name to use
+        valuelen = kwargs.get("valuelen", 0)       # Length of attribute value to use
+        rmtdeleg = kwargs.get("rmtdeleg", 0)       # Get delegation on second client
+
+        #=======================================================================
+        # Main test
+        #=======================================================================
+        self.test_group(re.sub("\s+", " ", self.test_description()))
+        fd   = None
+        fdko = None
+        srcname = None
+        try:
+            self.trace_start()
+            self.mount()
+
+            if rmtdeleg:
+                filename = self.files[self.dgfileidx]
+                self.dgfileidx += 1
+
+                # Mount server on remote client
+                self.clientobj.mount()
+
+                # Get a read delegation on the remote client
+                self.get_deleg_remote(filename)
+            else:
+               filename = self.files[fileidx]
+            absfile = self.abspath(filename)
+
+            # Valid extended attribute name for file under test
+            if not rmtdeleg and opcode == OP_REMOVEXATTR:
+                idx = self.removeidx
+                self.removeidx += 1
+            else:
+                idx = 1
+            name = "%s%02d" % (self.xattrbase, idx)
+            ename = name if exists else (None if opcode == OP_SETXATTR else "user.notexisting")
+
+            if namelen > 0:
+                ename = "%s_%d_" % (self.xattrbase, namelen)
+                ename += "x" * (namelen - len(ename))
+
+            evalue = None
+            if valuelen > 0:
+                evalue = b"X" * valuelen
+
+            user_xattrs = []
+            if opcode == OP_GETXATTR:
+                opstr = "GETXATTR"
+                try:
+                    err = 0
+                    value = None
+                    self.dprint('DBG1', "Get extended attribute [%s] for %s" % (ename, absfile))
+                    value = os.getxattr(absfile, ename)
+                    self.dprint('DBG2', "Extended attribute value: %r" % value)
+                except OSError as error:
+                    err = error.errno
+                expr, amsg, fmsg = self.get_assertion(failure, err, "get attribute value")
+                self.test(expr, "GETXATTR should %s" % amsg, failmsg=fmsg)
+                if value is not None:
+                    expr = (value == self.xattr_values.get(ename))
+                    self.test(expr, "GETXATTR should return correct attribute value")
+            elif opcode == OP_SETXATTR:
+                opstr = "SETXATTR"
+                try:
+                    err = 0
+                    ename = self.set_xattr(filename, name=ename, value=evalue, stype=stype)
+                except OSError as error:
+                    ename = self.xattrname
+                    err = error.errno
+                expr, amsg, fmsg = self.get_assertion(failure, err, "create extended attribute")
+                self.test(expr, "SETXATTR should %s" % amsg, failmsg=fmsg)
+                if not err:
+                    self.dprint('DBG2', "List extended attributes for %s" % absfile)
+                    xattr_list = os.listxattr(absfile)
+                    self.dprint('DBG3', "Extended attribute list: %r" % xattr_list)
+                    expr = ename in xattr_list
+                    self.test(expr, "Extended attribute should exist in file")
+                    self.dprint('DBG2', "Get extended attribute [%s] for %s" % (ename, absfile))
+                    value = os.getxattr(absfile, ename)
+                    self.dprint('DBG3', "Extended attribute value: %r" % value)
+                    expr = value == self.xattr_values.get(ename)
+                    self.test(expr, "Extended attribute value should be correct")
+            elif opcode == OP_REMOVEXATTR:
+                opstr = "REMOVEXATTR"
+                try:
+                    err = 0
+                    self.dprint('DBG2', "List extended attributes for %s" % absfile)
+                    xattr_list = os.listxattr(absfile)
+                    self.dprint('DBG3', "Extended attribute list: %r" % xattr_list)
+                    self.dprint('DBG3', "Remove extended attribute [%s] for %s" % (ename, absfile))
+                    os.removexattr(absfile, ename)
+                except OSError as error:
+                    err = error.errno
+                try:
+                    self.dprint('DBG2', "List extended attributes for %s" % absfile)
+                    xattr_list = os.listxattr(absfile)
+                    self.dprint('DBG3', "Extended attribute list: %r" % xattr_list)
+                except:
+                    pass
+                expr, amsg, fmsg = self.get_assertion(failure, err, "succeed")
+                self.test(expr, "REMOVEXATTR should %s" % amsg, failmsg=fmsg)
+                if xattr_list is not None:
+                    if failure:
+                        expr = True if not exists else (ename in xattr_list)
+                        self.test(expr, "Extended attribute should not be removed from file")
+                    else:
+                        expr = ename not in xattr_list
+                        self.test(expr, "Extended attribute should be removed from file")
+            elif opcode == OP_LISTXATTRS:
+                opstr = "LISTXATTRS"
+                try:
+                    err = 0
+                    self.dprint('DBG1', "List extended attributes for %s" % absfile)
+                    xattr_list = os.listxattr(absfile)
+                    self.dprint('DBG2', "Extended attribute list: %r" % xattr_list)
+                    user_xattrs = [x for x in xattr_list if x[:5] == "user."]
+                except OSError as error:
+                    err = error.errno
+                expr, amsg, fmsg = self.get_assertion(failure, err, "succeed")
+                self.test(expr, "LISTXATTR should %s" % amsg, failmsg=fmsg)
+                if fileidx == self.noxattridx:
+                    expr = (len(user_xattrs) == 0)
+                    self.test(expr, "LISTXATTR should not return any user namespace attributes")
+                else:
+                    expr = (len(user_xattrs) > 0)
+                    self.test(expr, "LISTXATTR should return all user namespace attributes")
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            if fdko is not None:
+                fdko.close()
+            if fd is not None:
+                fd.close()
+            self.umount()
+            self.clientobj.umount()
+            self.trace_stop()
+
+        #=======================================================================
+        # Process packet trace
+        #=======================================================================
+        try:
+            nfs4errlist = [estatus, NFS4ERR_NOENT]
+            if rmtdeleg:
+                nfs4errlist.append(NFS4ERR_DELAY)
+            file_name = filename
+
+            self.set_nfserr_list(nfs4list=nfs4errlist)
+            self.trace_open()
+
+            self.get_filehandles()
+
+            self.verify_xattr_support()
+
+            cbcall = None
+            deleg_stateid = None
+            if rmtdeleg:
+                # Look for delegation on second client
+                filehandle, open_stateid, deleg_stateid = self.find_open(filename=file_name, nfs_version=self.clientobj.nfs_version)
+                cbcall, cbreply = self.find_nfs_op(OP_CB_RECALL, ipaddr=self.client_ipaddr, port=None, src_ipaddr=self.server_ipaddr, first_call=True, nfs_version=None)
+                if cbcall:
+                    self.pktt.rewind(cbcall.record.index)
+                    drcall, drreply = self.find_nfs_op(OP_DELEGRETURN, first_call=True, nfs_version=self.clientobj.nfs_version)
+                self.pktt.rewind()
+
+            # Look for main XATTR operation
+            cookie = 0
+            xlist = set()
+            xlist_done = set()
+            fh = self.name_fh.get(file_name)
+            matchstr = "nfs.argop == %d" % opcode
+            cbrecall_done = False
+            self.pktt.clear_xid_list()
+            while self.pktt.match(matchstr, reply=True, rewind=False):
+                pkt = self.pktt.pkt
+                if pkt.rpc.type == 1:
+                    pkt_call = self.pktt.pkt_call
+                    callobj  = pkt_call.NFSop
+                    replyobj = pkt.nfs.array[pkt_call.NFSidx]
+
+                    # Verify Packet Call
+                    self.verify_xattr_call(pkt_call, opcode, opstr, fh, ename, stype, cookie)
+
+                    estat = estatus
+                    if rmtdeleg and opcode in (OP_SETXATTR, OP_REMOVEXATTR) and (cbcall or estatus == NFS4_OK):
+                        if cbcall.record.index > pkt.record.index or (cbreply and \
+                           cbreply.record.index > pkt.record.index):
+                            estat = NFS4ERR_DELAY
+                        cbrecall = True
+                        emsg = " when recalling delegation"
+                    else:
+                        cbrecall = False
+                        emsg = ""
+
+                    if opcode == OP_LISTXATTRS:
+                        if callobj.cookie == 0:
+                            xlist = set(user_xattrs)
+                        else:
+                            xlist = xlist.difference(xlist_done)
+
+                    # Verify Packet Reply
+                    cookie = self.verify_xattr_reply(pkt, pkt_call.NFSidx, opcode, opstr, estat, ename, xlist, emsg=emsg)
+
+                    if opcode == OP_LISTXATTRS:
+                        if replyobj.eof:
+                            # Done with this listing, reset the cookie
+                            cookie = 0
+                            xlist_done = set()
+                        else:
+                            xlist_done = xlist_done.union(["user."+x for x in replyobj.names])
+
+                    if cbrecall:
+                        cbrecall_done = True
+                        self.test(cbcall, "%s should recall delegation on second client" % opstr)
+                        if cbcall:
+                            expr = cbcall.NFSop.stateid.other == deleg_stateid
+                            self.test(expr, "CB_RECALL call  should recall delegation granted to client")
+                            self.test(cbreply, "CB_RECALL reply should be sent to the server")
+                            if cbreply:
+                                self.test(cbreply.NFSop.status == NFS4_OK, "CB_RECALL should return NFS4_OK")
+                            self.test(drcall, "DELEGRETURN call  should be sent to server")
+                            if drcall:
+                                expr = drcall.NFSop.stateid.other == deleg_stateid
+                                self.test(expr, "DELEGRETURN call  should be sent with the stateid of delegation being recalled")
+                            self.test(drreply, "DELEGRETURN reply should be sent to the client")
+                            if drreply:
+                                self.test(drreply.NFSop.status == NFS4_OK, "DELEGRETURN reply should return NFS4_OK")
+                    elif deleg_stateid and not cbrecall_done:
+                        self.test(cbcall is None, "%s should not recall delegation on second client" % opstr)
+            self.pktt.rewind()
+
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            self.pktt.close()
+
+    def test_cinfo(self, **kwargs):
+        """Verify extended attribute change info"""
+        fileidx  = kwargs.get("fileidx", 1) # Index of file to use for testing
+        stype    = kwargs.get("stype",   0) # SETXATTR create/replace flag
+        failure  = kwargs.get("failure", 0) # Expected failure for function
+        exists   = kwargs.get("exists",  0) # Use existing attribute name
+        modify   = kwargs.get("modify",  0) # Modify file on a second client
+
+        #=======================================================================
+        # Main test
+        #=======================================================================
+        self.test_group(re.sub("\s+", " ", self.test_description()))
+        try:
+            self.trace_start()
+            self.mount()
+
+            if modify:
+                # Mount server on remote client
+                self.clientobj.mount()
+
+            filename = self.files[fileidx]
+            absfile  = self.abspath(filename)
+            opcode = OP_SETXATTR
+            opstr = "SETXATTR"
+            estatus = NFS4_OK
+            ename_list = []
+            modindex = 2
+
+            for i in range(4):
+                # Valid extended attribute name for file under test
+                name = "%s%02d" % (self.xattrbase, 1)
+                ename = name if exists else None
+
+                if modify and i == modindex:
+                    afile = self.clientobj.abspath(filename)
+                    self.dprint('DBG2', "Modify file on the second client %r" % afile)
+                    st = os.stat(afile)
+                    offset = st.st_size
+                    with open(afile, "ab") as fd:
+                        fd.write(self.data_pattern(offset, 32))
+
+                try:
+                    err = 0
+                    ename = self.set_xattr(filename, name=ename, stype=stype)
+                except OSError as error:
+                    ename = self.xattrname
+                    err = error.errno
+                ename_list.append(ename)
+                expr, amsg, fmsg = self.get_assertion(failure, err, "create extended attribute")
+                self.test(expr, "SETXATTR should %s" % amsg, failmsg=fmsg)
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            self.umount()
+            self.trace_stop()
+
+        #=======================================================================
+        # Process packet trace
+        #=======================================================================
+        try:
+            self.trace_open()
+            self.get_filehandles()
+
+            # Look for main SETXATTR operation
+            index = 0
+            cookie = 0
+            cinfo = -1 # Not valid but not None so change info is displayed
+            fh = self.name_fh.get(filename)
+            matchstr = "nfs.argop == %d" % opcode
+            self.pktt.clear_xid_list()
+            while self.pktt.match(matchstr, reply=True, rewind=False):
+                pkt = self.pktt.pkt
+                if pkt.rpc.type == 1:
+                    pkt_call = self.pktt.pkt_call
+                    callobj  = pkt_call.NFSop
+                    replyobj = pkt.nfs.array[pkt_call.NFSidx]
+                    cmod = True if modify and modindex == index else False
+                    ename = ename_list[index]
+                    index += 1
+
+                    # Verify Packet Call
+                    self.verify_xattr_call(pkt_call, OP_SETXATTR, opstr, fh, ename, stype)
+
+                    # Verify Packet Reply
+                    self.verify_xattr_reply(pkt, pkt_call.NFSidx, OP_SETXATTR, opstr, estatus, ename, cinfo=cinfo, cinfodiff=cmod)
+                    cinfo = replyobj.info.after
+        except Exception:
+            self.test(False, traceback.format_exc())
+        finally:
+            self.pktt.close()
+
+    def ngetxattr01_test(self):
+        """Verify getting extended attribute"""
+        self.test_xattr(OP_GETXATTR, exists=1)
+
+    def ngetxattr02_test(self):
+        """Verify getting extended attribute fails when attribute does not exist"""
+        self.test_xattr(OP_GETXATTR, exists=0, failure=errno.ENODATA, estatus=NFS4ERR_NOXATTR)
+
+    def dgetxattr01_test(self):
+        """Verify getting extended attribute
+           when delegation is granted on second client"""
+        self.test_xattr(OP_GETXATTR, exists=1, rmtdeleg=1)
+
+    def dgetxattr02_test(self):
+        """Verify getting extended attribute fails when attribute does not exist
+           when delegation is granted on second client"""
+        self.test_xattr(OP_GETXATTR, exists=0, failure=errno.ENODATA, estatus=NFS4ERR_NOXATTR, rmtdeleg=1)
+
+    def nsetxattr01_test(self):
+        """Verify setting extended attribute with SETXATTR4_EITHER when attribute does not exist"""
+        self.test_xattr(OP_SETXATTR)
+
+    def nsetxattr02_test(self):
+        """Verify setting extended attribute with SETXATTR4_CREATE when attribute does not exist"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_CREATE)
+
+    def nsetxattr03_test(self):
+        """Verify setting extended attribute with SETXATTR4_REPLACE fails when attribute does not exist"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_REPLACE, failure=errno.ENODATA, estatus=NFS4ERR_NOXATTR)
+
+    def nsetxattr04_test(self):
+        """Verify setting extended attribute with SETXATTR4_EITHER when attribute already exists"""
+        self.test_xattr(OP_SETXATTR, exists=1)
+
+    def nsetxattr05_test(self):
+        """Verify setting extended attribute with SETXATTR4_CREATE fails when attribute already exists"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_CREATE, exists=1, failure=errno.EEXIST, estatus=NFS4ERR_EXIST)
+
+    def nsetxattr06_test(self):
+        """Verify setting extended attribute with SETXATTR4_REPLACE when attribute already exists"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_REPLACE, exists=1)
+
+    def dsetxattr01_test(self):
+        """Verify setting extended attribute with SETXATTR4_EITHER when attribute does not exist
+           when delegation is granted on second client"""
+        self.test_xattr(OP_SETXATTR, rmtdeleg=1)
+
+    def dsetxattr02_test(self):
+        """Verify setting extended attribute with SETXATTR4_CREATE when attribute does not exist
+           when delegation is granted on second client"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_CREATE, rmtdeleg=1)
+
+    def dsetxattr03_test(self):
+        """Verify setting extended attribute with SETXATTR4_REPLACE fails when attribute does not exist
+           when delegation is granted on second client"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_REPLACE, failure=errno.ENODATA, estatus=NFS4ERR_NOXATTR, rmtdeleg=1)
+
+    def dsetxattr04_test(self):
+        """Verify setting extended attribute with SETXATTR4_EITHER when attribute already exists
+           when delegation is granted on second client"""
+        self.test_xattr(OP_SETXATTR, exists=1, rmtdeleg=1)
+
+    def dsetxattr05_test(self):
+        """Verify setting extended attribute with SETXATTR4_CREATE fails when attribute already exists
+           when delegation is granted on second client"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_CREATE, exists=1, failure=errno.EEXIST, estatus=NFS4ERR_EXIST, rmtdeleg=1)
+
+    def dsetxattr06_test(self):
+        """Verify setting extended attribute with SETXATTR4_REPLACE when attribute already exists
+           when delegation is granted on second client"""
+        self.test_xattr(OP_SETXATTR, stype=os.XATTR_REPLACE, exists=1, rmtdeleg=1)
+
+    def nremovexattr01_test(self):
+        """Verify removing extended attribute"""
+        self.test_xattr(OP_REMOVEXATTR, exists=1)
+
+    def nremovexattr02_test(self):
+        """Verify removing extended attribute fails when attribute does not exist"""
+        self.test_xattr(OP_REMOVEXATTR, exists=0, failure=errno.ENODATA, estatus=NFS4ERR_NOXATTR)
+
+    def dremovexattr01_test(self):
+        """Verify removing extended attribute
+           when delegation is granted on second client"""
+        self.test_xattr(OP_REMOVEXATTR, exists=1, rmtdeleg=1)
+
+    def dremovexattr02_test(self):
+        """Verify removing extended attribute fails when attribute does not exist
+           when delegation is granted on second client"""
+        self.test_xattr(OP_REMOVEXATTR, exists=0, failure=errno.ENODATA, estatus=NFS4ERR_NOXATTR, rmtdeleg=1)
+
+    def nlistxattr01_test(self):
+        """Verify listing extended attributes with no user namespace attributes"""
+        self.test_xattr(OP_LISTXATTRS, fileidx=self.noxattridx)
+
+    def nlistxattr02_test(self):
+        """Verify listing extended attribute"""
+        self.test_xattr(OP_LISTXATTRS)
+
+    def nlistxattr03_test(self):
+        """Verify listing extended attribute (many attributes)"""
+        self.test_xattr(OP_LISTXATTRS, fileidx=self.mxattridx)
+
+    def dlistxattr01_test(self):
+        """Verify listing extended attributes with no user namespace attributes
+           when delegation is granted on second client"""
+        self.test_xattr(OP_LISTXATTRS, fileidx=self.noxattridx, rmtdeleg=1)
+
+    def dlistxattr02_test(self):
+        """Verify listing extended attribute
+           when delegation is granted on second client"""
+        self.test_xattr(OP_LISTXATTRS, rmtdeleg=1)
+
+    def dlistxattr03_test(self):
+        """Verify listing extended attribute (many attributes)
+           when delegation is granted on second client"""
+        self.test_xattr(OP_LISTXATTRS, fileidx=self.mxattridx, rmtdeleg=1)
+
+    def ncinfo01_test(self):
+        """Verify SETXATTR change info with SETXATTR4_EITHER when attribute does not exist"""
+        self.test_cinfo()
+
+    def ncinfo02_test(self):
+        """Verify SETXATTR change info with SETXATTR4_EITHER when attribute already exists"""
+        self.test_cinfo(exists=1)
+
+    def ncinfo03_test(self):
+        """Verify SETXATTR change info with SETXATTR4_CREATE when attribute does not exist"""
+        self.test_cinfo(stype=os.XATTR_CREATE)
+
+    def ncinfo04_test(self):
+        """Verify SETXATTR change info with SETXATTR4_REPLACE when attribute already exists"""
+        self.test_cinfo(stype=os.XATTR_REPLACE, exists=1)
+
+    def mcinfo01_test(self):
+        """Verify SETXATTR change info with SETXATTR4_EITHER when attribute does not exist
+           when file is modified on second client"""
+        self.test_cinfo(modify=1)
+
+    def mcinfo02_test(self):
+        """Verify SETXATTR change info with SETXATTR4_EITHER when attribute already exists
+           when file is modified on second client"""
+        self.test_cinfo(exists=1, modify=1)
+
+    def mcinfo03_test(self):
+        """Verify SETXATTR change info with SETXATTR4_CREATE when attribute does not exist
+           when file is modified on second client"""
+        self.test_cinfo(stype=os.XATTR_CREATE, modify=1)
+
+    def mcinfo04_test(self):
+        """Verify SETXATTR change info with SETXATTR4_REPLACE when attribute already exists
+           when file is modified on second client"""
+        self.test_cinfo(stype=os.XATTR_REPLACE, exists=1, modify=1)
+
+################################################################################
+# Entry point
+x = XATTRTest(usage=USAGE, testnames=TESTNAMES, testgroups=TESTGROUPS, sid=SCRIPT_ID)
+
+try:
+    x.setup()
+
+    # Run all the tests
+    x.run_tests()
+except Exception:
+    x.test(False, traceback.format_exc())
+finally:
+    x.cleanup()
+    x.exit()
