@@ -40,14 +40,12 @@ Packet layers supported:
 """
 import os
 import re
+import ast
 import sys
 import gzip
 import time
 import fcntl
-import token
 import struct
-import parser
-import symbol
 import termios
 from formatstr import *
 import nfstest_config as c
@@ -67,7 +65,7 @@ from packet.transport.rdmainfo import RDMAinfo
 __author__    = "Jorge Mora (%s)" % c.NFSTEST_AUTHOR_EMAIL
 __copyright__ = "Copyright (C) 2012 NetApp, Inc."
 __license__   = "GPL v2"
-__version__   = "2.6"
+__version__   = "2.7"
 
 BaseObj.debug_map(0x100000000, 'pkt1', "PKT1: ")
 BaseObj.debug_map(0x200000000, 'pkt2', "PKT2: ")
@@ -75,12 +73,10 @@ BaseObj.debug_map(0x400000000, 'pkt3', "PKT3: ")
 BaseObj.debug_map(0x800000000, 'pkt4', "PKT4: ")
 BaseObj.debug_map(0xF00000000, 'pktt', "PKTT: ")
 
-# Map of tokens
-_token_map = dict(list(token.tok_name.items()) + list(symbol.sym_name.items()))
 # Map of items not in the array of the compound
-_nfsopmap = {'status': 1, 'tag': 1, 'minorversion': 1}
-# Match function map
-_match_func_map = dict(zip(PKT_layers,["self._match_%s"%x for x in PKT_layers]))
+_nfsopmap = {'status', 'tag', 'minorversion'}
+# Set of valid layers
+_pkt_layers = set(PKT_layers)
 
 # Read size -- the amount of data read at a time from the file
 # The read ahead buffer actual size is always >= 2*READ_SIZE
@@ -88,6 +84,200 @@ READ_SIZE = 64*1024
 
 # Show progress if stderr is a tty and stdout is not
 SHOWPROG = os.isatty(2) and not os.isatty(1)
+
+oplogic_d = {
+    ast.Eq    : " == ",
+    ast.NotEq : " != ",
+    ast.Lt    : " < ",
+    ast.LtE   : " <= ",
+    ast.Gt    : " > ",
+    ast.GtE   : " >= ",
+    ast.Is    : " is ",
+    ast.IsNot : " is not ",
+    ast.In    : " in ",
+    ast.NotIn : " not in ",
+}
+
+binop_d = {
+    ast.Add      : " + ",
+    ast.Sub      : " - ",
+    ast.Mult     : " * ",
+    ast.Div      : " / ",
+    ast.FloorDiv : " // ",
+    ast.Mod      : " % ",
+    ast.Pow      : " ** ",
+    ast.LShift   : " << ",
+    ast.RShift   : " >> ",
+    ast.BitOr    : " | ",
+    ast.BitXor   : " ^ ",
+    ast.BitAnd   : " & ",
+    ast.MatMult  : " @ ",
+}
+
+bool_d = {
+    ast.And : " and ",
+    ast.Or  : " or ",
+}
+
+unary_d = {
+    ast.Not    : "not ",
+    ast.USub   : "-",
+    ast.UAdd   : "+",
+    ast.Invert : "~",
+}
+
+precedence_d = {
+    ast.Pow      : 80,
+    ast.USub     : 70,
+    ast.UAdd     : 70,
+    ast.Invert   : 70,
+    ast.MatMult  : 60,
+    ast.Mult     : 60,
+    ast.Div      : 60,
+    ast.FloorDiv : 60,
+    ast.Mod      : 60,
+    ast.Add      : 50,
+    ast.Sub      : 50,
+    ast.LShift   : 40,
+    ast.RShift   : 40,
+    ast.BitAnd   : 34,
+    ast.BitXor   : 32,
+    ast.BitOr    : 30,
+    ast.Compare  : 20,
+    ast.Not      : 14,
+    ast.And      : 12,
+    ast.Or       : 10,
+}
+
+def get_op(op):
+    """Return the string representation of the logical operator AST object"""
+    ret = oplogic_d.get(type(op))
+    if ret is None:
+        raise Exception("Unknown logical operator class '%s'" % op)
+    return ret
+
+def get_binop(op):
+    """Return the string representation of the operator AST object"""
+    ret = binop_d.get(type(op))
+    if ret is None:
+        raise Exception("Unknown operator class '%s'" % op)
+    return ret
+
+def get_precedence(op):
+    """Return the precedence of operator AST object"""
+    ret = precedence_d.get(type(op))
+    if ret is None:
+        raise Exception("Unknown operator class '%s'" % op)
+    return ret
+
+def get_bool(op):
+    """Return the string representation of the logical operator AST object"""
+    ret = bool_d.get(type(op))
+    if ret is None:
+        raise Exception("Unknown boolean operator class '%s'" % op)
+    return ret
+
+def get_unary(op):
+    """Return the string representation of the unary operator AST object"""
+    ret = unary_d.get(type(op))
+    if ret is None:
+        raise Exception("Unknown unary operator class '%s'" % op)
+    return ret
+
+def unparse(tree):
+    """Older Python releases do not define ast.unparse(). Create function
+       unparse with limited functionality but enough for the matching
+       language it is needed for match(). This function runs twice as fast
+       as ast.unparse(), so always use it regardless if it is defined or
+       not on the ast module.
+    """
+    if isinstance(tree, ast.Name):
+        return tree.id
+    elif isinstance(tree, ast.Attribute):
+        return unparse(tree.value) + "." + tree.attr
+    elif isinstance(tree, ast.Constant):
+        return repr(tree.value)
+    elif isinstance(tree, ast.Tuple):
+        tlist = [unparse(x) for x in tree.elts]
+        if len(tlist) <= 1:
+            # Empty or single item tuple must have a comma, e.g., (,) or ("item",)
+            tlist.append("")
+        return "(%s)" % ", ".join(tlist)
+    elif isinstance(tree, ast.List):
+        return "[%s]" % ", ".join([unparse(x) for x in tree.elts])
+    elif isinstance(tree, ast.Call):
+        return "%s(%s)" % (unparse(tree.func), ", ".join([unparse(x) for x in tree.args]))
+    elif isinstance(tree, ast.Num):   # Deprecated
+        return repr(tree.n)
+    elif isinstance(tree, ast.Str):   # Deprecated
+        return repr(tree.s)
+    elif isinstance(tree, ast.Bytes): # Deprecated
+        return repr(tree.s)
+    elif isinstance(tree, ast.Expression):
+        tree = tree.body
+
+    if isinstance(tree, ast.Compare):
+        left = unparse(tree.left)
+        ops = [get_op(x) for x in tree.ops]
+        comparators = [unparse(x) for x in tree.comparators]
+        ret = left + "".join([x+y for x,y in zip(ops, comparators)])
+        return ret
+    elif isinstance(tree, ast.BoolOp):
+        blist = []
+        for item in tree.values:
+            itemstr = unparse(item)
+            if isinstance(item, ast.BoolOp):
+                # Nested logical operations -- add parentheses
+                itemstr = "(%s)" % itemstr
+            blist.append(itemstr)
+        return get_bool(tree.op).join([x for x in blist])
+    elif isinstance(tree, ast.BinOp):
+        lhs = unparse(tree.left)
+        rhs = unparse(tree.right)
+        if isinstance(tree.left, ast.BinOp) and \
+           ((isinstance(tree.op, ast.Pow) and tree.op == tree.left.op) or \
+           get_precedence(tree.left.op) < get_precedence(tree.op)):
+            # Add parentheses on the LHS according to operation precedence
+            # or if both operations are '**' -- exponent operation has a
+            # right-to-left associativity as opposed to others operations
+            # which have a left-to-right associativity
+            lhs = "(%s)" % lhs
+        if isinstance(tree.right, ast.BinOp) and \
+           get_precedence(tree.right.op) < get_precedence(tree.op):
+            rhs = "(%s)" % rhs
+        return (lhs + get_binop(tree.op) + rhs)
+    elif isinstance(tree, ast.UnaryOp):
+        operand = unparse(tree.operand)
+        if isinstance(tree.operand, (ast.BinOp, ast.BoolOp)) and \
+           get_precedence(tree.operand.op) < get_precedence(tree.op):
+            operand = "(%s)" % operand
+        return get_unary(tree.op) + operand
+
+def convert_attrs(tree):
+    """Convert all valid layer AST Attributes to fully qualified names.
+       Also, return the name of the correct wrapper function to be used.
+
+       NOTE:
+         The tree argument is modified so when tree is unparsed, all layer
+         attributes are expanded correctly.
+    """
+    name = None
+    for node in ast.walk(tree):
+        curr = node
+        while isinstance(curr, ast.Attribute):
+            if isinstance(curr.value, ast.Name):
+                layer = curr.value.id.lower()
+                if layer == 'nfs' and curr.attr not in _nfsopmap:
+                    curr.value.id = layer
+                    name = 'match_nfs'
+                elif layer in _pkt_layers:
+                    # Add proper object prefix
+                    curr.value.id = 'self.pkt.' + layer
+                    if name is None:
+                        name = 'match_pkt'
+                break
+            curr = curr.value
+    return name
 
 class Header(BaseObj):
     # Class attributes
@@ -657,104 +847,6 @@ class Pktt(BaseObj):
         self.offset += ldata
         return data
 
-    def _split_match(self, uargs):
-        """Split match arguments and return a tuple (lhs, opr, rhs)
-           where lhs is the left hand side of the given argument expression,
-           opr is the operation and rhs is the right hand side of the given
-           argument expression:
-
-               <lhs> <opr> <rhs>
-
-           Valid opr values are: ==, !=, <, >, <=, >=, in
-        """
-        m = re.search(r"([^!=<>]+)\s*([!=<>]+|in)\s*(.*)", uargs)
-        lhs = m.group(1).rstrip()
-        opr = m.group(2)
-        rhs = m.group(3)
-        return (lhs, opr, rhs)
-
-    def _process_match(self, obj, lhs, opr, rhs):
-        """Process "regex" and 'in' operator on match expression.
-           Regular expression is given as re('regex') and converted to a
-           proper regex re.search('regex', data), where data is the object
-           compose of obj and lhs|rhs depending on opr. The argument obj
-           is an object prefix.
-
-           If opr is a comparison operation (==, !=, etc.), both obj and lhs
-           will be the actual LHS and rhs will be the actual RHS.
-           If opr is 'in', lhs will be the actual LHS and both obj and rhs
-           will be the actual RHS.
-
-           Return the processed match expression.
-
-           Examples:
-               # Regular expression processing
-               expr = x._process_match('self.pkt.ip.', 'src', '==', "re(r'192\.*')")
-
-               Returns the following expression ready to be evaluated:
-               expr = "re.search(r'192\.*', str(self.pkt,ip.src))"
-
-               # Object prefix processing
-               expr = x._process_match('item.', 'argop', '==', '25')
-
-               Returns the following expression ready to be evaluated:
-               expr = "item.argop==25"
-
-               # Membership (in) processing
-               expr = x._process_match('item.', '62', 'in', 'attributes')
-
-               Returns the following expression ready to be evaluated:
-               expr = "62 in item.attributes"
-        """
-        func = None
-        if opr != 'in':
-            regex = re.search(r"(\w+)\((.*)\)", lhs)
-            if regex:
-                lhs = regex.group(2)
-                func = regex.group(1)
-
-        if rhs[:3] == 're(':
-            # Regular expression, it must be in rhs
-            rhs = "re.search" + rhs[2:]
-            if opr == "!=":
-                rhs = "not " + rhs
-            LHS = rhs[:-1] + ", str(" + obj + lhs +  "))"
-            RHS = ""
-            opr = ""
-        elif opr == 'in':
-            opr = " in "
-            if self.inlhs:
-                LHS = obj + lhs
-                RHS = rhs
-            else:
-                LHS = lhs
-                RHS = obj + rhs
-        else:
-            LHS = obj + lhs
-            RHS = rhs
-
-        if func is not None:
-            LHS = "%s(%s)" % (func, LHS)
-
-        return LHS + opr + RHS
-
-    def _match(self, layer, uargs):
-        """Default match function."""
-        if getattr(self.pkt, layer, None) is None:
-            # Layer is not defined
-            texpr = False
-        elif layer == "nfs":
-            # Use special matching function for NFS
-            texpr = self.match_nfs(uargs)
-        else:
-            # Use general match
-            obj = "self.pkt.%s." % layer.lower()
-            lhs, opr, rhs = self._split_match(uargs)
-            expr = self._process_match(obj, lhs, opr, rhs)
-            texpr = eval(expr)
-        self.dprint('PKT3', "    %d: match_%s(%s) -> %r" % (self.pkt.record.index, layer, uargs, texpr))
-        return texpr
-
     def get_index(self):
         """Get current packet index"""
         if self.pktlist is None:
@@ -779,7 +871,79 @@ class Pktt(BaseObj):
         """Clear list of outstanding xids"""
         self._match_xid_list = []
 
-    def match_nfs(self, uargs):
+    def _convert_match(self, matchstr, astout=False):
+        """Convert a string match expression into a valid match expression
+           to be evaluated by eval(). All items specified as valid packet
+           layers are replaced with a call to the correct wrapper function.
+
+           Examples:
+               expr = "TCP.flags.ACK == 1 and NFS.argop == 50"
+               data = self._convert_match(expr)
+               Returns:
+               "self.match_pkt('self.pkt.tcp.flags.ACK == 1') and self.match_nfs('nfs.argop == 50')"
+
+               expr = "tcp.dst_port == 2049"
+               data = self._convert_match(expr)
+               Returns:
+               "self.match_pkt('self.pkt.tcp.dst_port == 2049')"
+
+               expr = "2049 == tcp.dst_port"
+               data = self._convert_match(expr)
+               Returns:
+               "self.match_pkt('2049 == self.pkt.tcp.dst_port')"
+
+               expr = "nfs.status == 0"
+               data = self._convert_match(expr)
+               Returns:
+               "self.match_pkt('self.pkt.nfs.status == 0')"
+
+               expr = "(crc32(nfs.fh) == 0x0f581ee9)"
+               data = self._convert_match(expr)
+               Returns:
+               "self.match_nfs('crc32(nfs.fh) == 257433321')"
+
+               expr = "re.search(r'192\..*', ip.src)"
+               data = self._convert_match(expr)
+               Returns:
+               "self.match_pkt(\"re.search('192\\\\..*', self.pkt.ip.src)\")"
+        """
+        if isinstance(matchstr, str):
+            # Convert match string into an AST object
+            tree = ast.parse(matchstr, mode='eval')
+        else:
+            tree = matchstr
+
+        if isinstance(tree, ast.Expression):
+            tree = tree.body
+        if isinstance(tree, (ast.Compare, ast.Call, ast.UnaryOp, ast.BinOp)):
+            name = convert_attrs(tree)
+            if name is not None:
+                # Create wrapper function AST having the modified tree as the arguments
+                func = ast.Attribute(ast.Name("self", ast.Load()), name, ast.Load())
+                args = [ast.Constant(unparse(tree))]
+                tree = ast.Call(func, args, [])
+        elif isinstance(tree, ast.BoolOp):
+            # Process logical operators ("and", "or")
+            for idx in range(len(tree.values)):
+                subexpr = tree.values[idx]
+                tree.values[idx] = self._convert_match(subexpr, True)
+        else:
+            raise Exception("%r should be a comparison, function call or unary operation" % unparse(tree))
+
+        return (tree if astout else unparse(tree))
+
+    def match_pkt(self, expr):
+        """Default wrapper function to evaluate a simple string expression."""
+        ret = False
+        try:
+            ret = eval(expr)
+        except:
+            pass
+
+        self.dprint('PKT3', "    %d: match_pkt(%s) -> %r" % (self.pkt.record.index, expr, ret))
+        return ret
+
+    def match_nfs(self, expr):
         """Match NFS values on current packet.
 
            In NFSv4, there is a single compound procedure with multiple
@@ -847,97 +1011,34 @@ class Pktt(BaseObj):
            the match engine to match the second or Nth occurrence of an
            operation.
         """
-        array = None
-        isarg = True
-        lhs, opr, rhs = self._split_match(uargs)
-
-        if self.pkt.rpc.version == 3 or _nfsopmap.get(lhs):
-            try:
-                # Top level NFSv4 packet info or NFSv3 packet
-                expr = self._process_match("self.pkt.nfs.", lhs, opr, rhs)
+        ret = False
+        try:
+            if self.pkt.rpc.version == 3:
+                # NFSv3 packet set nfs object
+                nfs = self.pkt.nfs
                 if eval(expr):
-                    if self.pkt.rpc.version == 3:
-                        # Set NFSop and NFSidx
-                        self._nfsop  = self.pkt.nfs
-                        self._nfsidx = None
-                    return True
-                return False
-            except Exception:
-                return False
-
-        idx = 0
-        obj_prefix = "item."
-        for item in self.pkt.nfs.array:
-            try:
-                # Get expression to eval
-                expr = self._process_match(obj_prefix, lhs, opr, rhs)
-                if eval(expr):
-                    self._nfsop  = item
-                    self._nfsidx = idx
-                    return True
-            except Exception:
-                # Continue searching
-                pass
-            idx += 1
-        return False
-
-    def _convert_match(self, ast):
-        """Convert a parser list match expression into their corresponding
-           function calls.
-
-           Example:
-               expr = "TCP.flags.ACK == 1 and NFS.argop == 50"
-               st = parser.expr(expr)
-               ast = parser.st2list(st)
-               data =  self._convert_match(ast)
-
-               Returns:
-               data = "(self._match('tcp','flags.ACK==1'))and(self._match('nfs','argop==50'))"
-        """
-        ret = ''
-        isin = False
-        if not isinstance(ast, list):
-            if ast.lower() in _match_func_map:
-                # Replace name by its corresponding function name
-                return _match_func_map[ast.lower()]
-            return ast
-        if len(ast) == 2:
-            return self._convert_match(ast[1])
-
-        for a in ast[1:]:
-            data = self._convert_match(a)
-            if data == 'in':
-                data = ' in '
-                isin = True
-                if ret[:5] == "self.":
-                    # LHS in the 'in' operator is a packet object
-                    self.inlhs = True
-                else:
-                    # LHS in the 'in' operator is a constant value
-                    self.inlhs = False
-            ret += data
-
-        if _token_map[ast[0]] == "comparison":
-            # Comparison
-            if isin:
-                regex = re.search(r'(.*)(self\._match)_(\w+)\.(.*)', ret)
-                data  = regex.groups()
-                func  = data[1]
-                layer = data[2]
-                uargs = data[0] + data[3]
+                    # Set NFSop and NFSidx
+                    self._nfsop  = nfs
+                    self._nfsidx = None
+                    ret = True
             else:
-                regex = re.search(r"^((\w+)\()?(self\._match)_(\w+)\.(.*)", ret)
-                data  = regex.groups()
-                func  = data[2]
-                layer = data[3]
-                if data[0] is None:
-                    uargs = data[4]
-                else:
-                    uargs = data[0] + data[4]
-            # Escape all single quotes since the whole string will be quoted
-            uargs = re.sub(r"'", "\\'", uargs)
-            ret = "(%s('%s','%s'))" % (func, layer, uargs)
+                idx = 0
+                # NFSv4 packet, nfs object is each item in the array
+                for nfs in self.pkt.nfs.array:
+                    try:
+                        if eval(expr):
+                            self._nfsop  = nfs
+                            self._nfsidx = idx
+                            ret = True
+                            continue
+                    except Exception:
+                        # Continue searching on next operation
+                        pass
+                    idx += 1
+        except:
+            pass
 
+        self.dprint('PKT3', "    %d: match_nfs(%s) -> %r" % (self.pkt.record.index, expr, ret))
         return ret
 
     def match(self, expr, maxindex=None, rewind=True, reply=False):
@@ -970,7 +1071,7 @@ class Pktt(BaseObj):
 
                # Find all packets coming from subnet 192.168.1.0/24 using
                # a regular expression
-               while x.match(r"IP.src == re('192\.168\.1\.\d*')"):
+               while x.match(r"re.search('192\.168\.1\.\d*', IP.src)"):
                    print x.pkt.tcp
 
                # Find packet having a GETATTR asking for FATTR4_FS_LAYOUT_TYPES(bit 62)
@@ -1020,9 +1121,7 @@ class Pktt(BaseObj):
                match_ethernet(), match_ip(), match_tcp(), match_rpc(), match_nfs()
         """
         # Parse match expression
-        st = parser.expr(expr)
-        smap = parser.st2list(st)
-        pdata = self._convert_match(smap)
+        pdata = self._convert_match(expr)
         self.reply_matched = False
         if self.pktlist is None:
             pkt_list   = self
@@ -1160,8 +1259,7 @@ class Pktt(BaseObj):
         rdata = rdata[1:-1].replace('"', dquote)
         # Replace all single quotes to its corresponding hex value
         rdata = rdata.replace("'", squote)
-        # Escape all backslashes
-        return rdata.replace('\\', '\\\\')
+        return rdata
 
     @staticmethod
     def ip_tcp_src_expr(ipaddr, port=None):
@@ -1222,7 +1320,6 @@ if __name__ == '__main__':
     for quote in ["'", '"']:
         for data in l_escape:
             expr = "data == %s%s%s" % (quote, Pktt.escape(data), quote)
-            expr = re.sub(r'\\\\', r'\\', expr)
             if eval(expr):
                 tcount += 1
 
