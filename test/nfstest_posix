@@ -310,6 +310,7 @@ class PosixTest(TestUtil):
         """
         not_str = "" if test else "not "
         out = posix.access(path, mode)
+        self.dprint('DBG4', "access(%s) returns %s" % (access_str(mode), out))
         self.test(out == test, "access - file access %sallowed with mode %s%s" % (not_str, access_str(mode), msg))
 
     def access_test(self):
@@ -320,16 +321,34 @@ class PosixTest(TestUtil):
 
         try:
             self.create_file()
+
+            isroot = False
+            if os.getuid() == 0:
+                fstat = os.stat(self.absfile)
+                if fstat.st_uid == 0:
+                    isroot = True
+
             self.access(self.absfile, posix.F_OK, True)
             self.access(self.absfile+'bogus', posix.F_OK, False, " for a non-existent file")
             for perm in perms:
                 msg = " for file with permissions %s" % oct(perm)
                 os.chmod(self.absfile, perm)
-                self.access(self.absfile, posix.R_OK, (perm&4)!=0, msg)
-                self.access(self.absfile, posix.W_OK, (perm&2)!=0, msg)
+                # When running as root and the file is created as root,
+                # access is granted for either R or W even when the file
+                # does not have R or W permission.
+                self.access(self.absfile, posix.R_OK, isroot or (perm&4)!=0, msg)
+                self.access(self.absfile, posix.W_OK, isroot or (perm&2)!=0, msg)
                 self.access(self.absfile, posix.X_OK, (perm&1)!=0, msg)
                 for mode in cperms:
-                    self.access(self.absfile, mode, mode&perm == mode, msg)
+                    if isroot:
+                        # Asking for multiple access bits when running as root
+                        # and the file is created as root, expect access unless
+                        # asking for X and file does not have X permissions.
+                        expr = (not mode&posix.X_OK or perm&posix.X_OK)
+                    else:
+                        # Running as a regular user
+                        expr = (mode&perm == mode)
+                    self.access(self.absfile, mode, expr, msg)
         except Exception:
             self.test(False, traceback.format_exc())
 
