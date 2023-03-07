@@ -248,7 +248,7 @@ class DERunpack(Unpack):
 
            Where the optional fff is accurate to three decimal places
         """
-        data = re.search(r"(\d+)(.(\d+))?(Z?)(([\+\-])(\d\d)(\d\d))?", self.read(size)).groups()
+        data = re.search(r"(\d+)(.(\d+))?(Z?)(([\+\-])(\d\d)(\d\d))?", self.read(size).decode()).groups()
         datestr = data[0]
         if len(datestr) == 14:
             fmt = "%Y%m%d%H%M%S"
