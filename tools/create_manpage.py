@@ -338,7 +338,7 @@ def create_manpage(src, dst):
                     continue
                 testname = re.search(r'\s*(\w+)\s+-', line)
             else:
-                testname = re.search(r'\s*(.*):$', line)
+                testname = re.search(r'^\s*(\w+):$', line)
             if testname:
                 if test:
                     tests.append(test)
