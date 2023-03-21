@@ -277,6 +277,10 @@ class LockTest(TestUtil):
         TestUtil.__init__(self, **kwargs)
         self.opts.version = "%prog " + __version__
 
+        # Set default script options
+        # Display all test messages
+        self.opts.set_defaults(tverbose='2')
+
         # Options specific for this test script
         hmsg = "Remote NFS client and options used for conflicting lock tests. " \
                "Clients are separated by a ',' and each client definition is " \
