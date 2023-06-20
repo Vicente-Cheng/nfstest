@@ -38,7 +38,7 @@ if sys.version_info[0] != 3:
 
 # Module variables
 _dindent = ""
-_sindent = "    "
+_sindent = "\t"
 _dlevel = 0
 _rlevel = 1
 _dcount = 0
