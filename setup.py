@@ -26,8 +26,8 @@
 import os
 import nfstest_config as c
 from tools import create_manpage
-from distutils.core import setup
-from distutils.command.build import build
+from setuptools import setup
+from setuptools.command.build import build
 
 class Build(build):
     def run(self):
