@@ -795,7 +795,7 @@ class XATTRTest(TestUtil):
                     self.verify_xattr_call(pkt_call, opcode, opstr, fh, ename, stype, cookie)
 
                     estat = estatus
-                    if rmtdeleg and opcode in (OP_SETXATTR, OP_REMOVEXATTR) and (cbcall or estatus == NFS4_OK):
+                    if rmtdeleg and opcode in (OP_SETXATTR, OP_REMOVEXATTR) and cbcall:
                         if cbcall.record.index > pkt.record.index or (cbreply and \
                            cbreply.record.index > pkt.record.index):
                             estat = NFS4ERR_DELAY
