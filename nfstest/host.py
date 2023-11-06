@@ -228,11 +228,12 @@ class Host(BaseObj):
         self.need_network_reset = False
         self.fqdn = socket.getfqdn(self.host)
         ipv6 = self.proto[-1] == '6'
-        self.ipaddr = self.get_ip_address(host=self.host, ipv6=ipv6)
 
         if self.host in (None, "", "127.0.0.1", "localhost", "::1"):
+            self.ipaddr = "127.0.0.1"
             self._localhost = True
         else:
+            self.ipaddr = self.get_ip_address(host=self.host, ipv6=ipv6)
             self._localhost = False
 
         if len(self.datadir):
